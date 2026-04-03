@@ -1,6 +1,6 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import {
-  View, Text, FlatList, StyleSheet, Pressable, Image, ActivityIndicator,
+  View, Text, FlatList, StyleSheet, Pressable, Image, ActivityIndicator, ScrollView,
 } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -22,23 +22,40 @@ import { resolveEffectiveAgentPlan } from '../../utils/planResolver';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { shouldLoadMockData } from '../../utils/dataUtils';
 
-const BG = '#111';
-const CARD_BG = '#1a1a1a';
-const ACCENT = '#ff6b5b';
-const GREEN = '#2ecc71';
-const YELLOW = '#f39c12';
+const BG = '#0d0d0d';
+const CARD_BG = '#151515';
+const SURFACE = '#1a1a1a';
+const ACCENT = '#f59e0b';
+const GREEN = '#22c55e';
 const BLUE = '#3b82f6';
-const RED = '#e74c3c';
+const RED = '#ef4444';
+const PURPLE = '#a855f7';
 
 type StatusFilter = 'all' | 'assembling' | 'invited' | 'active' | 'placed' | 'dissolved';
 
-const STATUS_CONFIG: Record<string, { color: string; label: string; icon: string }> = {
-  assembling: { color: BLUE, label: 'Assembling', icon: 'edit-3' },
-  invited: { color: YELLOW, label: 'Invited', icon: 'send' },
-  active: { color: GREEN, label: 'Active', icon: 'check-circle' },
-  placed: { color: ACCENT, label: 'Placed', icon: 'award' },
-  dissolved: { color: '#666', label: 'Dissolved', icon: 'x-circle' },
-};
+const STATUS_PIPELINE: { key: StatusFilter; label: string; color: string; icon: string; description: string }[] = [
+  { key: 'all', label: 'All', color: ACCENT, icon: '', description: '' },
+  { key: 'assembling', label: 'Assembling', color: ACCENT, icon: 'tool', description: 'Building the group \u2014 add more renters' },
+  { key: 'invited', label: 'Invited', color: BLUE, icon: 'send', description: 'Invites sent \u2014 waiting for responses' },
+  { key: 'active', label: 'Active', color: GREEN, icon: 'check-circle', description: 'All accepted \u2014 ready to match with listing' },
+  { key: 'placed', label: 'Placed', color: PURPLE, icon: 'award', description: 'Matched with apartment \u2014 placement fee earned' },
+  { key: 'dissolved', label: 'Dissolved', color: '#666', icon: 'x-circle', description: 'Group disbanded' },
+];
+
+function statusColor(status: string): string {
+  return STATUS_PIPELINE.find(s => s.key === status)?.color ?? '#666';
+}
+
+function statusIcon(status: string): string {
+  return STATUS_PIPELINE.find(s => s.key === status)?.icon ?? 'help-circle';
+}
+
+function scoreColor(s: number): string {
+  if (s >= 80) return GREEN;
+  if (s >= 65) return ACCENT;
+  if (s >= 50) return '#f97316';
+  return RED;
+}
 
 export const AgentGroupsScreen = () => {
   const navigation = useNavigation<any>();
@@ -51,6 +68,8 @@ export const AgentGroupsScreen = () => {
   const [loadError, setLoadError] = useState(false);
   const [isStale, setIsStale] = useState(false);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
+  const [actionStates, setActionStates] = useState<Record<string, string>>({});
 
   const agentPlan = resolveEffectiveAgentPlan(user) as AgentPlan;
   const planLimits = getAgentPlanLimits(agentPlan);
@@ -91,45 +110,31 @@ export const AgentGroupsScreen = () => {
 
   const handleMarkPlaced = async (group: AgentGroup) => {
     if (!user) return;
-
     const monthlyCount = await getMonthlyPlacementCount(user.id);
     if (!canAgentPlace(agentPlan, monthlyCount)) {
       showAlert({ title: 'Limit Reached', message: 'Monthly placement limit reached. Upgrade to place more groups.' });
       return;
     }
-
     const feeDisplay = `$${(planLimits.placementFeeCents / 100).toFixed(2)}`;
-
     const confirmed = await confirm({
       title: 'Confirm Placement',
       message: `A placement fee of ${feeDisplay} will be charged to your payment method on file.`,
     });
     if (confirmed) {
       try {
-        const placement = await recordPlacement(
-          user.id,
-          group.id,
-          group.targetListingId ?? '',
-          planLimits.placementFeeCents
-        );
-
-        const chargeResult = await chargeAgentPlacementFee(
-          user.id,
-          placement.id,
-          group.id,
-          group.targetListingId ?? ''
-        );
-
+        const placement = await recordPlacement(user.id, group.id, group.targetListingId ?? '', planLimits.placementFeeCents);
+        const chargeResult = await chargeAgentPlacementFee(user.id, placement.id, group.id, group.targetListingId ?? '');
         if (chargeResult.success) {
           await updateAgentGroupStatus(group.id, 'placed');
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          setActionStates(prev => ({ ...prev, [group.id]: 'placed' }));
         } else {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-          showAlert({ title: 'Payment Issue', message: chargeResult.error ?? 'Placement fee could not be charged. Please check your payment method.' });
+          showAlert({ title: 'Payment Issue', message: chargeResult.error ?? 'Placement fee could not be charged.' });
         }
       } catch (e: any) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        showAlert({ title: 'Error', message: e?.message || 'Failed to record placement. Please try again.' });
+        showAlert({ title: 'Error', message: e?.message || 'Failed to record placement.' });
       }
       loadGroups();
     }
@@ -147,182 +152,485 @@ export const AgentGroupsScreen = () => {
     }
   };
 
-  const filteredGroups = statusFilter === 'all'
-    ? groups
-    : groups.filter(g => g.groupStatus === statusFilter);
+  const handleSendInvites = async (group: AgentGroup) => {
+    setActionStates(prev => ({ ...prev, [group.id]: 'invited' }));
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    navigation.navigate('AgentGroupBuilder', {
+      preselectedIds: group.memberIds,
+      listingId: group.targetListingId,
+    });
+  };
 
-  const renderGroupCard = ({ item }: { item: AgentGroup }) => {
-    const config = STATUS_CONFIG[item.groupStatus] ?? STATUS_CONFIG.assembling;
+  const filteredGroups = useMemo(() => {
+    if (statusFilter === 'all') return groups;
+    return groups.filter(g => g.groupStatus === statusFilter);
+  }, [groups, statusFilter]);
+
+  const tabCounts = useMemo(() => {
+    const counts: Record<string, number> = { all: groups.length };
+    for (const s of STATUS_PIPELINE) {
+      if (s.key !== 'all') counts[s.key] = groups.filter(g => g.groupStatus === s.key).length;
+    }
+    return counts;
+  }, [groups]);
+
+  const getInviteStats = (group: AgentGroup) => {
+    const invites = group.invites || [];
+    const accepted = invites.filter(i => i.status === 'accepted').length;
+    const declined = invites.filter(i => i.status === 'declined').length;
+    const pending = invites.filter(i => i.status === 'pending').length;
+    const total = group.members?.length || invites.length;
+    return { accepted, declined, pending, total };
+  };
+
+  const renderPipelineBar = () => {
+    const activeStatuses = STATUS_PIPELINE.filter(s => s.key !== 'all' && s.key !== 'dissolved');
+    const activeCounts = activeStatuses.map(s => tabCounts[s.key] || 0);
+    const totalActive = activeCounts.reduce((a, b) => a + b, 0);
+    if (totalActive === 0) return null;
 
     return (
-      <Pressable style={styles.card} onPress={() => navigation.navigate('AgentGroupDetail', { groupId: item.id, group: item })}>
-        <View style={styles.cardHeader}>
-          <View style={[styles.statusBadge, { backgroundColor: config.color + '20' }]}>
-            <Feather name={config.icon as any} size={12} color={config.color} />
-            <Text style={[styles.statusText, { color: config.color }]}>{config.label}</Text>
-          </View>
-          {item.avgCompatibility > 0 ? (
-            <View style={styles.compatBadge}>
-              <Text style={styles.compatText}>{item.avgCompatibility}%</Text>
-            </View>
-          ) : null}
+      <View style={{ paddingHorizontal: 20, marginTop: 16 }}>
+        <View style={{ flexDirection: 'row', gap: 4, height: 4, borderRadius: 2, overflow: 'hidden' }}>
+          {activeStatuses.map((s, i) => {
+            if (activeCounts[i] === 0) return null;
+            return <View key={s.key} style={{ flex: activeCounts[i], backgroundColor: s.color, borderRadius: 2 }} />;
+          })}
         </View>
-
-        <Text style={styles.groupName}>{item.name}</Text>
-
-        {item.targetListing ? (
-          <Text style={styles.listingInfo}>
-            {item.targetListing.title} - ${item.targetListing.price.toLocaleString()}/mo
-          </Text>
-        ) : null}
-
-        <View style={styles.membersRow}>
-          {item.members.slice(0, 4).map((m, i) => (
-            <View key={m.id} style={styles.memberChip}>
-              {m.photos?.[0] ? (
-                <Image source={{ uri: m.photos[0] }} style={styles.memberAvatar} />
-              ) : (
-                <View style={[styles.memberAvatar, styles.avatarPlaceholder]}>
-                  <Feather name="user" size={12} color="#666" />
-                </View>
-              )}
-              <Text style={styles.memberName} numberOfLines={1}>{m.name.split(' ')[0]}</Text>
+        <View style={{ flexDirection: 'row', gap: 12, justifyContent: 'center', marginTop: 6 }}>
+          {activeStatuses.map(s => (
+            <View key={s.key} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: s.color }} />
+              <Text style={{ fontSize: 10, color: '#888' }}>{tabCounts[s.key] || 0} {s.label}</Text>
             </View>
           ))}
         </View>
+      </View>
+    );
+  };
 
-        <View style={styles.budgetRow}>
-          <Text style={styles.budgetLabel}>Budget:</Text>
-          <Text style={styles.budgetValue}>
-            ${item.combinedBudgetMin.toLocaleString()}-${item.combinedBudgetMax.toLocaleString()}/mo
-          </Text>
-          {item.targetListing ? (
-            <Text style={[styles.coversRent, { color: item.coversRent ? GREEN : RED }]}>
-              {item.coversRent ? 'Covers rent' : 'Short'}
+  const renderGroupCard = ({ item }: { item: AgentGroup }) => {
+    const color = statusColor(item.groupStatus);
+    const icon = statusIcon(item.groupStatus);
+    const isExpanded = expandedGroup === item.id;
+    const actionState = actionStates[item.id];
+    const inviteStats = getInviteStats(item);
+
+    return (
+      <View style={[st.card, { borderLeftWidth: 3, borderLeftColor: color }]}>
+        <Pressable
+          onPress={() => setExpandedGroup(isExpanded ? null : item.id)}
+          style={{ padding: 16, paddingBottom: 0 }}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Feather name={icon as any} size={13} color={color} />
+              <Text style={{ fontSize: 12, fontWeight: '700', color, textTransform: 'capitalize' }}>{item.groupStatus}</Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              {item.avgCompatibility > 0 ? (
+                <Text style={{ fontSize: 13, fontWeight: '700', color: scoreColor(item.avgCompatibility) }}>{item.avgCompatibility}%</Text>
+              ) : null}
+              <Feather name={isExpanded ? 'chevron-up' : 'chevron-down'} size={16} color="#666" />
+            </View>
+          </View>
+
+          <Text style={{ fontSize: 18, fontWeight: '700', color: '#fff', marginBottom: 10 }}>{item.name}</Text>
+
+          <View style={{ flexDirection: 'row', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
+            {item.members.slice(0, 5).map(m => {
+              const invite = item.invites?.find(inv => inv.renterId === m.id);
+              const accepted = invite?.status === 'accepted';
+              const declined = invite?.status === 'declined';
+              return (
+                <View key={m.id} style={st.memberPill}>
+                  <View style={{ position: 'relative' }}>
+                    {m.photos?.[0] ? (
+                      <Image source={{ uri: m.photos[0] }} style={st.memberAvatar} />
+                    ) : (
+                      <View style={[st.memberAvatar, { backgroundColor: '#2a2a2a', alignItems: 'center', justifyContent: 'center' }]}>
+                        <Feather name="user" size={11} color="#666" />
+                      </View>
+                    )}
+                    {item.groupStatus === 'invited' && invite ? (
+                      <View style={{ position: 'absolute', bottom: -2, right: -2, width: 12, height: 12, borderRadius: 6, backgroundColor: BG, alignItems: 'center', justifyContent: 'center' }}>
+                        <Feather
+                          name={accepted ? 'check-circle' : declined ? 'x-circle' : 'clock'}
+                          size={9}
+                          color={accepted ? GREEN : declined ? RED : ACCENT}
+                        />
+                      </View>
+                    ) : null}
+                  </View>
+                  <Text style={{ fontSize: 12, color: '#ccc' }}>{m.name.split(' ')[0]}</Text>
+                </View>
+              );
+            })}
+            {item.groupStatus === 'assembling' ? (
+              <Pressable
+                style={st.addMemberBtn}
+                onPress={() => navigation.navigate('BrowseRenters', { groupId: item.id })}
+              >
+                <Feather name="user-plus" size={12} color="#888" />
+                <Text style={{ fontSize: 12, color: '#888' }}>Add</Text>
+              </Pressable>
+            ) : null}
+          </View>
+
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 }}>
+            <Text style={{ fontSize: 13, color: '#888' }}>Budget:</Text>
+            <Text style={{ fontSize: 14, fontWeight: '700', color: GREEN }}>
+              ${item.combinedBudgetMin.toLocaleString()}-${item.combinedBudgetMax.toLocaleString()}/mo
             </Text>
-          ) : null}
-        </View>
+          </View>
 
-        <View style={styles.actionRow}>
+          {item.targetListing ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 14, marginTop: -6 }}>
+              <Feather name="home" size={13} color="#888" />
+              <Text style={{ fontSize: 12, color: '#aaa' }}>{item.targetListing.title}</Text>
+              <Text style={{ fontSize: 12, color: '#666' }}>${item.targetListing.price?.toLocaleString()}/mo</Text>
+            </View>
+          ) : null}
+        </Pressable>
+
+        {item.groupStatus === 'placed' && planLimits.placementFeeCents > 0 ? (
+          <View style={st.placementBanner}>
+            <Feather name="award" size={14} color={PURPLE} />
+            <Text style={{ fontSize: 12, fontWeight: '600', color: PURPLE }}>
+              Placement fee: ${(planLimits.placementFeeCents / 100).toFixed(2)}
+            </Text>
+          </View>
+        ) : null}
+
+        {item.groupStatus === 'dissolved' && (item as any).dissolvedReason ? (
+          <View style={st.dissolvedBanner}>
+            <Feather name="x-circle" size={14} color={RED} />
+            <Text style={{ fontSize: 12, color: RED }}>{(item as any).dissolvedReason}</Text>
+          </View>
+        ) : null}
+
+        {item.groupStatus === 'invited' ? (
+          <View style={st.inviteStatusBanner}>
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <Text style={{ fontSize: 12, color: BLUE }}>{inviteStats.accepted}/{inviteStats.total} accepted</Text>
+              {inviteStats.pending > 0 ? <Text style={{ fontSize: 12, color: ACCENT }}>{inviteStats.pending} pending</Text> : null}
+              {inviteStats.declined > 0 ? <Text style={{ fontSize: 12, color: RED }}>{inviteStats.declined} declined</Text> : null}
+            </View>
+          </View>
+        ) : null}
+
+        <View style={st.actionRow}>
           {item.groupStatus === 'assembling' ? (
-            <Pressable style={styles.actionBtn} onPress={() => navigation.navigate('AgentGroupBuilder', {
-              preselectedIds: item.memberIds,
-              listingId: item.targetListingId,
-            })}>
-              <Feather name="send" size={14} color="#fff" />
-              <Text style={styles.actionText}>Send Invites</Text>
-            </Pressable>
+            <>
+              <Pressable
+                style={[st.primaryBtn, actionState === 'invited' ? { backgroundColor: '#1a3a1a' } : { backgroundColor: ACCENT }]}
+                onPress={() => handleSendInvites(item)}
+                disabled={actionState === 'invited'}
+              >
+                <Feather name={actionState === 'invited' ? 'check-circle' : 'send'} size={15} color={actionState === 'invited' ? GREEN : '#000'} />
+                <Text style={[st.primaryBtnText, actionState === 'invited' ? { color: GREEN } : { color: '#000' }]}>
+                  {actionState === 'invited' ? 'Invites Sent' : 'Send Invites'}
+                </Text>
+              </Pressable>
+              <Pressable
+                style={st.secondaryBtn}
+                onPress={() => navigation.navigate('RenterCompatibility', {
+                  renters: item.members,
+                  listingId: item.targetListingId,
+                  listing: item.targetListing,
+                })}
+              >
+                <Feather name="grid" size={14} color="#aaa" />
+                <Text style={st.secondaryBtnText}>Matrix</Text>
+              </Pressable>
+              <Pressable style={st.iconBtn} onPress={() => navigation.navigate('AgentGroupDetail', { groupId: item.id, group: item })}>
+                <Feather name="more-horizontal" size={16} color="#666" />
+              </Pressable>
+            </>
+          ) : null}
+
+          {item.groupStatus === 'invited' ? (
+            <>
+              <Pressable
+                style={[st.primaryBtn, { backgroundColor: BLUE }]}
+                onPress={() => navigation.navigate('Messages', { highlightGroupId: item.id })}
+              >
+                <Feather name="message-circle" size={15} color="#fff" />
+                <Text style={[st.primaryBtnText, { color: '#fff' }]}>Message All</Text>
+              </Pressable>
+              <Pressable style={st.secondaryBtn} onPress={() => handleSendInvites(item)}>
+                <Feather name="send" size={14} color="#aaa" />
+                <Text style={st.secondaryBtnText}>Resend</Text>
+              </Pressable>
+              <Pressable style={st.iconBtn} onPress={() => navigation.navigate('AgentGroupDetail', { groupId: item.id, group: item })}>
+                <Feather name="more-horizontal" size={16} color="#666" />
+              </Pressable>
+            </>
           ) : null}
 
           {item.groupStatus === 'active' ? (
             <>
               <Pressable
-                style={[styles.actionBtn, { backgroundColor: GREEN }]}
+                style={[st.primaryBtn, actionState === 'placed' ? { backgroundColor: 'rgba(168,85,247,0.15)' } : { backgroundColor: GREEN }]}
                 onPress={() => handleMarkPlaced(item)}
+                disabled={actionState === 'placed'}
               >
-                <Feather name="check" size={14} color="#fff" />
-                <Text style={styles.actionText}>Mark as Placed</Text>
+                <Feather name={actionState === 'placed' ? 'award' : 'check-circle'} size={15} color={actionState === 'placed' ? PURPLE : '#000'} />
+                <Text style={[st.primaryBtnText, actionState === 'placed' ? { color: PURPLE } : { color: '#000' }]}>
+                  {actionState === 'placed' ? 'Placed!' : 'Mark as Placed'}
+                </Text>
               </Pressable>
               <Pressable
-                style={[styles.actionBtn, { backgroundColor: BLUE }]}
+                style={st.secondaryBtn}
                 onPress={() => navigation.navigate('Messages', { highlightGroupId: item.id })}
               >
-                <Feather name="message-circle" size={14} color="#fff" />
-                <Text style={styles.actionText}>Message</Text>
+                <Feather name="message-circle" size={14} color="#aaa" />
+                <Text style={st.secondaryBtnText}>Message</Text>
+              </Pressable>
+              <Pressable style={st.iconBtn} onPress={() => navigation.navigate('AgentGroupDetail', { groupId: item.id, group: item })}>
+                <Feather name="more-horizontal" size={16} color="#666" />
               </Pressable>
             </>
           ) : null}
 
           {item.groupStatus === 'placed' ? (
-            <View style={styles.placedInfo}>
-              <Feather name="award" size={16} color={ACCENT} />
-              <Text style={styles.placedText}>
-                Placement fee: ${(planLimits.placementFeeCents / 100).toFixed(2)}
-              </Text>
-            </View>
+            <>
+              <Pressable
+                style={[st.secondaryBtn, { flex: 1 }]}
+                onPress={() => navigation.navigate('Messages', { highlightGroupId: item.id })}
+              >
+                <Feather name="message-circle" size={15} color="#ccc" />
+                <Text style={[st.secondaryBtnText, { color: '#ccc', fontWeight: '600' }]}>Message Group</Text>
+              </Pressable>
+              <Pressable style={st.secondaryBtn} onPress={() => navigation.navigate('AgentGroupDetail', { groupId: item.id, group: item })}>
+                <Feather name="copy" size={14} color="#aaa" />
+                <Text style={st.secondaryBtnText}>Duplicate</Text>
+              </Pressable>
+            </>
           ) : null}
 
-          {item.groupStatus !== 'placed' && item.groupStatus !== 'dissolved' ? (
-            <Pressable
-              style={styles.dissolveBtn}
-              onPress={() => handleDissolve(item)}
-            >
-              <Feather name="x" size={14} color="#888" />
-            </Pressable>
+          {item.groupStatus === 'dissolved' ? (
+            <>
+              <Pressable
+                style={[st.primaryBtn, { flex: 1, backgroundColor: 'rgba(245,158,11,0.12)', borderWidth: 1, borderColor: ACCENT + '40' }]}
+                onPress={() => navigation.navigate('AgentGroupBuilder', {
+                  preselectedIds: item.memberIds,
+                  listingId: item.targetListingId,
+                })}
+              >
+                <Feather name="copy" size={15} color={ACCENT} />
+                <Text style={[st.primaryBtnText, { color: ACCENT }]}>Recreate Group</Text>
+              </Pressable>
+              <Pressable
+                style={{ paddingHorizontal: 14, paddingVertical: 11, borderRadius: 10, backgroundColor: 'rgba(239,68,68,0.08)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.2)', flexDirection: 'row', alignItems: 'center', gap: 6 }}
+                onPress={() => showAlert({ title: 'Deleted', message: 'Group record removed.' })}
+              >
+                <Feather name="trash-2" size={14} color={RED} />
+                <Text style={{ fontSize: 12, fontWeight: '600', color: RED }}>Delete</Text>
+              </Pressable>
+            </>
           ) : null}
         </View>
-      </Pressable>
+
+        {isExpanded ? (
+          <View style={st.expandedPanel}>
+            <Text style={st.sectionLabel}>MEMBERS</Text>
+            {item.members.map(m => {
+              const invite = item.invites?.find(inv => inv.renterId === m.id);
+              return (
+                <View key={m.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                  {m.photos?.[0] ? (
+                    <Image source={{ uri: m.photos[0] }} style={{ width: 32, height: 32, borderRadius: 16 }} />
+                  ) : (
+                    <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#2a2a2a', alignItems: 'center', justifyContent: 'center' }}>
+                      <Feather name="user" size={14} color="#666" />
+                    </View>
+                  )}
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: '#fff' }}>{m.name}</Text>
+                    <Text style={{ fontSize: 11, color: GREEN }}>
+                      ${(m.budgetMin ?? 0).toLocaleString()} - ${(m.budgetMax ?? 0).toLocaleString()}/mo
+                    </Text>
+                  </View>
+                  {item.groupStatus === 'invited' && invite ? (
+                    <View style={{
+                      paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6,
+                      backgroundColor: invite.status === 'accepted' ? 'rgba(34,197,94,0.1)' : invite.status === 'declined' ? 'rgba(239,68,68,0.1)' : 'rgba(245,158,11,0.1)',
+                    }}>
+                      <Text style={{
+                        fontSize: 10, fontWeight: '600',
+                        color: invite.status === 'accepted' ? GREEN : invite.status === 'declined' ? RED : ACCENT,
+                      }}>
+                        {invite.status === 'accepted' ? 'Accepted' : invite.status === 'declined' ? 'Declined' : 'Pending'}
+                      </Text>
+                    </View>
+                  ) : null}
+                  <Pressable
+                    style={{ padding: 4 }}
+                    onPress={() => navigation.navigate('Chat', {
+                      conversationId: `agent-${user?.id}-${m.id}`,
+                      otherUser: { id: m.id, name: m.name, photos: m.photos },
+                    })}
+                  >
+                    <Feather name="message-circle" size={14} color="#666" />
+                  </Pressable>
+                </View>
+              );
+            })}
+
+            <Text style={[st.sectionLabel, { marginTop: 14 }]}>TIMELINE</Text>
+            <View style={{ gap: 6 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: ACCENT }} />
+                <Text style={{ fontSize: 12, color: '#aaa' }}>Created {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : 'recently'}</Text>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: color }} />
+                <Text style={{ fontSize: 12, color: '#aaa' }}>Status: {item.groupStatus}</Text>
+              </View>
+            </View>
+
+            <View style={{ marginTop: 14, flexDirection: 'row', gap: 8 }}>
+              <Pressable
+                style={st.expandedAction}
+                onPress={() => navigation.navigate('AgentGroupDetail', { groupId: item.id, group: item })}
+              >
+                <Feather name="edit-3" size={13} color="#aaa" />
+                <Text style={st.expandedActionText}>Edit Name</Text>
+              </Pressable>
+              <Pressable
+                style={st.expandedAction}
+                onPress={() => navigation.navigate('RenterCompatibility', {
+                  renters: item.members,
+                  listingId: item.targetListingId,
+                  listing: item.targetListing,
+                })}
+              >
+                <Feather name="grid" size={13} color="#aaa" />
+                <Text style={st.expandedActionText}>View Matrix</Text>
+              </Pressable>
+              {item.groupStatus !== 'placed' && item.groupStatus !== 'dissolved' ? (
+                <Pressable
+                  style={[st.expandedAction, { backgroundColor: 'rgba(239,68,68,0.06)', borderColor: 'rgba(239,68,68,0.15)' }]}
+                  onPress={() => handleDissolve(item)}
+                >
+                  <Feather name="x-circle" size={13} color={RED} />
+                  <Text style={[st.expandedActionText, { color: RED }]}>Dissolve</Text>
+                </Pressable>
+              ) : null}
+            </View>
+          </View>
+        ) : null}
+      </View>
+    );
+  };
+
+  const renderEmptyForStatus = () => {
+    const messages: Record<string, string> = {
+      assembling: "Start building a group from the Renters tab \u2014 tap 'Add to Group' on renter cards.",
+      invited: 'Send invites to an assembling group to move them here.',
+      active: 'Groups move here when all invited renters accept.',
+      placed: 'Mark an active group as placed once they\'ve signed a lease.',
+      dissolved: 'Dissolved groups appear here for your records.',
+    };
+    return (
+      <View style={st.emptyState}>
+        <Feather name="users" size={48} color="#333" />
+        <Text style={st.emptyTitle}>No {statusFilter} groups</Text>
+        <Text style={st.emptyDesc}>{messages[statusFilter] || 'No groups match this filter.'}</Text>
+      </View>
     );
   };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <View style={styles.header}>
-        <Text style={styles.title}>My Groups</Text>
+    <View style={[st.container, { paddingTop: insets.top }]}>
+      <View style={st.header}>
+        <Text style={st.title}>My Groups</Text>
         <Pressable
-          style={styles.newGroupBtn}
+          style={st.newGroupBtn}
           onPress={() => navigation.navigate('AgentGroupBuilder')}
         >
-          <Feather name="plus" size={16} color="#fff" />
-          <Text style={styles.newGroupText}>New</Text>
+          <Feather name="plus" size={16} color="#000" />
+          <Text style={{ color: '#000', fontWeight: '700', fontSize: 14 }}>New</Text>
         </Pressable>
       </View>
 
-      <View style={styles.filterRow}>
-        {(['all', 'assembling', 'invited', 'active', 'placed', 'dissolved'] as StatusFilter[]).map(f => (
-          <Pressable
-            key={f}
-            style={[styles.filterChip, statusFilter === f ? styles.filterChipActive : null]}
-            onPress={() => setStatusFilter(f)}
-          >
-            <Text style={[styles.filterText, statusFilter === f ? styles.filterTextActive : null]}>
-              {f === 'all' ? 'All' : (STATUS_CONFIG[f]?.label ?? f)}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
+      {renderPipelineBar()}
+
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 14, paddingLeft: 20 }} contentContainerStyle={{ paddingRight: 20, gap: 6 }}>
+        {STATUS_PIPELINE.map(s => {
+          const isActive = statusFilter === s.key;
+          const count = tabCounts[s.key] || 0;
+          return (
+            <Pressable
+              key={s.key}
+              onPress={() => setStatusFilter(s.key)}
+              style={[
+                st.filterChip,
+                isActive ? { backgroundColor: s.color + '20', borderColor: s.color + '40' } : null,
+              ]}
+            >
+              <Text style={[st.filterText, isActive ? { color: s.color } : null]}>{s.label}</Text>
+              {count > 0 ? (
+                <View style={[st.filterBadge, isActive ? { backgroundColor: s.color + '30' } : null]}>
+                  <Text style={[st.filterBadgeText, isActive ? { color: s.color } : null]}>{count}</Text>
+                </View>
+              ) : null}
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+
+      {statusFilter !== 'all' ? (
+        <View style={st.statusHint}>
+          <Feather name={statusIcon(statusFilter) as any} size={14} color={statusColor(statusFilter)} />
+          <Text style={{ fontSize: 12, color: '#888' }}>
+            {STATUS_PIPELINE.find(s => s.key === statusFilter)?.description}
+          </Text>
+        </View>
+      ) : null}
 
       {isStale ? (
-        <View style={{ backgroundColor: '#2a2200', padding: 8, marginHorizontal: 16, borderRadius: 8, marginBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <Feather name="clock" size={14} color={YELLOW} />
-          <Text style={{ color: YELLOW, fontSize: 12 }}>Using cached data</Text>
+        <View style={{ backgroundColor: '#2a2200', padding: 8, marginHorizontal: 20, borderRadius: 8, marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Feather name="clock" size={14} color={ACCENT} />
+          <Text style={{ color: ACCENT, fontSize: 12 }}>Using cached data</Text>
         </View>
       ) : null}
 
       {loading ? (
         <ActivityIndicator size="large" color={ACCENT} style={{ marginTop: 40 }} />
       ) : loadError && groups.length === 0 ? (
-        <View style={styles.emptyState}>
+        <View style={st.emptyState}>
           <Feather name="alert-circle" size={48} color="#999" />
-          <Text style={styles.emptyTitle}>Failed to load groups</Text>
+          <Text style={st.emptyTitle}>Failed to load groups</Text>
           <Pressable onPress={() => loadGroups()}>
             <Text style={{ color: ACCENT, marginTop: 12, fontWeight: '600' }}>Tap to retry</Text>
           </Pressable>
         </View>
       ) : filteredGroups.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Feather name="users" size={48} color="#444" />
-          <Text style={styles.emptyTitle}>No Groups Yet</Text>
-          <Text style={styles.emptyDesc}>
-            Browse renters, shortlist your top picks, and build your first group.
-          </Text>
-          <Pressable
-            style={styles.startBtn}
-            onPress={() => {
-              const parent = navigation.getParent();
-              if (parent) parent.navigate('BrowseRenters');
-              else navigation.navigate('BrowseRenters' as never);
-            }}
-          >
-            <Text style={styles.startBtnText}>Browse Renters</Text>
-          </Pressable>
-        </View>
+        statusFilter !== 'all' ? renderEmptyForStatus() : (
+          <View style={st.emptyState}>
+            <Feather name="users" size={48} color="#444" />
+            <Text style={st.emptyTitle}>No Groups Yet</Text>
+            <Text style={st.emptyDesc}>Browse renters, shortlist your top picks, and build your first group.</Text>
+            <Pressable
+              style={st.startBtn}
+              onPress={() => {
+                const parent = navigation.getParent();
+                if (parent) parent.navigate('BrowseRenters');
+                else navigation.navigate('BrowseRenters' as never);
+              }}
+            >
+              <Text style={{ color: '#000', fontSize: 15, fontWeight: '700' }}>Browse Renters</Text>
+            </Pressable>
+          </View>
+        )
       ) : (
         <FlatList
           data={filteredGroups}
           keyExtractor={item => item.id}
           renderItem={renderGroupCard}
-          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100 }}
+          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 100, paddingTop: 10 }}
           showsVerticalScrollIndicator={false}
         />
       )}
@@ -330,43 +638,43 @@ export const AgentGroupsScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const st = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12 },
-  title: { fontSize: 24, fontWeight: '700', color: '#fff' },
-  newGroupBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: ACCENT, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20 },
-  newGroupText: { color: '#fff', fontWeight: '600', fontSize: 13 },
-  filterRow: { flexDirection: 'row', paddingHorizontal: 16, marginBottom: 12, flexWrap: 'wrap', gap: 6 },
-  filterChip: { backgroundColor: CARD_BG, borderRadius: 16, paddingHorizontal: 12, paddingVertical: 6 },
-  filterChipActive: { backgroundColor: ACCENT },
-  filterText: { color: '#888', fontSize: 12, fontWeight: '600' },
-  filterTextActive: { color: '#fff' },
-  card: { backgroundColor: CARD_BG, borderRadius: 16, padding: 16, marginBottom: 12 },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  statusBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 4 },
-  statusText: { fontSize: 12, fontWeight: '700' },
-  compatBadge: { backgroundColor: 'rgba(46,204,113,0.15)', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 3 },
-  compatText: { color: GREEN, fontSize: 13, fontWeight: '700' },
-  groupName: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  listingInfo: { color: '#888', fontSize: 13, marginTop: 4 },
-  membersRow: { flexDirection: 'row', gap: 8, marginTop: 12, flexWrap: 'wrap' },
-  memberChip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#222', borderRadius: 20, paddingRight: 10, paddingLeft: 2, paddingVertical: 2 },
-  memberAvatar: { width: 28, height: 28, borderRadius: 14 },
-  avatarPlaceholder: { backgroundColor: '#333', alignItems: 'center', justifyContent: 'center' },
-  memberName: { color: '#ccc', fontSize: 12, maxWidth: 80 },
-  budgetRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12 },
-  budgetLabel: { color: '#888', fontSize: 13 },
-  budgetValue: { color: '#ccc', fontSize: 13, fontWeight: '600' },
-  coversRent: { fontSize: 12, fontWeight: '700' },
-  actionRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 14 },
-  actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: ACCENT, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8, flex: 1, justifyContent: 'center' },
-  actionText: { color: '#fff', fontSize: 13, fontWeight: '600' },
-  dissolveBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#222', alignItems: 'center', justifyContent: 'center' },
-  placedInfo: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  placedText: { color: '#aaa', fontSize: 13 },
-  emptyState: { alignItems: 'center', paddingTop: 60 },
-  emptyTitle: { color: '#fff', fontSize: 20, fontWeight: '700', marginTop: 16 },
-  emptyDesc: { color: '#888', fontSize: 14, textAlign: 'center', marginTop: 8, paddingHorizontal: 40, lineHeight: 22 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 12 },
+  title: { fontSize: 28, fontWeight: '800', color: '#fff' },
+  newGroupBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: ACCENT, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 12 },
+
+  filterChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: SURFACE, borderWidth: 1, borderColor: '#2a2a2a' },
+  filterText: { fontSize: 13, fontWeight: '600', color: '#888' },
+  filterBadge: { paddingHorizontal: 6, paddingVertical: 1, borderRadius: 8, backgroundColor: '#2a2a2a' },
+  filterBadgeText: { fontSize: 10, fontWeight: '700', color: '#666' },
+
+  statusHint: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 20, marginTop: 10, padding: 8, paddingHorizontal: 12, borderRadius: 10, backgroundColor: CARD_BG, borderWidth: 1, borderColor: '#222' },
+
+  card: { backgroundColor: CARD_BG, borderRadius: 18, borderWidth: 1, borderColor: '#222', marginBottom: 14, overflow: 'hidden' },
+
+  memberPill: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: SURFACE, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
+  memberAvatar: { width: 26, height: 26, borderRadius: 13 },
+  addMemberBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderStyle: 'dashed', borderColor: '#444', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 4 },
+
+  placementBanner: { marginHorizontal: 16, marginBottom: 14, padding: 8, paddingHorizontal: 12, borderRadius: 10, backgroundColor: 'rgba(168,85,247,0.1)', borderWidth: 1, borderColor: 'rgba(168,85,247,0.2)', flexDirection: 'row', alignItems: 'center', gap: 8 },
+  dissolvedBanner: { marginHorizontal: 16, marginBottom: 14, padding: 8, paddingHorizontal: 12, borderRadius: 10, backgroundColor: 'rgba(239,68,68,0.06)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.15)', flexDirection: 'row', alignItems: 'center', gap: 8 },
+  inviteStatusBanner: { marginHorizontal: 16, marginBottom: 14, padding: 8, paddingHorizontal: 12, borderRadius: 10, backgroundColor: 'rgba(59,130,246,0.08)', borderWidth: 1, borderColor: 'rgba(59,130,246,0.15)' },
+
+  actionRow: { paddingHorizontal: 16, paddingBottom: 14, flexDirection: 'row', gap: 8 },
+  primaryBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 11, borderRadius: 10 },
+  primaryBtnText: { fontSize: 13, fontWeight: '700' },
+  secondaryBtn: { paddingHorizontal: 14, paddingVertical: 11, borderRadius: 10, backgroundColor: SURFACE, borderWidth: 1, borderColor: '#333', flexDirection: 'row', alignItems: 'center', gap: 6 },
+  secondaryBtnText: { fontSize: 12, fontWeight: '600', color: '#aaa' },
+  iconBtn: { paddingHorizontal: 12, paddingVertical: 11, borderRadius: 10, backgroundColor: SURFACE, borderWidth: 1, borderColor: '#333' },
+
+  expandedPanel: { borderTopWidth: 1, borderTopColor: '#222', padding: 14, paddingHorizontal: 16 },
+  sectionLabel: { fontSize: 11, fontWeight: '600', color: '#666', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 },
+  expandedAction: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 9, borderRadius: 8, backgroundColor: SURFACE, borderWidth: 1, borderColor: '#333' },
+  expandedActionText: { fontSize: 12, fontWeight: '600', color: '#aaa' },
+
+  emptyState: { alignItems: 'center', paddingTop: 60, paddingHorizontal: 40 },
+  emptyTitle: { color: '#fff', fontSize: 16, fontWeight: '600', marginTop: 16, marginBottom: 8 },
+  emptyDesc: { color: '#555', fontSize: 13, textAlign: 'center', lineHeight: 20 },
   startBtn: { backgroundColor: ACCENT, borderRadius: 14, paddingHorizontal: 24, paddingVertical: 12, marginTop: 20 },
-  startBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
 });
