@@ -24,6 +24,7 @@ const STORAGE_KEYS = {
   GROUP_LIKES: '@rhome/group_likes',
   HOST_SUBSCRIPTIONS: '@rhome/host_subscriptions',
   GROUP_INVITES: '@rhome/group_invites',
+  BOOST_PURCHASES: '@rhome/boost_purchases',
 };
 
 let notificationIdCounter = 0;
@@ -2181,6 +2182,57 @@ export const StorageService = {
       return count;
     } catch {
       return 0;
+    }
+  },
+
+  async getBoostCredits(userId: string): Promise<{ quick: number; standard: number; extended: number }> {
+    try {
+      const sub = await this.getHostSubscription(userId);
+      return sub.boostCredits || { quick: 0, standard: 0, extended: 0 };
+    } catch {
+      return { quick: 0, standard: 0, extended: 0 };
+    }
+  },
+
+  async updateBoostCredits(userId: string, credits: { quick: number; standard: number; extended: number }): Promise<void> {
+    try {
+      const sub = await this.getHostSubscription(userId);
+      sub.boostCredits = credits;
+      await this.updateHostSubscription(userId, sub);
+    } catch (error) {
+      console.error('[StorageService] Error updating boost credits:', error);
+    }
+  },
+
+  async recordBoostPurchase(purchase: {
+    userId: string;
+    packId: string;
+    boostType: 'quick' | 'standard' | 'extended';
+    quantity: number;
+    pricePerBoost: number;
+    totalPrice: number;
+  }): Promise<void> {
+    try {
+      const data = await AsyncStorage.getItem(STORAGE_KEYS.BOOST_PURCHASES);
+      const purchases: any[] = data ? JSON.parse(data) : [];
+      purchases.push({
+        id: `bp-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        ...purchase,
+        purchasedAt: new Date().toISOString(),
+      });
+      await AsyncStorage.setItem(STORAGE_KEYS.BOOST_PURCHASES, JSON.stringify(purchases));
+    } catch (error) {
+      console.error('[StorageService] Error recording boost purchase:', error);
+    }
+  },
+
+  async getBoostPurchaseHistory(userId: string): Promise<any[]> {
+    try {
+      const data = await AsyncStorage.getItem(STORAGE_KEYS.BOOST_PURCHASES);
+      const purchases: any[] = data ? JSON.parse(data) : [];
+      return purchases.filter(p => p.userId === userId);
+    } catch {
+      return [];
     }
   },
 

@@ -249,6 +249,14 @@ export const ListingBoostScreen = () => {
       const newCredits = { ...boostCredits, [boostType]: boostCredits[boostType] + pack.quantity };
       setBoostCredits(newCredits);
       await StorageService.updateHostSubscription(user.id, { boostCredits: newCredits });
+      await StorageService.recordBoostPurchase({
+        userId: user.id,
+        packId,
+        boostType,
+        quantity: pack.quantity,
+        pricePerBoost: pack.pricePerBoost,
+        totalPrice: pack.totalPrice,
+      });
       await showAlert({
         title: 'Credits Added!',
         message: `${pack.quantity} ${boostType.charAt(0).toUpperCase() + boostType.slice(1)} Boost credit${pack.quantity > 1 ? 's' : ''} added!\nYou now have ${newCredits[boostType]} ${boostType} credit${newCredits[boostType] !== 1 ? 's' : ''}.`,
