@@ -517,7 +517,7 @@ export const ProfileScreen = () => {
               </Text>
             </View>
           ) : null}
-          {!isHost ? (
+          {!isHost && !isPlaceSeeker() ? (
             <View style={styles.superInterestTracker}>
               <Feather name="star" size={16} color="#4A90E2" />
               {user?.subscription?.plan === 'elite' ? (
