@@ -98,7 +98,7 @@ export type HostTabParamList = {
   Roommates: undefined;
   BrowseRenters: undefined;
   AgentGroups: undefined;
-  Messages: undefined;
+  Messages: { role?: string } | undefined;
   Profile: undefined;
 };
 
@@ -313,7 +313,7 @@ export const HostTabNavigator = () => {
         <Tab.Screen name="Dashboard" component={DashboardStackNavigator} />
         <Tab.Screen name="BrowseRenters" component={AgentBrowseStackNavigator} />
         <Tab.Screen name="AgentGroups" component={AgentGroupsStackNavigator} />
-        <Tab.Screen name="Messages" component={HostMessagesStackNavigator} />
+        <Tab.Screen name="Messages" component={HostMessagesStackNavigator} initialParams={{ role: 'agent' }} />
         <Tab.Screen name="Profile" component={ProfileStackNavigator} />
       </Tab.Navigator>
     );

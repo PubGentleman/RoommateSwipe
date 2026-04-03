@@ -11,7 +11,7 @@ import { GroupInfoScreen } from '../screens/shared/GroupInfoScreen';
 import { RoommateProfile } from '../types/models';
 
 export type HostMessagesStackParamList = {
-  MessagesList: { role: 'host' };
+  MessagesList: { role: 'host' | 'agent' | 'company' };
   Chat: {
     conversationId: string;
     otherUser?: RoommateProfile;
@@ -46,13 +46,14 @@ export type HostMessagesStackParamList = {
 
 const Stack = createNativeStackNavigator<HostMessagesStackParamList>();
 
-export const HostMessagesStackNavigator = () => {
+export const HostMessagesStackNavigator = ({ route }: any) => {
+  const passedRole = route?.params?.role || 'host';
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen
         name="MessagesList"
         component={MessagesScreen}
-        initialParams={{ role: 'host' }}
+        initialParams={{ role: passedRole }}
       />
       <Stack.Screen name="Chat" component={ChatScreen} />
       <Stack.Screen name="CreateGroup" component={CreateGroupScreen} />

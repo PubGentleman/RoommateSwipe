@@ -51,8 +51,9 @@ type ChatFilterKey = 'all' | 'people' | 'direct' | 'groups';
 export const MessagesScreen = () => {
   const navigation = useNavigation<MessagesScreenNavigationProp>();
   const route = useRoute<any>();
-  const role: 'host' | 'renter' = route.params?.role || 'renter';
-  const isHostMode = role === 'host';
+  const role: 'host' | 'renter' | 'agent' | 'company' = route.params?.role || 'renter';
+  const isHostMode = role === 'host' || role === 'agent' || role === 'company';
+  const isAgentMode = role === 'agent';
   const insets = useSafeAreaInsets();
   const { user, isPlaceSeeker } = useAuth();
   const { alert } = useConfirm();

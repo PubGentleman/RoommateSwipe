@@ -533,6 +533,16 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
             read: true,
           }));
           loadedFromSupabase = true;
+          try {
+            await supabase
+              .from('group_messages')
+              .update({ read: true })
+              .eq('group_id', groupId)
+              .neq('sender_id', user?.id || '')
+              .eq('read', false);
+          } catch (_markErr) {
+            console.warn('[Chat] Failed to mark group messages as read:', _markErr);
+          }
         }
       } else {
         const supaMessages = await getSupabaseMessages(matchIdFromConversation);
@@ -845,6 +855,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
     if (isInquiryChat && inquiryGroup?.hostId) {
       if (user.id === inquiryGroup.hostId) {
         updateAgentResponseTimestamp(conversationId).catch(() => {});
+        setResponseDelayHours(0);
       } else {
         updateRenterMessageTimestamp(conversationId).catch(() => {});
       }
@@ -2237,9 +2248,9 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
       <PaywallSheet
         visible={showPaywall}
         featureName={paywallFeature}
-        requiredPlan="elite"
-        role="renter"
-        onUpgrade={() => { setShowPaywall(false); (navigation as any).navigate('Plans'); }}
+        requiredPlan={user?.hostType === 'agent' ? 'pro' : isHost ? 'pro' : 'elite'}
+        role={user?.hostType === 'agent' ? 'host' : isHost ? 'host' : 'renter'}
+        onUpgrade={() => { setShowPaywall(false); (navigation as any).navigate(isHost ? 'HostSubscription' : 'Plans'); }}
         onDismiss={() => setShowPaywall(false)}
       />
     </KeyboardAvoidingView>
