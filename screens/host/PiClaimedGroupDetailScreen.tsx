@@ -220,7 +220,7 @@ export const PiClaimedGroupDetailScreen = () => {
         await supabase.from('group_members').insert(memberInserts);
       }
 
-      await sendGroupMessage(linkedGroupId, introMessage);
+      await sendGroupMessage(user!.id, linkedGroupId, introMessage);
 
       if (claimStep === 'Claimed') setClaimStep('Contacted');
 

@@ -29,7 +29,7 @@ export const BackgroundCheckScreen = ({ navigation }: any) => {
   const loadBadge = async () => {
     setLoading(true)
     try {
-      const result = await getMyBackgroundCheck()
+      const result = await getMyBackgroundCheck(user!.id)
       setBadge(result)
     } catch (_e) {}
     setLoading(false)

@@ -16,6 +16,7 @@ import * as Linking from 'expo-linking';
 import { Feather } from '../../components/VectorIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
+import { useAuth } from '../../contexts/AuthContext';
 import { createPreformedGroup } from '../../services/preformedGroupService';
 import { RhomeLogo } from '../../components/RhomeLogo';
 import { Spacing } from '../../constants/theme';
@@ -38,6 +39,7 @@ interface Props {
 export default function GroupSetupScreen({ onComplete, onSkip }: Props) {
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
+  const { user } = useAuth();
 
   const [groupName, setGroupName] = useState('');
   const [groupSize, setGroupSize] = useState(2);
@@ -125,7 +127,7 @@ export default function GroupSetupScreen({ onComplete, onSkip }: Props) {
     setSaving(true);
     try {
       const memberNames = invites.map((inv, idx) => inv.value.trim() || `Roommate ${idx + 1}`);
-      const group = await createPreformedGroup({
+      const group = await createPreformedGroup(user!.id, {
         name: groupName.trim() || undefined,
         groupSize,
         memberNames,

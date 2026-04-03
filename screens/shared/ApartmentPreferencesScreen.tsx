@@ -134,7 +134,7 @@ export default function ApartmentPreferencesScreen() {
     await StorageService.setApartmentPreferences(user.id, prefs);
 
     try {
-      await updateProfile({
+      await updateProfile(user!.id, {
         desired_bedrooms: bedrooms,
         budget_per_person_min: budgetMin,
         budget_per_person_max: budgetMax,

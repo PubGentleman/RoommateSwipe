@@ -50,7 +50,7 @@ export const HostAnalyticsScreen = () => {
     if (!user) return;
 
     try {
-      const supaListings = await getMyListings();
+      const supaListings = await getMyListings(user.id);
       if (supaListings?.length) {
         const mapped: Property[] = supaListings.map((l: any) => mapListingToProperty(l, user.name));
         setProperties(mapped);
@@ -67,7 +67,7 @@ export const HostAnalyticsScreen = () => {
     }
 
     try {
-      const supaCards = await getReceivedInterestCards();
+      const supaCards = await getReceivedInterestCards(user.id);
       const mapped: InterestCard[] = (supaCards || []).map((c: any) => ({
         id: c.id,
         renterId: c.sender?.id || c.sender_id,

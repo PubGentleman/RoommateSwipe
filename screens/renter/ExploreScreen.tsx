@@ -444,7 +444,7 @@ export const ExploreScreen = () => {
     try {
       if (!user?.id) { setUserGroups([]); return; }
       const { getMyGroups } = await import('../../services/groupService');
-      const supabaseGroups = await getMyGroups('roommate');
+      const supabaseGroups = await getMyGroups(user!.id, 'roommate');
       if (supabaseGroups && supabaseGroups.length > 0) {
         const mapped = supabaseGroups.map((g: any) => {
           const activeMembers = (g.members || []).filter((m: any) => m.status === 'active' || !m.status);
@@ -481,6 +481,7 @@ export const ExploreScreen = () => {
     try {
       const { createListingInquiryGroup } = await import('../../services/groupService');
       await createListingInquiryGroup(
+        user!.id,
         selectedProperty.id,
         selectedProperty.hostId,
         selectedProperty.address || selectedProperty.title,
@@ -532,7 +533,7 @@ export const ExploreScreen = () => {
 
   useEffect(() => {
     if (selectedProperty?.id) {
-      recordListingView(selectedProperty.id);
+      recordListingView(user!.id, selectedProperty.id);
       trackListingView({
         id: selectedProperty.id,
         city: selectedProperty.city,
@@ -1154,12 +1155,12 @@ export const ExploreScreen = () => {
         const searchType = user.profileData?.apartment_search_type;
         if (searchType === 'have_group') {
           try {
-            const myGroup = await getUserPreformedGroup();
+            const myGroup = await getUserPreformedGroup(user!.id);
             if (myGroup) {
-              await addToShortlist(myGroup.id, id);
+              await addToShortlist(user!.id, myGroup.id, id);
               try {
                 const { likeListingForGroup } = await import('../../services/groupService');
-                await likeListingForGroup(myGroup.id, id);
+                await likeListingForGroup(user!.id, myGroup.id, id);
               } catch {}
             }
           } catch (shortlistErr) {
@@ -3147,12 +3148,12 @@ export const ExploreScreen = () => {
         userName={selectedProperty?.hostName || 'Host'}
         type="listing"
         onReport={async (reason) => {
-          try { if (selectedProperty) await reportListing(selectedProperty.id, reason); } catch {}
+          try { if (selectedProperty) await reportListing(user!.id, selectedProperty.id, reason); } catch {}
         }}
         onBlock={async () => {
           try {
             if (selectedProperty?.hostProfileId) {
-              await blockUserRemote(selectedProperty.hostProfileId);
+              await blockUserRemote(user!.id, selectedProperty.hostProfileId);
               await blockUserLocal(selectedProperty.hostProfileId);
               setShowPropertyDetail(false);
               setShowListingReport(false);
@@ -3168,13 +3169,13 @@ export const ExploreScreen = () => {
         type="user"
         onReport={async (reason) => {
           try {
-            if (selectedProperty?.hostProfileId) await reportUser(selectedProperty.hostProfileId, reason);
+            if (selectedProperty?.hostProfileId) await reportUser(user!.id, selectedProperty.hostProfileId, reason);
           } catch {}
         }}
         onBlock={async () => {
           try {
             if (selectedProperty?.hostProfileId) {
-              await blockUserRemote(selectedProperty.hostProfileId);
+              await blockUserRemote(user!.id, selectedProperty.hostProfileId);
               await blockUserLocal(selectedProperty.hostProfileId);
               setShowPropertyDetail(false);
               setShowHostReport(false);

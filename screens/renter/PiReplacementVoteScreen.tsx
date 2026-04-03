@@ -147,7 +147,7 @@ export function PiReplacementVoteScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     try {
-      const result = await voteOnReplacement(groupId, memberId, vote);
+      const result = await voteOnReplacement(user!.id, groupId, memberId, vote);
 
       if (result.result === 'approved') {
         Alert.alert(
@@ -192,7 +192,7 @@ export function PiReplacementVoteScreen() {
             if (!groupId) return;
             setDissolving(true);
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-            const success = await requestGroupDissolve(groupId);
+            const success = await requestGroupDissolve(user!.id, groupId);
             setDissolving(false);
             if (success) {
               navigation.goBack();

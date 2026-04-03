@@ -203,6 +203,7 @@ export const BrowseRenterGroupsScreen = () => {
         try {
           const groupName = `Inquiry — ${composeTarget.location || composeTarget.neighborhoods[0] || 'Listing'}`;
           await createListingInquiryGroup(
+            user.id,
             activeListing.id,
             user.id,
             activeListing.address || activeListing.city || 'Your listing',

@@ -21,14 +21,13 @@ export const startBackgroundCheck = async (
   return data
 }
 
-export const getMyBackgroundCheck = async (): Promise<BackgroundCheckBadge> => {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { status: 'none', identityVerified: false, criminalClear: false, checkType: 'standard' }
+export const getMyBackgroundCheck = async (userId: string): Promise<BackgroundCheckBadge> => {
+  if (!userId) return { status: 'none', identityVerified: false, criminalClear: false, checkType: 'standard' }
 
   const { data } = await supabase
     .from('background_checks')
     .select('*')
-    .eq('user_id', user.id)
+    .eq('user_id', userId)
     .order('created_at', { ascending: false })
     .limit(1)
     .single()

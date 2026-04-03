@@ -130,27 +130,25 @@ export async function getListing(id: string) {
   return data;
 }
 
-export async function getMyListings() {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return [];
+export async function getMyListings(userId: string) {
+  if (!userId) return [];
 
   const { data, error } = await supabase
     .from('listings')
     .select('*')
-    .eq('host_id', user.id)
+    .eq('host_id', userId)
     .order('created_at', { ascending: false });
 
   if (error) throw error;
   return data || [];
 }
 
-export async function createListing(listing: ListingData) {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not authenticated');
+export async function createListing(userId: string, listing: ListingData) {
+  if (!userId) throw new Error('Not authenticated');
 
   const { data, error } = await supabase
     .from('listings')
-    .insert({ host_id: user.id, ...listing })
+    .insert({ host_id: userId, ...listing })
     .select()
     .single();
 
@@ -210,13 +208,12 @@ export async function getOutreachStatus(listingId: string): Promise<{
   }
 }
 
-export async function recordListingView(listingId: string): Promise<void> {
+export async function recordListingView(userId: string, listingId: string): Promise<void> {
   try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!userId) return;
     await supabase.rpc('record_listing_view', {
       p_listing_id: listingId,
-      p_viewer_id: user.id,
+      p_viewer_id: userId,
     });
   } catch {}
 }
@@ -618,13 +615,12 @@ export async function reassignConversation(
   }
 }
 
-export async function uploadListingPhoto(uri: string, fileName: string) {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not authenticated');
+export async function uploadListingPhoto(userId: string, uri: string, fileName: string) {
+  if (!userId) throw new Error('Not authenticated');
 
   const response = await fetch(uri);
   const blob = await response.blob();
-  const filePath = `${user.id}/${fileName}`;
+  const filePath = `${userId}/${fileName}`;
 
   const { error } = await supabase.storage
     .from('listing-photos')

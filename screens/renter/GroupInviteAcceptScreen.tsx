@@ -88,7 +88,7 @@ export default function GroupInviteAcceptScreen() {
       if (emailInvite) {
         await acceptGroupInvite(emailInvite.invite_code, user.id);
       } else {
-        const result = await joinGroupByCode(inviteCode, user.name || 'Member');
+        const result = await joinGroupByCode(user.id, inviteCode, user.name || 'Member');
         if (!result.success) {
           setError('Failed to join group');
           setJoining(false);

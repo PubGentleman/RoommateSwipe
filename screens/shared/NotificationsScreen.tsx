@@ -42,7 +42,7 @@ export const NotificationsScreen = () => {
     if (!user?.id) return;
     let mapped: Notification[] = [];
     try {
-      const supabaseNotifications = await getNotifications();
+      const supabaseNotifications = await getNotifications(user!.id);
       if (supabaseNotifications.length > 0) {
         mapped = supabaseNotifications.map(mapSupabaseNotification);
       } else {
@@ -327,7 +327,7 @@ export const NotificationsScreen = () => {
   const handleMarkAllAsRead = async () => {
     if (!user?.id) return;
     try {
-      await markAllNotificationsRead();
+      await markAllNotificationsRead(user!.id);
     } catch (error) {
       console.error('Error marking all read via Supabase, falling back:', error);
       await StorageService.markAllNotificationsAsRead(user.id);

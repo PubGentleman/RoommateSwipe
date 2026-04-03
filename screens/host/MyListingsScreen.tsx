@@ -102,7 +102,7 @@ export const MyListingsScreen = () => {
   const loadData = useCallback(async () => {
     if (!user) return;
     try {
-      const supaListings = await getMyListings();
+      const supaListings = await getMyListings(user.id);
       if (supaListings && supaListings.length > 0) {
         const mapped: Property[] = supaListings.map((l: any) => mapListingToProperty(l, user.name));
         setListings(mapped);
@@ -118,7 +118,7 @@ export const MyListingsScreen = () => {
     }
 
     try {
-      const supaCards = await getReceivedInterestCards();
+      const supaCards = await getReceivedInterestCards(user.id);
       const mapped: InterestCard[] = (supaCards || []).map((c: any) => ({
         id: c.id,
         renterId: c.sender?.id || c.sender_id,

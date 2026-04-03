@@ -3,15 +3,6 @@ import { PiAutoGroup, PiAutoGroupMember, PiGroupClaim } from '../types/models';
 import { getAutoClaimLimits } from '../constants/planLimits';
 import { RENTER_PLAN_LIMITS, RenterPlan } from '../constants/renterPlanLimits';
 
-async function getCurrentUserId(): Promise<string | null> {
-  try {
-    const { data } = await supabase.auth.getUser();
-    return data?.user?.id ?? null;
-  } catch {
-    return null;
-  }
-}
-
 export async function triggerAutoMatch(userId: string): Promise<{ success: boolean; groupId?: string }> {
   try {
     const { data: profile } = await supabase
@@ -104,17 +95,16 @@ export async function getPendingGroupInvite(userId: string): Promise<PiAutoGroup
   }
 }
 
-export async function acceptGroupInvite(groupId: string): Promise<boolean> {
-  return respondToAutoGroupInvite(groupId, true);
+export async function acceptGroupInvite(userId: string, groupId: string): Promise<boolean> {
+  return respondToAutoGroupInvite(userId, groupId, true);
 }
 
-export async function declineGroupInvite(groupId: string): Promise<boolean> {
-  return respondToAutoGroupInvite(groupId, false);
+export async function declineGroupInvite(userId: string, groupId: string): Promise<boolean> {
+  return respondToAutoGroupInvite(userId, groupId, false);
 }
 
-export async function respondToAutoGroupInvite(groupId: string, accept: boolean): Promise<boolean> {
+export async function respondToAutoGroupInvite(userId: string, groupId: string, accept: boolean): Promise<boolean> {
   try {
-    const userId = await getCurrentUserId();
     if (!userId) return false;
 
     const now = new Date().toISOString();
@@ -193,12 +183,12 @@ export async function getReplacementCandidates(groupId: string): Promise<PiAutoG
 }
 
 export async function voteOnReplacement(
+  userId: string,
   groupId: string,
   replacementMemberId: string,
   vote: 'approve' | 'pass'
 ): Promise<{ result: 'voted' | 'approved' | 'rejected' | 'dissolved' | 'error' }> {
   try {
-    const userId = await getCurrentUserId();
     if (!userId) return { result: 'error' };
 
     const { data, error } = await supabase.rpc('pi_vote_on_replacement', {
@@ -217,9 +207,8 @@ export async function voteOnReplacement(
   }
 }
 
-export async function requestGroupDissolve(groupId: string): Promise<boolean> {
+export async function requestGroupDissolve(userId: string, groupId: string): Promise<boolean> {
   try {
-    const userId = await getCurrentUserId();
     if (!userId) return false;
 
     const { data, error } = await supabase.rpc('pi_dissolve_group', {

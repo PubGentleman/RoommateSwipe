@@ -50,9 +50,8 @@ export const connectInstagram = async (): Promise<{ success: boolean; handle?: s
   }
 };
 
-export const disconnectInstagram = async (): Promise<void> => {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return;
+export const disconnectInstagram = async (userId: string): Promise<void> => {
+  if (!userId) return;
 
   await supabase
     .from('profiles')
@@ -61,5 +60,5 @@ export const disconnectInstagram = async (): Promise<void> => {
       instagram_verified: false,
       instagram_connected_at: null,
     })
-    .eq('id', user.id);
+    .eq('id', userId);
 };

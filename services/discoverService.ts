@@ -5,25 +5,27 @@ import { getClosestNeighborhoodDistance } from '../utils/locationData';
 import { getCachedDeckRanking, generateDeckReranking } from './piMatchingService';
 import { RENTER_PLAN_LIMITS, normalizeRenterPlan } from '../constants/renterPlanLimits';
 
-export async function getSwipeDeck(city?: string, filters?: {
+export async function getSwipeDeck(userId: string, city?: string, filters?: {
   budgetMin?: number;
   budgetMax?: number;
   roomType?: string;
   minCompatibility?: number;
   neighborhoods?: string[];
   zipCode?: string;
+  searchType?: string;
+  genderPref?: string;
+  gender?: string;
 }) {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return [];
+  if (!userId) return [];
 
   const [blockedResult, swipedResult] = await Promise.all([
-    supabase.from('blocked_users').select('blocked_id').eq('blocker_id', user.id),
-    supabase.from('interest_cards').select('recipient_id').eq('sender_id', user.id),
+    supabase.from('blocked_users').select('blocked_id').eq('blocker_id', userId),
+    supabase.from('interest_cards').select('recipient_id').eq('sender_id', userId),
   ]);
   const blocked = (blockedResult.data || []).map((b: any) => b.blocked_id);
   const swiped = (swipedResult.data || []).map((s: any) => s.recipient_id);
 
-  const excludeIds = [...blocked, ...swiped, user.id];
+  const excludeIds = [...blocked, ...swiped, userId];
 
   let query = supabase
     .from('users')
@@ -44,20 +46,24 @@ export async function getSwipeDeck(city?: string, filters?: {
   const { data, error } = await query.limit(50);
   if (error) throw error;
 
-  const { data: currentProfile } = await supabase
-    .from('profiles')
-    .select('apartment_search_type, household_gender_preference')
-    .eq('user_id', user.id)
-    .single();
-  const currentSearchType = currentProfile?.apartment_search_type;
+  let currentSearchType: string | undefined = filters?.searchType;
+  let genderPref: string | undefined = filters?.genderPref;
+  let currentGender: string | undefined = filters?.gender;
 
-  const { data: currentUserData } = await supabase
-    .from('users')
-    .select('gender')
-    .eq('id', user.id)
-    .single();
-  const currentGender = currentUserData?.gender;
-  const genderPref = currentProfile?.household_gender_preference;
+  if (!currentSearchType || !genderPref || !currentGender) {
+    const [profileResult, userDataResult] = await Promise.all([
+      (!currentSearchType || !genderPref)
+        ? supabase.from('profiles').select('apartment_search_type, household_gender_preference').eq('user_id', userId).single()
+        : Promise.resolve({ data: null }),
+      !currentGender
+        ? supabase.from('users').select('gender').eq('id', userId).single()
+        : Promise.resolve({ data: null }),
+    ]);
+
+    if (!currentSearchType) currentSearchType = profileResult.data?.apartment_search_type;
+    if (!genderPref) genderPref = profileResult.data?.household_gender_preference;
+    if (!currentGender) currentGender = userDataResult.data?.gender;
+  }
 
   let profiles = (data || []).filter(p => {
     if (p.profile?.search_paused === true) return false;
@@ -150,17 +156,17 @@ export async function getSwipeDeck(city?: string, filters?: {
     !p.boost?.some((b: any) => b.is_active && new Date(b.expires_at) > new Date())
   );
 
-  let finalDeck = applyBoostRotation(boosted, normal, user.id);
+  let finalDeck = applyBoostRotation(boosted, normal, userId);
 
-  const hasPiReranking = await checkPiDeckReranking(user.id);
+  const hasPiReranking = await checkPiDeckReranking(userId);
   if (hasPiReranking && finalDeck.length >= 5) {
     try {
-      const cached = await getCachedDeckRanking();
+      const cached = await getCachedDeckRanking(userId);
       if (cached) {
         finalDeck = applyAIRanking(finalDeck, cached.ranked_user_ids);
       } else {
         const top30Ids = finalDeck.slice(0, 30).map((p: any) => p.id);
-        generateDeckReranking(top30Ids).catch(() => {});
+        generateDeckReranking(userId, top30Ids).catch(() => {});
       }
     } catch {}
   }
@@ -168,28 +174,27 @@ export async function getSwipeDeck(city?: string, filters?: {
   return finalDeck;
 }
 
-export async function sendLike(recipientId: string) {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not authenticated');
+export async function sendLike(userId: string, recipientId: string) {
+  if (!userId) throw new Error('Not authenticated');
 
   const { data, error } = await supabase
     .from('interest_cards')
-    .insert({ sender_id: user.id, recipient_id: recipientId, action: 'like' })
+    .insert({ sender_id: userId, recipient_id: recipientId, action: 'like' })
     .select()
     .single();
 
   if (error) throw error;
 
-  incrementUsage('interest_cards_today').catch(() => {});
+  incrementUsage(userId, 'interest_cards_today').catch(() => {});
 
   supabase.functions.invoke('calculate-match-scores', {
-    body: { userId: user.id },
+    body: { userId },
   }).catch(() => {});
 
   const matchPromise = supabase
     .from('matches')
     .select('*')
-    .or(`and(user_id_1.eq.${user.id},user_id_2.eq.${recipientId}),and(user_id_1.eq.${recipientId},user_id_2.eq.${user.id})`)
+    .or(`and(user_id_1.eq.${userId},user_id_2.eq.${recipientId}),and(user_id_1.eq.${recipientId},user_id_2.eq.${userId})`)
     .eq('status', 'matched')
     .single()
     .then(({ data: match }) => match)
@@ -198,25 +203,23 @@ export async function sendLike(recipientId: string) {
   return { interestCard: data, matchPromise };
 }
 
-export async function sendPass(recipientId: string) {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not authenticated');
+export async function sendPass(userId: string, recipientId: string) {
+  if (!userId) throw new Error('Not authenticated');
 
   const { error } = await supabase
     .from('interest_cards')
-    .insert({ sender_id: user.id, recipient_id: recipientId, action: 'pass' });
+    .insert({ sender_id: userId, recipient_id: recipientId, action: 'pass' });
 
   if (error) throw error;
 }
 
-export async function undoLastAction() {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not authenticated');
+export async function undoLastAction(userId: string) {
+  if (!userId) throw new Error('Not authenticated');
 
   const { data: lastCard } = await supabase
     .from('interest_cards')
     .select('*')
-    .eq('sender_id', user.id)
+    .eq('sender_id', userId)
     .order('created_at', { ascending: false })
     .limit(1)
     .single();
@@ -228,28 +231,26 @@ export async function undoLastAction() {
     .delete()
     .eq('id', lastCard.id);
 
-  await incrementUsage('rewinds_today');
+  await incrementUsage(userId, 'rewinds_today');
 
   return lastCard;
 }
 
-export async function getReceivedInterestCards() {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return [];
+export async function getReceivedInterestCards(userId: string) {
+  if (!userId) return [];
 
   const { data } = await supabase
     .from('interest_cards')
     .select('*, sender:users!sender_id(id, full_name, avatar_url, age, occupation, city)')
-    .eq('recipient_id', user.id)
+    .eq('recipient_id', userId)
     .in('action', ['like', 'super_interest'])
     .order('created_at', { ascending: false });
 
   return data || [];
 }
 
-export async function acceptInterestCard(cardId: string, senderId: string) {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not authenticated');
+export async function acceptInterestCard(userId: string, cardId: string, senderId: string) {
+  if (!userId) throw new Error('Not authenticated');
 
   const now = new Date().toISOString();
 
@@ -260,8 +261,8 @@ export async function acceptInterestCard(cardId: string, senderId: string) {
 
   if (updateError) throw updateError;
 
-  const userId1 = user.id < senderId ? user.id : senderId;
-  const userId2 = user.id < senderId ? senderId : user.id;
+  const userId1 = userId < senderId ? userId : senderId;
+  const userId2 = userId < senderId ? senderId : userId;
 
   const { data: match, error: matchError } = await supabase
     .from('matches')
@@ -279,9 +280,8 @@ export async function acceptInterestCard(cardId: string, senderId: string) {
   return { match };
 }
 
-export async function rejectInterestCard(cardId: string) {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not authenticated');
+export async function rejectInterestCard(userId: string, cardId: string) {
+  if (!userId) throw new Error('Not authenticated');
 
   const now = new Date().toISOString();
 
@@ -293,14 +293,13 @@ export async function rejectInterestCard(cardId: string) {
   if (error) throw error;
 }
 
-async function incrementUsage(field: string) {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return;
+async function incrementUsage(userId: string, field: string) {
+  if (!userId) return;
 
   const { data: usage } = await supabase
     .from('usage_tracking')
     .select('*')
-    .eq('user_id', user.id)
+    .eq('user_id', userId)
     .single();
 
   if (!usage) return;
@@ -318,30 +317,28 @@ async function incrementUsage(field: string) {
   await supabase
     .from('usage_tracking')
     .update(updates)
-    .eq('user_id', user.id);
+    .eq('user_id', userId);
 }
 
-export async function getUsage() {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
+export async function getUsage(userId: string) {
+  if (!userId) return null;
 
   const { data } = await supabase
     .from('usage_tracking')
     .select('*')
-    .eq('user_id', user.id)
+    .eq('user_id', userId)
     .single();
 
   return data;
 }
 
-export async function getSentInterestCards() {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return [];
+export async function getSentInterestCards(userId: string) {
+  if (!userId) return [];
 
   const { data } = await supabase
     .from('interest_cards')
     .select('*, recipient:users!recipient_id(id, full_name, avatar_url, age, occupation, city)')
-    .eq('sender_id', user.id)
+    .eq('sender_id', userId)
     .in('action', ['like', 'super_interest'])
     .order('created_at', { ascending: false });
 
@@ -360,28 +357,26 @@ export async function updateInterestCardStatus(cardId: string, status: 'accepted
   return data;
 }
 
-export async function getInterestCardsForHost() {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return [];
+export async function getInterestCardsForHost(userId: string) {
+  if (!userId) return [];
 
   const { data } = await supabase
     .from('interest_cards')
     .select('*, sender:users!sender_id(id, full_name, avatar_url, age, occupation, city)')
-    .eq('recipient_id', user.id)
+    .eq('recipient_id', userId)
     .in('action', ['like', 'super_interest'])
     .order('created_at', { ascending: false });
 
   return data || [];
 }
 
-export async function saveRefinementAnswer(questionId: string, value: string): Promise<{ success: boolean }> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { success: false };
+export async function saveRefinementAnswer(userId: string, questionId: string, value: string): Promise<{ success: boolean }> {
+  if (!userId) return { success: false };
 
   const { data: profile, error: fetchError } = await supabase
     .from('profiles')
     .select('personality_answers')
-    .eq('user_id', user.id)
+    .eq('user_id', userId)
     .single();
 
   if (fetchError) {
@@ -399,7 +394,7 @@ export async function saveRefinementAnswer(questionId: string, value: string): P
   const { error: updateError } = await supabase
     .from('profiles')
     .update({ personality_answers: updated })
-    .eq('user_id', user.id);
+    .eq('user_id', userId);
 
   if (updateError) {
     console.error('[saveRefinementAnswer] Failed to update profile:', updateError.message);
@@ -409,7 +404,7 @@ export async function saveRefinementAnswer(questionId: string, value: string): P
   const { error: memoryError } = await supabase
     .from('user_ai_memory')
     .insert({
-      user_id: user.id,
+      user_id: userId,
       memory_text: `Refinement answer: ${questionId} = ${value}`,
       memory_type: 'refinement',
     });

@@ -268,7 +268,7 @@ export const RoommatesScreen = () => {
 
   const handleQuestionAnswer = async (questionId: string, value: string) => {
     await markQuestionAsked(questionId);
-    await saveRefinementAnswer(questionId, value);
+    await saveRefinementAnswer(user!.id, questionId, value);
     setPendingQuestion(null);
     setQuestionInjectedAtIndex(null);
   };
@@ -294,7 +294,7 @@ export const RoommatesScreen = () => {
       if (user) {
         (async () => {
           try {
-            const supabaseGroups = await getMyGroupsFromSupabase('roommate');
+            const supabaseGroups = await getMyGroupsFromSupabase(user.id, 'roommate');
             if (supabaseGroups && supabaseGroups.length > 0) {
               const mapped = supabaseGroups.map((g: any) => ({
                 id: g.id,
@@ -349,7 +349,7 @@ export const RoommatesScreen = () => {
         if (matchFilters.minCompatibility && matchFilters.minCompatibility > 0) {
           supabaseFilters.minCompatibility = matchFilters.minCompatibility;
         }
-        const deckProfiles = await getSwipeDeck(activeCity || undefined, supabaseFilters);
+        const deckProfiles = await getSwipeDeck(user!.id, activeCity || undefined, supabaseFilters);
         if (deckProfiles && deckProfiles.length > 0) {
           allProfiles = deckProfiles.map((p: any) => ({
             id: p.id,
@@ -518,7 +518,7 @@ export const RoommatesScreen = () => {
 
   useEffect(() => {
     if (!renterLimits.hasPiDeckReranking || profiles.length === 0) return;
-    getCachedDeckRanking().then((ranking) => {
+    getCachedDeckRanking(user!.id).then((ranking) => {
       if (!ranking?.adjustments) return;
       const boosted = new Set<string>();
       for (const adj of ranking.adjustments) {
@@ -543,7 +543,7 @@ export const RoommatesScreen = () => {
     let stale = false;
     setPiCardSummary(null);
     setPiCardLoading(true);
-    getCachedOrGenerateInsight(profileId, currentProfile?.compatibility).then((insight) => {
+    getCachedOrGenerateInsight(user!.id, profileId, currentProfile?.compatibility).then((insight) => {
       if (stale) return;
       if (insight?.summary) {
         piSummaryCache.current[profileId] = insight.summary;
@@ -660,7 +660,7 @@ export const RoommatesScreen = () => {
   const undoLastSwipeAsync = async (profileId: string, action: 'like' | 'nope' | 'superlike') => {
     try {
       try {
-        await undoLastAction();
+        await undoLastAction(user!.id);
         console.log('[RoommatesScreen] Undo via Supabase successful');
         return;
       } catch (supabaseError) {
@@ -685,11 +685,11 @@ export const RoommatesScreen = () => {
 
       try {
         if (action === 'like' || action === 'superlike') {
-          supabaseResult = await sendLike(profileId);
+          supabaseResult = await sendLike(user!.id, profileId);
           usedSupabase = true;
           console.log('[RoommatesScreen] Sent like via Supabase');
         } else {
-          await sendPass(profileId);
+          await sendPass(user!.id, profileId);
           usedSupabase = true;
           console.log('[RoommatesScreen] Sent pass via Supabase');
         }

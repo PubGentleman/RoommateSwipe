@@ -61,13 +61,13 @@ export function GroupInviteScreen({ navigation, route }: any) {
     setLoading(true);
     try {
       if (tab === 'matches') {
-        const data = await getInvitableMates(groupId);
+        const data = await getInvitableMates(user!.id, groupId);
         setMates(data);
       } else if (tab === 'code') {
         const code = await getInviteCode(groupId);
         setInviteCode(code);
       } else if (tab === 'listing' && listingId) {
-        const data = await getRentersInterestedInListing(listingId);
+        const data = await getRentersInterestedInListing(user!.id, listingId);
         setInterestedRenters(data);
       } else if (tab === 'requests') {
         const data = await getJoinRequests(groupId);
@@ -106,9 +106,9 @@ export function GroupInviteScreen({ navigation, route }: any) {
   const handleInvite = async (userId: string) => {
     setSendingTo(userId);
     try {
-      await sendGroupInvite(groupId, userId);
+      await sendGroupInvite(user!.id, groupId, userId);
       if (tab === 'matches') {
-        const updated = await getInvitableMates(groupId);
+        const updated = await getInvitableMates(user!.id, groupId);
         setMates(updated);
       }
     } catch (err: any) {

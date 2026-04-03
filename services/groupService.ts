@@ -87,9 +87,7 @@ export async function getGroup(id: string) {
   return data;
 }
 
-export async function getGroupDetails(groupId: string) {
-  const { data: { user } } = await supabase.auth.getUser();
-
+export async function getGroupDetails(userId: string, groupId: string) {
   const { data, error } = await supabase
     .from('groups')
     .select(`
@@ -148,17 +146,8 @@ export async function getGroupDetails(groupId: string) {
   };
 }
 
-export async function getMyGroups(type?: GroupType, userId?: string) {
-  let uid = userId;
-  if (!uid) {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      uid = user?.id;
-    } catch (authErr) {
-      console.warn('[getMyGroups] Auth failed:', authErr);
-      return [];
-    }
-  }
+export async function getMyGroups(userId: string, type?: GroupType) {
+  const uid = userId;
   if (!uid) return [];
 
   const { data: memberships, error: memberError } = await supabase
@@ -195,22 +184,21 @@ export async function getMyGroups(type?: GroupType, userId?: string) {
   return data || [];
 }
 
-export async function getMyRoommateGroups() {
-  return getMyGroups('roommate');
+export async function getMyRoommateGroups(userId: string) {
+  return getMyGroups(userId, 'roommate');
 }
 
-export async function getMyInquiryGroups(userId?: string) {
-  return getMyGroups('listing_inquiry', userId);
+export async function getMyInquiryGroups(userId: string) {
+  return getMyGroups(userId, 'listing_inquiry');
 }
 
-export async function createGroup(group: GroupData) {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not authenticated');
+export async function createGroup(userId: string, group: GroupData) {
+  if (!userId) throw new Error('Not authenticated');
 
   const { data, error } = await supabase
     .from('groups')
     .insert({
-      created_by: user.id,
+      created_by: userId,
       type: group.type || 'roommate',
       is_visible_to_hosts: group.type === 'listing_inquiry' ? false : true,
       ...group,
@@ -222,12 +210,13 @@ export async function createGroup(group: GroupData) {
 
   await supabase
     .from('group_members')
-    .insert({ group_id: data.id, user_id: user.id, role: 'admin', is_host: false });
+    .insert({ group_id: data.id, user_id: userId, role: 'admin', is_host: false });
 
   return data;
 }
 
 export async function createListingInquiryGroup(
+  userId: string,
   listingId: string,
   hostId: string,
   listingAddress: string,
@@ -235,8 +224,7 @@ export async function createListingInquiryGroup(
   groupName: string
 ) {
   try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('Not authenticated');
+    if (!userId) throw new Error('Not authenticated');
 
     let effectiveHostId = hostId;
     try {
@@ -261,7 +249,7 @@ export async function createListingInquiryGroup(
 
       renterIds = (sourceMembers || []).map(m => m.user_id);
     } else {
-      renterIds = [user.id];
+      renterIds = [userId];
     }
 
     const { data: group, error } = await supabase
@@ -273,7 +261,7 @@ export async function createListingInquiryGroup(
         host_id: effectiveHostId,
         listing_address: listingAddress,
         source_group_id: sourceGroupId,
-        created_by: user.id,
+        created_by: userId,
         is_archived: false,
       })
       .select()
@@ -398,13 +386,12 @@ export async function updateGroup(id: string, updates: Partial<GroupData>) {
   return data;
 }
 
-export async function joinGroup(groupId: string) {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not authenticated');
+export async function joinGroup(userId: string, groupId: string) {
+  if (!userId) throw new Error('Not authenticated');
 
   const { data, error } = await supabase
     .from('group_members')
-    .insert({ group_id: groupId, user_id: user.id, role: 'member', status: 'active' })
+    .insert({ group_id: groupId, user_id: userId, role: 'member', status: 'active' })
     .select()
     .single();
 
@@ -422,7 +409,7 @@ export async function joinGroup(groupId: string) {
       const { data: profile } = await supabase
         .from('users')
         .select('full_name')
-        .eq('id', user.id)
+        .eq('id', userId)
         .single();
 
       const memberName = profile?.full_name || 'A new member';
@@ -432,7 +419,7 @@ export async function joinGroup(groupId: string) {
           .from('group_members')
           .insert({
             group_id: inquiryGroup.id,
-            user_id: user.id,
+            user_id: userId,
             role: 'member',
             is_host: false,
             status: 'active',
@@ -466,15 +453,14 @@ export async function joinGroup(groupId: string) {
   return data;
 }
 
-export async function leaveGroup(groupId: string): Promise<'deleted' | 'left'> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not authenticated');
+export async function leaveGroup(userId: string, groupId: string): Promise<'deleted' | 'left'> {
+  if (!userId) throw new Error('Not authenticated');
 
   const { data: myMembership } = await supabase
     .from('group_members')
     .select('role')
     .eq('group_id', groupId)
-    .eq('user_id', user.id)
+    .eq('user_id', userId)
     .single();
 
   if (myMembership?.role === 'admin') {
@@ -482,7 +468,7 @@ export async function leaveGroup(groupId: string): Promise<'deleted' | 'left'> {
       .from('group_members')
       .select('id', { count: 'exact', head: true })
       .eq('group_id', groupId)
-      .neq('user_id', user.id);
+      .neq('user_id', userId);
 
     if ((count || 0) > 0) {
       throw new Error('PROMOTE_REQUIRED');
@@ -496,7 +482,7 @@ export async function leaveGroup(groupId: string): Promise<'deleted' | 'left'> {
     .from('group_members')
     .delete()
     .eq('group_id', groupId)
-    .eq('user_id', user.id);
+    .eq('user_id', userId);
 
   return 'left';
 }
@@ -643,13 +629,12 @@ export async function getGroupMessages(groupId: string): Promise<GroupMessage[]>
   }));
 }
 
-export async function sendGroupMessage(groupId: string, content: string): Promise<void> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not authenticated');
+export async function sendGroupMessage(userId: string, groupId: string, content: string): Promise<void> {
+  if (!userId) throw new Error('Not authenticated');
 
   const { error } = await supabase.from('group_messages').insert({
     group_id: groupId,
-    sender_id: user.id,
+    sender_id: userId,
     content,
   });
   if (error) throw error;
@@ -715,26 +700,25 @@ export function getMemberLimit(plan: string, linkedListingBedrooms?: number | nu
 
 // ─── METHOD A: Invite from Matches ───────────────────────────────────────────
 
-export async function getInvitableMates(groupId: string): Promise<{
+export async function getInvitableMates(userId: string, groupId: string): Promise<{
   id: string;
   name: string;
   photo?: string;
   alreadyInGroup: boolean;
   alreadyInvited: boolean;
 }[]> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return [];
+  if (!userId) return [];
 
   const { data: conversations } = await supabase
     .from('conversations')
     .select('participant_ids')
-    .contains('participant_ids', [user.id]);
+    .contains('participant_ids', [userId]);
 
   if (!conversations?.length) return [];
 
   const userIds = [...new Set(
     conversations.flatMap((c: any) => c.participant_ids)
-  )].filter(id => id !== user.id);
+  )].filter(id => id !== userId);
 
   if (!userIds.length) return [];
 
@@ -766,9 +750,8 @@ export async function getInvitableMates(groupId: string): Promise<{
   }));
 }
 
-export async function sendGroupInvite(groupId: string, invitedUserId: string): Promise<void> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not authenticated');
+export async function sendGroupInvite(userId: string, groupId: string, invitedUserId: string): Promise<void> {
+  if (!userId) throw new Error('Not authenticated');
 
   const { data: group } = await supabase
     .from('groups')
@@ -794,7 +777,7 @@ export async function sendGroupInvite(groupId: string, invitedUserId: string): P
 
   const { error } = await supabase.from('group_invites').insert({
     group_id: groupId,
-    invited_by: user.id,
+    invited_by: userId,
     invited_user_id: invitedUserId,
     status: 'pending',
   });
@@ -802,17 +785,17 @@ export async function sendGroupInvite(groupId: string, invitedUserId: string): P
 }
 
 export async function respondToInvite(
+  userId: string,
   inviteId: string,
   response: 'accepted' | 'declined'
 ): Promise<void> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not authenticated');
+  if (!userId) throw new Error('Not authenticated');
 
   const { data: invite } = await supabase
     .from('group_invites')
     .update({ status: response })
     .eq('id', inviteId)
-    .eq('invited_user_id', user.id)
+    .eq('invited_user_id', userId)
     .select()
     .single();
 
@@ -845,13 +828,13 @@ export async function respondToInvite(
 
     await supabase.from('group_members').insert({
       group_id: invite.group_id,
-      user_id: user.id,
+      user_id: userId,
       role: 'member',
     });
   }
 }
 
-export async function getMyPendingInvites(): Promise<{
+export async function getMyPendingInvites(userId: string): Promise<{
   id: string;
   groupId: string;
   groupName: string;
@@ -859,8 +842,7 @@ export async function getMyPendingInvites(): Promise<{
   listingTitle?: string;
   createdAt: string;
 }[]> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return [];
+  if (!userId) return [];
 
   const { data, error } = await supabase
     .from('group_invites')
@@ -869,7 +851,7 @@ export async function getMyPendingInvites(): Promise<{
       groups ( name, listings ( title ) ),
       inviter:users!invited_by ( full_name )
     `)
-    .eq('invited_user_id', user.id)
+    .eq('invited_user_id', userId)
     .eq('status', 'pending');
 
   if (error) throw error;
@@ -884,7 +866,7 @@ export async function getMyPendingInvites(): Promise<{
   }));
 }
 
-export async function getMyPendingCompanyInvites(): Promise<{
+export async function getMyPendingCompanyInvites(userId: string): Promise<{
   id: string;
   listingId: string;
   groupId: string;
@@ -897,13 +879,12 @@ export async function getMyPendingCompanyInvites(): Promise<{
   bedrooms?: number;
   companyName?: string;
 }[]> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return [];
+  if (!userId) return [];
 
   const { data: memberRows } = await supabase
     .from('group_members')
     .select('group_id')
-    .eq('user_id', user.id);
+    .eq('user_id', userId);
 
   const groupIds = (memberRows || []).map((r: any) => r.group_id);
   if (groupIds.length === 0) return [];
@@ -978,9 +959,8 @@ export async function disableInviteCode(groupId: string): Promise<void> {
     .eq('id', groupId);
 }
 
-export async function joinGroupByCode(code: string): Promise<{ groupId: string; groupName: string }> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not authenticated');
+export async function joinGroupByCode(userId: string, code: string): Promise<{ groupId: string; groupName: string }> {
+  if (!userId) throw new Error('Not authenticated');
 
   const { data: group } = await supabase
     .from('groups')
@@ -995,7 +975,7 @@ export async function joinGroupByCode(code: string): Promise<{ groupId: string; 
     .from('group_members')
     .select('id')
     .eq('group_id', group.id)
-    .eq('user_id', user.id)
+    .eq('user_id', userId)
     .maybeSingle();
 
   if (existing) throw new Error('You are already in this group.');
@@ -1018,7 +998,7 @@ export async function joinGroupByCode(code: string): Promise<{ groupId: string; 
 
   const { error } = await supabase.from('group_members').insert({
     group_id: group.id,
-    user_id: user.id,
+    user_id: userId,
     role: 'member',
   });
   if (error) throw error;
@@ -1028,14 +1008,13 @@ export async function joinGroupByCode(code: string): Promise<{ groupId: string; 
 
 // ─── METHOD D: Host Invites from Listing Interest ────────────────────────────
 
-export async function getRentersInterestedInListing(listingId: string): Promise<{
+export async function getRentersInterestedInListing(userId: string, listingId: string): Promise<{
   id: string;
   name: string;
   photo?: string;
   interestedAt: string;
 }[]> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return [];
+  if (!userId) return [];
 
   const { data, error } = await supabase
     .from('interest_cards')
@@ -1093,15 +1072,14 @@ export async function linkListingToGroup(
   if (error) throw error;
 }
 
-export async function promoteMember(groupId: string, userId: string): Promise<void> {
-  const { data: { user: currentUser } } = await supabase.auth.getUser();
-  if (!currentUser) throw new Error('Not authenticated');
+export async function promoteMember(callerUserId: string, groupId: string, userId: string): Promise<void> {
+  if (!callerUserId) throw new Error('Not authenticated');
 
   const { data: callerMember } = await supabase
     .from('group_members')
     .select('role')
     .eq('group_id', groupId)
-    .eq('user_id', currentUser.id)
+    .eq('user_id', callerUserId)
     .single();
 
   if (callerMember?.role !== 'admin') throw new Error('Only admins can promote members.');
@@ -1118,7 +1096,7 @@ export async function promoteMember(groupId: string, userId: string): Promise<vo
     .from('group_members')
     .update({ role: 'member' })
     .eq('group_id', groupId)
-    .eq('user_id', currentUser.id);
+    .eq('user_id', callerUserId);
 
   await supabase.from('notifications').insert({
     user_id: userId,
@@ -1131,17 +1109,16 @@ export async function promoteMember(groupId: string, userId: string): Promise<vo
   }).then(() => {});
 }
 
-export async function removeMember(groupId: string, targetUserId: string): Promise<void> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not authenticated');
+export async function removeMember(userId: string, groupId: string, targetUserId: string): Promise<void> {
+  if (!userId) throw new Error('Not authenticated');
 
-  if (targetUserId === user.id) throw new Error('Use Leave Group to remove yourself.');
+  if (targetUserId === userId) throw new Error('Use Leave Group to remove yourself.');
 
   const { data: callerMember } = await supabase
     .from('group_members')
     .select('role')
     .eq('group_id', groupId)
-    .eq('user_id', user.id)
+    .eq('user_id', userId)
     .single();
 
   if (callerMember?.role !== 'admin') throw new Error('Only admins can remove members.');
@@ -1199,9 +1176,8 @@ export async function getDiscoverableGroupsForListing(listingId: string): Promis
   }));
 }
 
-export async function requestToJoinGroup(groupId: string): Promise<void> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not authenticated');
+export async function requestToJoinGroup(userId: string, groupId: string): Promise<void> {
+  if (!userId) throw new Error('Not authenticated');
 
   const { data: group } = await supabase
     .from('groups')
@@ -1215,14 +1191,14 @@ export async function requestToJoinGroup(groupId: string): Promise<void> {
     .from('group_members')
     .select('id')
     .eq('group_id', groupId)
-    .eq('user_id', user.id)
+    .eq('user_id', userId)
     .maybeSingle();
 
   if (existing) throw new Error('You are already in this group.');
 
   const { error } = await supabase.from('group_join_requests').insert({
     group_id: groupId,
-    user_id: user.id,
+    user_id: userId,
     status: 'pending',
   });
   if (error && error.code !== '23505') throw error;
@@ -1254,18 +1230,18 @@ export async function getJoinRequests(groupId: string): Promise<{
 }
 
 export async function respondToJoinRequest(
+  userId: string,
   requestId: string,
   groupId: string,
   response: 'approved' | 'declined'
 ): Promise<void> {
-  const { data: { user: currentUser } } = await supabase.auth.getUser();
-  if (!currentUser) throw new Error('Not authenticated');
+  if (!userId) throw new Error('Not authenticated');
 
   const { data: callerMember } = await supabase
     .from('group_members')
     .select('role')
     .eq('group_id', groupId)
-    .eq('user_id', currentUser.id)
+    .eq('user_id', userId)
     .single();
 
   if (callerMember?.role !== 'admin') throw new Error('Only admins can respond to join requests.');
@@ -1387,6 +1363,7 @@ export async function getGroupsForListing(listingId: string): Promise<{
 }
 
 export async function createOutreachPayment(
+  userId: string,
   listingId: string,
   packageId: string,
   groupIds: string[],
@@ -1400,12 +1377,11 @@ export async function createOutreachPayment(
 
   const { clientSecret, paymentIntentId, amountCents } = data;
 
-  const { data: { user } } = await supabase.auth.getUser();
   await supabase
     .from('host_outreach_pending')
     .insert({
       payment_intent_id: paymentIntentId,
-      host_id: user?.id,
+      host_id: userId,
       listing_id: listingId,
       message,
       group_ids: groupIds,
@@ -1423,37 +1399,34 @@ export async function getContactedGroupIds(listingId: string): Promise<string[]>
   return (data || []).map((r: any) => r.group_id);
 }
 
-export async function likeGroup(groupId: string): Promise<void> {
-  const user = (await supabase.auth.getUser()).data.user;
-  if (!user) throw new Error('Not authenticated');
+export async function likeGroup(userId: string, groupId: string): Promise<void> {
+  if (!userId) throw new Error('Not authenticated');
   const { error } = await supabase
     .from('group_likes')
-    .upsert({ group_id: groupId, user_id: user.id }, { onConflict: 'group_id,user_id' });
+    .upsert({ group_id: groupId, user_id: userId }, { onConflict: 'group_id,user_id' });
   if (error) throw error;
 }
 
-export async function unlikeGroupLike(groupId: string): Promise<void> {
-  const user = (await supabase.auth.getUser()).data.user;
-  if (!user) throw new Error('Not authenticated');
+export async function unlikeGroupLike(userId: string, groupId: string): Promise<void> {
+  if (!userId) throw new Error('Not authenticated');
   const { error } = await supabase
     .from('group_likes')
     .delete()
     .eq('group_id', groupId)
-    .eq('user_id', user.id);
+    .eq('user_id', userId);
   if (error) throw error;
 }
 
-export async function getLikedGroups(): Promise<{
+export async function getLikedGroups(userId: string): Promise<{
   groupId: string;
   mutualInterest: boolean;
   canRequestToJoin: boolean;
 }[]> {
-  const user = (await supabase.auth.getUser()).data.user;
-  if (!user) return [];
+  if (!userId) return [];
   const { data, error } = await supabase
     .from('group_likes')
     .select('group_id, admin_liked_back, dismissed')
-    .eq('user_id', user.id)
+    .eq('user_id', userId)
     .eq('dismissed', false);
   if (error) throw error;
   return (data || []).map((r: any) => ({
@@ -1518,14 +1491,13 @@ export async function getGroupLikeCount(groupId: string): Promise<number> {
   return count ?? 0;
 }
 
-export async function checkMutualInterest(groupId: string): Promise<boolean> {
-  const user = (await supabase.auth.getUser()).data.user;
-  if (!user) return false;
+export async function checkMutualInterest(userId: string, groupId: string): Promise<boolean> {
+  if (!userId) return false;
   const { data } = await supabase
     .from('group_likes')
     .select('admin_liked_back')
     .eq('group_id', groupId)
-    .eq('user_id', user.id)
+    .eq('user_id', userId)
     .maybeSingle();
   return data?.admin_liked_back ?? false;
 }
@@ -1648,26 +1620,24 @@ export async function declineGroupInvite(inviteCode: string): Promise<void> {
     .eq('invite_code', inviteCode);
 }
 
-export async function likeListingForGroup(groupId: string, listingId: string): Promise<void> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not authenticated');
+export async function likeListingForGroup(userId: string, groupId: string, listingId: string): Promise<void> {
+  if (!userId) throw new Error('Not authenticated');
   const { error } = await supabase.from('group_listing_likes').upsert({
     group_id: groupId,
     listing_id: listingId,
-    user_id: user.id,
+    user_id: userId,
   }, { onConflict: 'group_id,listing_id,user_id' });
   if (error) throw error;
 }
 
-export async function unlikeListingForGroup(groupId: string, listingId: string): Promise<void> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return;
+export async function unlikeListingForGroup(userId: string, groupId: string, listingId: string): Promise<void> {
+  if (!userId) return;
   await supabase
     .from('group_listing_likes')
     .delete()
     .eq('group_id', groupId)
     .eq('listing_id', listingId)
-    .eq('user_id', user.id);
+    .eq('user_id', userId);
 }
 
 export interface GroupShortlistListing {
@@ -1778,16 +1748,15 @@ export interface TourEventInput {
   notes?: string;
 }
 
-export async function createTourEvent(input: TourEventInput) {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not authenticated');
+export async function createTourEvent(userId: string, input: TourEventInput) {
+  if (!userId) throw new Error('Not authenticated');
 
   const { data, error } = await supabase
     .from('group_tour_events')
     .insert({
       group_id: input.groupId,
       listing_id: input.listingId || null,
-      created_by: user.id,
+      created_by: userId,
       tour_date: input.tourDate,
       tour_time: input.tourTime,
       duration_minutes: input.durationMinutes || 30,
@@ -1807,8 +1776,8 @@ export async function createTourEvent(input: TourEventInput) {
   const rsvpRows = (members || []).map((m: any) => ({
     tour_id: data.id,
     user_id: m.user_id,
-    status: m.user_id === user.id ? 'going' : 'pending',
-    responded_at: m.user_id === user.id ? new Date().toISOString() : null,
+    status: m.user_id === userId ? 'going' : 'pending',
+    responded_at: m.user_id === userId ? new Date().toISOString() : null,
   }));
 
   if (rsvpRows.length > 0) {
@@ -1848,13 +1817,12 @@ export async function getGroupTours(groupId: string) {
   return [];
 }
 
-export async function updateTourRSVP(tourId: string, status: 'going' | 'maybe' | 'not_going'): Promise<void> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not authenticated');
+export async function updateTourRSVP(userId: string, tourId: string, status: 'going' | 'maybe' | 'not_going'): Promise<void> {
+  if (!userId) throw new Error('Not authenticated');
 
   await supabase.from('group_tour_rsvps').upsert({
     tour_id: tourId,
-    user_id: user.id,
+    user_id: userId,
     status,
     responded_at: new Date().toISOString(),
   }, { onConflict: 'tour_id,user_id' });
@@ -1867,13 +1835,12 @@ export async function cancelTourEvent(tourId: string): Promise<void> {
     .eq('id', tourId);
 }
 
-export async function transferGroupLead(groupId: string, newLeadId: string): Promise<void> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not authenticated');
+export async function transferGroupLead(userId: string, groupId: string, newLeadId: string): Promise<void> {
+  if (!userId) throw new Error('Not authenticated');
 
   await supabase
     .from('preformed_groups')
     .update({ group_lead_id: newLeadId })
     .eq('id', groupId)
-    .eq('group_lead_id', user.id);
+    .eq('group_lead_id', userId);
 }

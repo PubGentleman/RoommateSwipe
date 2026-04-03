@@ -7,6 +7,7 @@ import { ThemedText } from '../../components/ThemedText';
 import { useTheme } from '../../hooks/useTheme';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { Typography, Spacing } from '../../constants/theme';
+import { useAuth } from '../../contexts/AuthContext';
 import {
   getDiscoverableGroupsForListing,
   requestToJoinGroup,
@@ -15,6 +16,7 @@ import {
 export function ListingGroupsScreen({ navigation, route }: any) {
   const { listingId } = route.params;
   const { theme } = useTheme();
+  const { user } = useAuth();
   const { alert: showAlert } = useConfirm();
   const [groups, setGroups] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -39,7 +41,7 @@ export function ListingGroupsScreen({ navigation, route }: any) {
   const handleRequestJoin = async (groupId: string) => {
     setRequestingId(groupId);
     try {
-      await requestToJoinGroup(groupId);
+      await requestToJoinGroup(user!.id, groupId);
       setRequestedIds(prev => new Set(prev).add(groupId));
       await showAlert({ title: 'Request Sent', message: 'The group admin will review your request.', variant: 'success' });
     } catch (err: any) {

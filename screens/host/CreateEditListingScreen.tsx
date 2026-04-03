@@ -222,7 +222,7 @@ export const CreateEditListingScreen = () => {
 
     try {
       const { uploadListingPhoto } = await import('../../services/listingService');
-      const uploadedUrl = await uploadListingPhoto(asset.uri, asset.fileName || `photo_${Date.now()}.jpg`);
+      const uploadedUrl = await uploadListingPhoto(user!.id, asset.uri, asset.fileName || `photo_${Date.now()}.jpg`);
       setPhotos(prev => [...prev, uploadedUrl]);
     } catch (err) {
       console.warn('Photo upload failed, using local URI:', err);
@@ -354,7 +354,7 @@ export const CreateEditListingScreen = () => {
         if (isEditing && propertyId) {
           await updateListingSupa(propertyId, supaData);
         } else {
-          const created = await createListingSupa(supaData);
+          const created = await createListingSupa(user!.id, supaData);
           createdListingId = created?.id || null;
         }
       } catch {

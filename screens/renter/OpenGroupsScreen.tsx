@@ -252,7 +252,7 @@ export default function OpenGroupsScreen() {
         userName={reportGroupTarget?.name || 'Group'}
         type="group"
         onReport={async (reason) => {
-          try { if (reportGroupTarget) await reportGroup(reportGroupTarget.id, reason); } catch {}
+          try { if (reportGroupTarget) await reportGroup(user!.id, reportGroupTarget.id, reason); } catch {}
         }}
       />
     </View>

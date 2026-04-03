@@ -425,7 +425,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
         if (isNearBottom.current) {
           setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
         }
-        try { markSupabaseMessagesAsRead(matchIdFromConversation); } catch (_e) {}
+        try { markSupabaseMessagesAsRead(user!.id, matchIdFromConversation); } catch (_e) {}
       }
     });
     return () => { isMounted = false; unsubscribe(); };
@@ -559,7 +559,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
             metadata: msg.metadata || undefined,
           }));
           loadedFromSupabase = true;
-          try { markSupabaseMessagesAsRead(matchIdFromConversation); } catch (_e) {}
+          try { markSupabaseMessagesAsRead(user!.id, matchIdFromConversation); } catch (_e) {}
         }
       }
     } catch (supaError) {
@@ -806,7 +806,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
     try {
       if (isGroupSend) {
         const groupId = conversationId.replace('group-', '');
-        await sendGroupMessage(groupId, inputText.trim());
+        await sendGroupMessage(user!.id, groupId, inputText.trim());
         newMessage = {
           id: `msg_${Date.now()}`,
           senderId: user.id,
@@ -818,7 +818,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
         } as any;
         sentViaSupabase = true;
       } else {
-        const supaMsg = await sendSupabaseMessage(matchIdFromConversation, inputText.trim());
+        const supaMsg = await sendSupabaseMessage(user!.id, matchIdFromConversation, inputText.trim());
         newMessage = {
           id: supaMsg.id,
           senderId: supaMsg.sender_id,

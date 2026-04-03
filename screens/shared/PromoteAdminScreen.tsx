@@ -38,8 +38,8 @@ export function PromoteAdminScreen({ navigation, route }: any) {
     if (!selected) return;
     setLoading(true);
     try {
-      await promoteMember(groupId, selected);
-      await leaveGroup(groupId);
+      await promoteMember(user!.id, groupId, selected);
+      await leaveGroup(user!.id, groupId);
       await alert({ title: 'Done', message: 'You have left the group.', variant: 'success' });
       navigation.popToTop();
     } catch (err: any) {

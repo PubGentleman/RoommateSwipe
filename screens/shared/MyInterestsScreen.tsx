@@ -33,8 +33,8 @@ export const MyInterestsScreen = () => {
     setLoading(true);
     try {
       const [supabaseSent, supabaseReceived] = await Promise.all([
-        getSentInterestCards(),
-        getReceivedInterestCards(),
+        getSentInterestCards(user!.id),
+        getReceivedInterestCards(user!.id),
       ]);
 
       if (supabaseSent.length > 0 || supabaseReceived.length > 0) {
@@ -197,7 +197,7 @@ export const MyInterestsScreen = () => {
       return;
     }
     try {
-      await sendLike(card.hostId);
+      await sendLike(user!.id, card.hostId);
     } catch (error) {
       console.log('[MyInterests] Supabase resend failed, using StorageService:', error);
     }

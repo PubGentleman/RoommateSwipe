@@ -12,7 +12,7 @@ function generateInviteCode(): string {
   return code;
 }
 
-export async function createPreformedGroup(params: {
+export async function createPreformedGroup(userId: string, params: {
   name?: string;
   groupSize: number;
   memberNames: string[];
@@ -22,8 +22,7 @@ export async function createPreformedGroup(params: {
   bedroomCount?: number;
   moveInDate?: string;
 }): Promise<PreformedGroup | null> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
+  if (!userId) return null;
 
   const invite_code = generateInviteCode();
 
@@ -31,7 +30,7 @@ export async function createPreformedGroup(params: {
     .from('preformed_groups')
     .insert({
       name: params.name || null,
-      group_lead_id: user.id,
+      group_lead_id: userId,
       group_size: params.groupSize,
       invite_code,
       city: params.city || null,
@@ -48,7 +47,7 @@ export async function createPreformedGroup(params: {
 
   await supabase.from('preformed_group_members').insert({
     preformed_group_id: group.id,
-    user_id: user.id,
+    user_id: userId,
     name: 'You (Group Lead)',
     status: 'joined',
     joined_at: new Date().toISOString(),
@@ -68,19 +67,18 @@ export async function createPreformedGroup(params: {
   await supabase
     .from('profiles')
     .update({ is_group_lead: true })
-    .eq('user_id', user.id);
+    .eq('user_id', userId);
 
   return group as PreformedGroup;
 }
 
-export async function getMyPreformedGroup(): Promise<PreformedGroup | null> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
+export async function getMyPreformedGroup(userId: string): Promise<PreformedGroup | null> {
+  if (!userId) return null;
 
   const { data, error } = await supabase
     .from('preformed_groups')
     .select('*')
-    .eq('group_lead_id', user.id)
+    .eq('group_lead_id', userId)
     .in('status', ['forming', 'ready', 'searching'])
     .order('created_at', { ascending: false })
     .limit(1)
@@ -124,9 +122,8 @@ export async function getGroupMembers(groupId: string): Promise<PreformedGroupMe
   return [];
 }
 
-export async function joinGroupByCode(code: string, userName: string): Promise<{ success: boolean; group?: PreformedGroup }> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { success: false };
+export async function joinGroupByCode(userId: string, code: string, userName: string): Promise<{ success: boolean; group?: PreformedGroup }> {
+  if (!userId) return { success: false };
 
   const { data, error } = await supabase.rpc('join_preformed_group_by_code', {
     p_invite_code: code,
@@ -142,9 +139,8 @@ export async function joinGroupByCode(code: string, userName: string): Promise<{
   return { success: true, group: group ?? undefined };
 }
 
-export async function acceptGroupInvite(groupId: string): Promise<boolean> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return false;
+export async function acceptGroupInvite(userId: string, groupId: string): Promise<boolean> {
+  if (!userId) return false;
 
   const { error } = await supabase
     .from('preformed_group_members')
@@ -153,7 +149,7 @@ export async function acceptGroupInvite(groupId: string): Promise<boolean> {
       joined_at: new Date().toISOString(),
     })
     .eq('preformed_group_id', groupId)
-    .eq('user_id', user.id);
+    .eq('user_id', userId);
 
   if (error) return false;
 
@@ -163,44 +159,42 @@ export async function acceptGroupInvite(groupId: string): Promise<boolean> {
       listing_type_preference: 'any',
       apartment_search_type: 'have_group',
     })
-    .eq('user_id', user.id);
+    .eq('user_id', userId);
 
   return true;
 }
 
-export async function declineGroupInvite(groupId: string): Promise<boolean> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return false;
+export async function declineGroupInvite(userId: string, groupId: string): Promise<boolean> {
+  if (!userId) return false;
 
   const { error } = await supabase
     .from('preformed_group_members')
     .update({ status: 'declined' })
     .eq('preformed_group_id', groupId)
-    .eq('user_id', user.id);
+    .eq('user_id', userId);
 
   return !error;
 }
 
-export async function leavePreformedGroup(groupId: string): Promise<boolean> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return false;
+export async function leavePreformedGroup(userId: string, groupId: string): Promise<boolean> {
+  if (!userId) return false;
 
   const group = await getGroupById(groupId);
   if (!group) return false;
 
-  if (group.group_lead_id === user.id) {
+  if (group.group_lead_id === userId) {
     await supabase.from('preformed_group_members').delete().eq('preformed_group_id', groupId);
     await supabase.from('group_shortlist').delete().eq('preformed_group_id', groupId);
     await supabase.from('preformed_groups').delete().eq('id', groupId);
-    await supabase.from('profiles').update({ is_group_lead: false }).eq('user_id', user.id);
+    await supabase.from('profiles').update({ is_group_lead: false }).eq('user_id', userId);
   } else {
     await supabase
       .from('preformed_group_members')
       .delete()
       .eq('preformed_group_id', groupId)
-      .eq('user_id', user.id);
+      .eq('user_id', userId);
 
-    if (group.group_lead_id !== user.id) {
+    if (group.group_lead_id !== userId) {
       await supabase.from('notifications').insert({
         user_id: group.group_lead_id,
         type: 'group_member_left',
@@ -266,16 +260,15 @@ export async function updateGroupPreferences(groupId: string, updates: {
   return !error;
 }
 
-export async function addToShortlist(groupId: string, listingId: string, notes?: string): Promise<boolean> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return false;
+export async function addToShortlist(userId: string, groupId: string, listingId: string, notes?: string): Promise<boolean> {
+  if (!userId) return false;
 
   const { error } = await supabase
     .from('group_shortlist')
     .upsert({
       preformed_group_id: groupId,
       listing_id: listingId,
-      added_by: user.id,
+      added_by: userId,
       notes: notes || null,
     }, { onConflict: 'preformed_group_id,listing_id' });
 
@@ -349,22 +342,13 @@ export async function removeMember(groupId: string, memberId: string): Promise<b
   return !error;
 }
 
-export async function getUserPreformedGroup(userId?: string): Promise<PreformedGroup | null> {
-  let uid = userId;
-  if (!uid) {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      uid = user?.id;
-    } catch {
-      return null;
-    }
-  }
-  if (!uid) return null;
+export async function getUserPreformedGroup(userId: string): Promise<PreformedGroup | null> {
+  if (!userId) return null;
 
   const { data: memberData, error } = await supabase
     .from('preformed_group_members')
     .select('preformed_group_id')
-    .eq('user_id', uid)
+    .eq('user_id', userId)
     .eq('status', 'joined')
     .limit(1)
     .maybeSingle();
@@ -373,7 +357,7 @@ export async function getUserPreformedGroup(userId?: string): Promise<PreformedG
     console.warn('[getUserPreformedGroup] Supabase query failed, checking local storage');
     if (shouldLoadMockData()) {
       try {
-        const local = await AsyncStorage.getItem(`@rhome/preformed_group_${uid}`);
+        const local = await AsyncStorage.getItem(`@rhome/preformed_group_${userId}`);
         if (local) return JSON.parse(local) as PreformedGroup;
       } catch (e) {
         console.warn('[getUserPreformedGroup] Local fallback failed:', e);
@@ -385,7 +369,7 @@ export async function getUserPreformedGroup(userId?: string): Promise<PreformedG
   if (!memberData) {
     if (shouldLoadMockData()) {
       try {
-        const local = await AsyncStorage.getItem(`@rhome/preformed_group_${uid}`);
+        const local = await AsyncStorage.getItem(`@rhome/preformed_group_${userId}`);
         if (local) return JSON.parse(local) as PreformedGroup;
       } catch (e) {
         console.warn('[getUserPreformedGroup] Local fallback failed:', e);

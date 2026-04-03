@@ -207,7 +207,7 @@ export const PiGroupInviteScreen = () => {
     if (!invite) return;
     setResponding(true);
     try {
-      const success = await acceptGroupInvite(invite.group_id);
+      const success = await acceptGroupInvite(user!.id, invite.group_id);
       if (!success) {
         Alert.alert('Error', 'Could not accept the invite. Please try again.');
         setResponding(false);
@@ -243,7 +243,7 @@ export const PiGroupInviteScreen = () => {
     if (!invite) return;
     setResponding(true);
     try {
-      const success = await declineGroupInvite(invite.group_id);
+      const success = await declineGroupInvite(user!.id, invite.group_id);
       if (!success) {
         Alert.alert('Error', 'Could not decline the invite. Please try again.');
         setResponding(false);
@@ -666,12 +666,12 @@ export const PiGroupInviteScreen = () => {
         userName={reportMemberTarget?.name || 'User'}
         type="user"
         onReport={async (reason) => {
-          try { if (reportMemberTarget) await reportUser(reportMemberTarget.id, reason); } catch {}
+          try { if (reportMemberTarget) await reportUser(user!.id, reportMemberTarget.id, reason); } catch {}
         }}
         onBlock={async () => {
           try {
             if (reportMemberTarget) {
-              await blockUserRemote(reportMemberTarget.id);
+              await blockUserRemote(user!.id, reportMemberTarget.id);
               await blockUserLocal(reportMemberTarget.id);
               setShowMemberReport(false);
               setReportMemberTarget(null);

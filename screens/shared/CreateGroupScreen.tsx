@@ -106,7 +106,7 @@ export const CreateGroupScreen = ({ navigation, route }: any) => {
       }
 
       try {
-        const group = await createGroupSupabase({
+        const group = await createGroupSupabase(user!.id, {
           name: name.trim(),
           description: description.trim() || undefined,
           listing_id: selectedListingId || undefined,

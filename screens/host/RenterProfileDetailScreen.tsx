@@ -33,14 +33,14 @@ export const RenterProfileDetailScreen = () => {
 
   const handleReport = async (reason: string) => {
     try {
-      if (renter.id) await reportUser(renter.id, reason);
+      if (renter.id) await reportUser(user!.id, renter.id, reason);
     } catch {}
   };
 
   const handleBlock = async () => {
     try {
       if (renter.id) {
-        await blockUserRemote(renter.id);
+        await blockUserRemote(user!.id, renter.id);
         await blockUserLocal(renter.id);
         navigation.goBack();
       }

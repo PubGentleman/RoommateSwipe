@@ -36,7 +36,7 @@ export const BlockedUsersScreen = () => {
     if (!user) return;
     setIsLoading(true);
     try {
-      const supabaseData = await supabaseGetBlockedUsers();
+      const supabaseData = await supabaseGetBlockedUsers(user!.id);
       const users: BlockedUserInfo[] = (supabaseData || []).map((entry: any) => ({
         id: entry.blocked?.id || entry.blocked_id,
         name: entry.blocked?.full_name || 'Unknown User',
@@ -81,7 +81,7 @@ export const BlockedUsersScreen = () => {
     if (!confirmed) return;
     if (!user) return;
     try {
-      await supabaseUnblockUser(blockedUser.id);
+      await supabaseUnblockUser(user!.id, blockedUser.id);
     } catch (supabaseError) {
       console.warn('[BlockedUsersScreen] Supabase unblock failed, falling back to StorageService:', supabaseError);
     }

@@ -185,6 +185,7 @@ export const HostRenterGroupDetailScreen = () => {
       if (activeListing) {
         try {
           await createListingInquiryGroup(
+            user.id,
             activeListing.id, user.id,
             activeListing.address || activeListing.city || 'Your listing',
             group.groupId,
@@ -568,12 +569,12 @@ export const HostRenterGroupDetailScreen = () => {
         userName={reportMemberTarget?.name || 'User'}
         type="user"
         onReport={async (reason) => {
-          try { if (reportMemberTarget) await reportUser(reportMemberTarget.id, reason); } catch {}
+          try { if (reportMemberTarget) await reportUser(user!.id, reportMemberTarget.id, reason); } catch {}
         }}
         onBlock={async () => {
           try {
             if (reportMemberTarget) {
-              await blockUserRemote(reportMemberTarget.id);
+              await blockUserRemote(user!.id, reportMemberTarget.id);
               await blockUserLocal(reportMemberTarget.id);
               setShowMemberReport(false);
               setReportMemberTarget(null);

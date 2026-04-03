@@ -1,14 +1,13 @@
 import { supabase } from '../lib/supabase';
 import { canAccessMessages, canAccessConversation } from '../utils/messagingAccess';
 
-async function checkMessagingPaywall(conversationId?: string) {
-  const { data: { user: authUser } } = await supabase.auth.getUser();
-  if (!authUser) return;
+async function checkMessagingPaywall(userId: string, conversationId?: string) {
+  if (!userId) return;
 
   const { data: userRow } = await supabase
     .from('users')
     .select('role, host_type, agent_plan, company_plan, free_message_unlock_used, free_message_unlock_conversation_id')
-    .eq('id', authUser.id)
+    .eq('id', userId)
     .single();
 
   if (!userRow) return;
@@ -34,9 +33,8 @@ async function checkMessagingPaywall(conversationId?: string) {
   }
 }
 
-export async function getConversations() {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return [];
+export async function getConversations(userId: string) {
+  if (!userId) return [];
 
   const { data: matches } = await supabase
     .from('matches')
@@ -53,21 +51,21 @@ export async function getConversations() {
       messages(id, content, created_at, sender_id, read, read_at)
     `)
     .eq('status', 'matched')
-    .or(`user_id_1.eq.${user.id},user_id_2.eq.${user.id}`)
+    .or(`user_id_1.eq.${userId},user_id_2.eq.${userId}`)
     .order('created_at', { ascending: false })
     .limit(30);
 
   if (!matches || matches.length === 0) return [];
 
   const conversations = matches.map((match: any) => {
-    const otherUser = match.user_id_1 === user.id ? match.user2 : match.user1;
+    const otherUser = match.user_id_1 === userId ? match.user2 : match.user1;
     const msgs = match.messages || [];
     const sortedMsgs = [...msgs].sort(
       (a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     );
     const lastMsg = sortedMsgs[0];
     const unreadCount = msgs.filter(
-      (m: any) => m.sender_id !== user.id && !m.read && !m.read_at
+      (m: any) => m.sender_id !== userId && !m.read && !m.read_at
     ).length;
 
     return {
@@ -98,17 +96,16 @@ export async function getMessages(matchId: string, limit = 50, offset = 0) {
   return data || [];
 }
 
-export async function sendMessage(matchId: string, content: string) {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not authenticated');
+export async function sendMessage(userId: string, matchId: string, content: string) {
+  if (!userId) throw new Error('Not authenticated');
 
-  await checkMessagingPaywall(matchId);
+  await checkMessagingPaywall(userId, matchId);
 
   const { data, error } = await supabase
     .from('messages')
     .insert({
       match_id: matchId,
-      sender_id: user.id,
+      sender_id: userId,
       content,
     })
     .select()
@@ -119,21 +116,21 @@ export async function sendMessage(matchId: string, content: string) {
 }
 
 export async function sendStructuredMessage(
+  userId: string,
   matchId: string,
   messageType: string,
   metadata: Record<string, any>,
   displayContent: string
 ) {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not authenticated');
+  if (!userId) throw new Error('Not authenticated');
 
-  await checkMessagingPaywall(matchId);
+  await checkMessagingPaywall(userId, matchId);
 
   const { data, error } = await supabase
     .from('messages')
     .insert({
       match_id: matchId,
-      sender_id: user.id,
+      sender_id: userId,
       content: displayContent,
       message_type: messageType,
       metadata,
@@ -165,24 +162,22 @@ export async function updateMessageMetadata(
   if (error) throw error;
 }
 
-export async function markMessagesAsRead(matchId: string) {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return;
+export async function markMessagesAsRead(userId: string, matchId: string) {
+  if (!userId) return;
 
   await supabase
     .from('messages')
     .update({ read: true, read_at: new Date().toISOString() })
     .eq('match_id', matchId)
-    .neq('sender_id', user.id)
+    .neq('sender_id', userId)
     .eq('read', false);
 }
 
-export async function sendColdMessage(recipientId: string, content: string) {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not authenticated');
+export async function sendColdMessage(userId: string, recipientId: string, content: string) {
+  if (!userId) throw new Error('Not authenticated');
 
-  const userId1 = user.id < recipientId ? user.id : recipientId;
-  const userId2 = user.id < recipientId ? recipientId : user.id;
+  const userId1 = userId < recipientId ? userId : recipientId;
+  const userId2 = userId < recipientId ? recipientId : userId;
 
   const { data: match, error: matchError } = await supabase
     .from('matches')
@@ -201,7 +196,7 @@ export async function sendColdMessage(recipientId: string, content: string) {
     .from('messages')
     .insert({
       match_id: match.id,
-      sender_id: user.id,
+      sender_id: userId,
       content,
     })
     .select()

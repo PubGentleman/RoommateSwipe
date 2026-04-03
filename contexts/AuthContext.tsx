@@ -421,9 +421,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return;
         }
       } else {
-        try {
-          await supabase.from('users').update({ last_active_at: new Date().toISOString() }).eq('id', session.user.id);
-        } catch (e) {}
+        supabase.from('users').update({ last_active_at: new Date().toISOString() }).eq('id', session.user.id).then(() => {}).catch(() => {});
       }
 
       const localUser = await StorageService.getCurrentUser();
@@ -508,14 +506,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
 
-      await StorageService.setCurrentUser(mappedUser);
-      await StorageService.addOrUpdateUser(mappedUser);
+      setUser(mappedUser);
+
+      StorageService.setCurrentUser(mappedUser).catch(() => {});
+      StorageService.addOrUpdateUser(mappedUser).catch(() => {});
 
       rcIdentifyUser(mappedUser.id).catch(() => {});
 
       StorageService.seedUserSpecificMockData(mappedUser.id, mappedUser.name, mappedUser.role, mappedUser.hostType).catch(() => {});
-
-      setUser(mappedUser);
     } catch (error) {
       console.error('Error loading user from Supabase:', error);
       try {
@@ -615,11 +613,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const loadUser = async () => {
     try {
-      await loadUserFromStorage();
+      const [_, sessionResult] = await Promise.all([
+        loadUserFromStorage(),
+        isSupabaseConfigured ? supabase.auth.getSession() : Promise.resolve(null),
+      ]);
 
-      if (!isSupabaseConfigured) return;
-
-      const { data: { session } } = await supabase.auth.getSession();
+      const session = (sessionResult as any)?.data?.session ?? null;
       if (session) {
         loadUserFromSupabase(session).catch((err) => {
           console.warn('[Auth] Background Supabase sync failed:', err);
@@ -1424,7 +1423,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(updatedUser);
 
     try {
-      await boostServiceActivateBoost(durationHours);
+      await boostServiceActivateBoost(user.id, durationHours);
       console.log('[Auth] Boost synced to Supabase');
     } catch (err) {
       console.log('[Auth] Supabase boost sync failed, local state updated:', err);
@@ -1481,7 +1480,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(updatedUser);
 
         try {
-          await deactivateExpiredBoosts();
+          await deactivateExpiredBoosts(user.id);
           console.log('[Auth] Expired boosts deactivated in Supabase');
         } catch (err) {
           console.log('[Auth] Supabase deactivate expired boosts failed:', err);

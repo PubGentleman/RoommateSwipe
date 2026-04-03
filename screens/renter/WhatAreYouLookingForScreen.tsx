@@ -103,7 +103,7 @@ export default function WhatAreYouLookingForScreen({ onComplete, isSettings, ini
     if (!user) return;
     setSaving(true);
 
-    updateProfile({
+    updateProfile(user.id, {
       listing_type_preference: listingPref,
       apartment_search_type: searchType,
     }).catch(err => {

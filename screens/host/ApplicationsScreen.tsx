@@ -24,7 +24,7 @@ export const ApplicationsScreen = () => {
   const loadApplications = useCallback(async () => {
     if (!user) return;
     try {
-      const supabaseCards = await getInterestCardsForHost();
+      const supabaseCards = await getInterestCardsForHost(user.id);
       if (supabaseCards) {
         const mappedApps: Application[] = supabaseCards.map((card: any) => ({
           id: card.id,

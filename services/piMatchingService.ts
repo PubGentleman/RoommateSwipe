@@ -13,21 +13,16 @@ import type {
 
 const DECK_SWIPED_INVALIDATION_RATIO = 0.5;
 
-async function getCurrentUserId(): Promise<string | null> {
-  const { data: { user } } = await supabase.auth.getUser();
-  return user?.id ?? null;
-}
-
 function isExpired(expiresAt: string): boolean {
   return new Date(expiresAt) <= new Date();
 }
 
 export async function getCachedOrGenerateInsight(
+  userId: string,
   targetUserId: string,
   matchScore?: number
 ): Promise<PiMatchInsight | null> {
   try {
-    const userId = await getCurrentUserId();
     if (!userId) return null;
 
     const { data: cached } = await supabase
@@ -57,10 +52,10 @@ export async function getCachedOrGenerateInsight(
 }
 
 export async function getCachedInsight(
+  userId: string,
   targetUserId: string
 ): Promise<PiMatchInsight | null> {
   try {
-    const userId = await getCurrentUserId();
     if (!userId) return null;
 
     const { data } = await supabase
@@ -80,10 +75,10 @@ export async function getCachedInsight(
 }
 
 export async function generateDeckReranking(
+  userId: string,
   candidateIds: string[]
 ): Promise<PiDeckRanking | null> {
   try {
-    const userId = await getCurrentUserId();
     if (!userId) return null;
 
     const quotaOk = await checkAIQuota(userId, 'deck_rerank');
@@ -101,9 +96,8 @@ export async function generateDeckReranking(
   }
 }
 
-export async function getCachedDeckRanking(): Promise<PiDeckRanking | null> {
+export async function getCachedDeckRanking(userId: string): Promise<PiDeckRanking | null> {
   try {
-    const userId = await getCurrentUserId();
     if (!userId) return null;
 
     const { data } = await supabase
@@ -146,10 +140,10 @@ export async function incrementDeckSwipedCount(rankingId: string): Promise<void>
 }
 
 export async function parseIdealRoommateText(
+  userId: string,
   text: string
 ): Promise<PiParsedPreferences | null> {
   try {
-    const userId = await getCurrentUserId();
     if (!userId) return null;
     if (!text || text.trim().length < 20) return null;
 
@@ -169,10 +163,10 @@ export async function parseIdealRoommateText(
 }
 
 export async function getHostRecommendations(
+  userId: string,
   listingId: string
 ): Promise<PiHostRecommendation | null> {
   try {
-    const userId = await getCurrentUserId();
     if (!userId) return null;
 
     const { data: cached } = await supabase

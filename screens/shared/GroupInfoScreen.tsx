@@ -194,7 +194,7 @@ export function GroupInfoScreen({ route, navigation }: Props) {
   async function loadGroup() {
     setLoading(true);
     try {
-      const data = await getGroupDetails(groupId);
+      const data = await getGroupDetails(user!.id, groupId);
       setGroup(data);
     } catch (err: any) {
       console.warn('[GroupInfoScreen] Supabase failed, using local fallback:', err.message);
@@ -408,7 +408,7 @@ export function GroupInfoScreen({ route, navigation }: Props) {
     setRemovingId(memberId);
     let success = false;
     try {
-      await removeMember(groupId, memberId);
+      await removeMember(user!.id, groupId, memberId);
       success = true;
     } catch {
       try {
@@ -444,7 +444,7 @@ export function GroupInfoScreen({ route, navigation }: Props) {
 
     let success = false;
     try {
-      await promoteMember(groupId, memberId);
+      await promoteMember(user!.id, groupId, memberId);
       success = true;
     } catch {
       try {
@@ -497,7 +497,7 @@ export function GroupInfoScreen({ route, navigation }: Props) {
 
     let success = false;
     try {
-      await leaveGroup(groupId);
+      await leaveGroup(user!.id, groupId);
       success = true;
     } catch (err: any) {
       if (err.message === 'PROMOTE_REQUIRED') {
@@ -540,7 +540,7 @@ export function GroupInfoScreen({ route, navigation }: Props) {
 
     let success = false;
     try {
-      await leaveGroup(groupId);
+      await leaveGroup(user!.id, groupId);
       success = true;
     } catch {
       try {
@@ -1351,7 +1351,7 @@ export function GroupInfoScreen({ route, navigation }: Props) {
         userName={group?.name || 'Group'}
         type="group"
         onReport={async (reason) => {
-          try { await reportGroup(groupId, reason); } catch {}
+          try { await reportGroup(user!.id, groupId, reason); } catch {}
         }}
       />
 
@@ -1361,12 +1361,12 @@ export function GroupInfoScreen({ route, navigation }: Props) {
         userName={reportMemberTarget?.name || 'User'}
         type="user"
         onReport={async (reason) => {
-          try { if (reportMemberTarget) await reportUser(reportMemberTarget.id, reason); } catch {}
+          try { if (reportMemberTarget) await reportUser(user!.id, reportMemberTarget.id, reason); } catch {}
         }}
         onBlock={async () => {
           try {
             if (reportMemberTarget) {
-              await blockUserRemote(reportMemberTarget.id);
+              await blockUserRemote(user!.id, reportMemberTarget.id);
               await blockUserLocal(reportMemberTarget.id);
               setShowMemberReport(false);
               setReportMemberTarget(null);

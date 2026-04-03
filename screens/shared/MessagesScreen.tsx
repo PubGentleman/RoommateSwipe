@@ -96,7 +96,7 @@ export const MessagesScreen = () => {
   );
 
   const loadConversationsFromSupabase = async (): Promise<Conversation[]> => {
-    const supaConvs = await getSupabaseConversations();
+    const supaConvs = await getSupabaseConversations(user!.id);
     return supaConvs.map((sc: any) => ({
       id: `conv_${sc.matchId}`,
       participant: {
@@ -292,7 +292,7 @@ export const MessagesScreen = () => {
       setConversations(accessibleConversations);
       if (!isHostMode) {
         try {
-          const groups = await getMyInquiryGroups();
+          const groups = await getMyInquiryGroups(user!.id);
           const mapped = groups.map((g: any) => ({
             ...g,
             listingAddress: g.listing_address || g.listingAddress,

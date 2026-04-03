@@ -137,7 +137,7 @@ export default function MyGroupScreen() {
         text: 'Leave',
         style: 'destructive',
         onPress: async () => {
-          await leavePreformedGroup(group.id);
+          await leavePreformedGroup(user!.id, group.id);
           navigation.goBack();
         },
       },
@@ -175,7 +175,7 @@ export default function MyGroupScreen() {
         style: 'destructive',
         onPress: async () => {
           await removeMember(group.id, memberId);
-          const freshGroup = await getUserPreformedGroup();
+          const freshGroup = await getUserPreformedGroup(user!.id);
           if (freshGroup) {
             const freshMembers = await getGroupMembers(freshGroup.id);
             setGroup(freshGroup);
@@ -470,7 +470,7 @@ export default function MyGroupScreen() {
                   if (!group) return;
                   setTourSubmitting(true);
                   try {
-                    await createTourEvent({
+                    await createTourEvent(user!.id, {
                       groupId: group.id,
                       tourDate: data.tourDate,
                       tourTime: data.tourTime,
@@ -510,7 +510,7 @@ export default function MyGroupScreen() {
                 isCreator={tour.created_by === user?.id}
                 onRSVP={async (tourId, status) => {
                   try {
-                    await updateTourRSVP(tourId, status);
+                    await updateTourRSVP(user!.id, tourId, status);
                     loadData();
                   } catch {
                     Alert.alert('Error', 'Failed to update RSVP.');
@@ -667,7 +667,7 @@ export default function MyGroupScreen() {
                             text: 'Transfer',
                             onPress: async () => {
                               try {
-                                await transferGroupLead(group.id, m.user_id);
+                                await transferGroupLead(user!.id, group.id, m.user_id);
                                 Alert.alert('Done', `${m.name || 'Member'} is now the group lead.`);
                                 loadData();
                               } catch {
@@ -732,7 +732,7 @@ export default function MyGroupScreen() {
         userName={group?.name || 'Group'}
         type="group"
         onReport={async (reason) => {
-          try { if (group) await reportGroup(group.id, reason); } catch {}
+          try { if (group) await reportGroup(user!.id, group.id, reason); } catch {}
         }}
       />
 
@@ -742,12 +742,12 @@ export default function MyGroupScreen() {
         userName={reportMemberTarget?.name || 'User'}
         type="user"
         onReport={async (reason) => {
-          try { if (reportMemberTarget) await reportUser(reportMemberTarget.id, reason); } catch {}
+          try { if (reportMemberTarget) await reportUser(user!.id, reportMemberTarget.id, reason); } catch {}
         }}
         onBlock={async () => {
           try {
             if (reportMemberTarget) {
-              await blockUserRemote(reportMemberTarget.id);
+              await blockUserRemote(user!.id, reportMemberTarget.id);
               await blockUserLocal(reportMemberTarget.id);
               setShowMemberReport(false);
               setReportMemberTarget(null);

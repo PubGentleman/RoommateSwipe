@@ -4,23 +4,21 @@ export type RenterPlan = 'basic' | 'plus' | 'elite';
 export type HostPlan = 'starter' | 'pro' | 'business';
 export type BillingCycle = 'monthly' | '3month' | 'annual';
 
-export async function getSubscription() {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
+export async function getSubscription(userId: string) {
+  if (!userId) return null;
 
   const { data, error } = await supabase
     .from('subscriptions')
     .select('*')
-    .eq('user_id', user.id)
+    .eq('user_id', userId)
     .single();
 
   if (error) return null;
   return data;
 }
 
-export async function updateSubscription(plan: string, billingCycle: BillingCycle) {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not authenticated');
+export async function updateSubscription(userId: string, plan: string, billingCycle: BillingCycle) {
+  if (!userId) throw new Error('Not authenticated');
 
   const periodEnd = calculatePeriodEnd(billingCycle);
 
@@ -33,7 +31,7 @@ export async function updateSubscription(plan: string, billingCycle: BillingCycl
       current_period_end: periodEnd,
       cancel_at_period_end: false,
     })
-    .eq('user_id', user.id)
+    .eq('user_id', userId)
     .select()
     .single();
 
@@ -44,15 +42,14 @@ export async function updateSubscription(plan: string, billingCycle: BillingCycl
     await supabase
       .from('users')
       .update({ agent_plan: plan })
-      .eq('id', user.id);
+      .eq('id', userId);
   }
 
   return data;
 }
 
-export async function cancelSubscription() {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not authenticated');
+export async function cancelSubscription(userId: string) {
+  if (!userId) throw new Error('Not authenticated');
 
   const { data, error } = await supabase
     .from('subscriptions')
@@ -60,7 +57,7 @@ export async function cancelSubscription() {
       status: 'cancelling',
       cancel_at_period_end: true,
     })
-    .eq('user_id', user.id)
+    .eq('user_id', userId)
     .select()
     .single();
 
@@ -68,9 +65,8 @@ export async function cancelSubscription() {
   return data;
 }
 
-export async function reactivateSubscription() {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not authenticated');
+export async function reactivateSubscription(userId: string) {
+  if (!userId) throw new Error('Not authenticated');
 
   const { data, error } = await supabase
     .from('subscriptions')
@@ -78,7 +74,7 @@ export async function reactivateSubscription() {
       status: 'active',
       cancel_at_period_end: false,
     })
-    .eq('user_id', user.id)
+    .eq('user_id', userId)
     .select()
     .single();
 

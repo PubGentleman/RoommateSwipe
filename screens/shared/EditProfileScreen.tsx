@@ -219,7 +219,7 @@ export const EditProfileScreen = () => {
         if (photo.startsWith('data:') || photo.startsWith('file://') || photo.startsWith('content://')) {
           try {
             const fileName = `photo_${Date.now()}_${uploadedPhotoUrls.length}.jpg`;
-            const url = await uploadProfilePhoto(photo, fileName);
+            const url = await uploadProfilePhoto(user!.id, photo, fileName);
             uploadedPhotoUrls.push(url);
           } catch (uploadErr) {
             console.warn('[EditProfileScreen] Photo upload failed, keeping local URI:', uploadErr);
@@ -230,7 +230,7 @@ export const EditProfileScreen = () => {
         }
       }
 
-      await supabaseUpdateUser({
+      await supabaseUpdateUser(user!.id, {
         full_name: name.trim(),
         avatar_url: uploadedPhotoUrls[0] || undefined,
         bio: bio.trim() || undefined,
@@ -246,7 +246,7 @@ export const EditProfileScreen = () => {
         } : {}),
       });
 
-      await supabaseUpdateProfile({
+      await supabaseUpdateProfile(user!.id, {
         budget_min: budgetMin.trim() ? parseInt(budgetMin) : (budget.trim() ? parseInt(budget) : undefined),
         budget_max: budgetMax.trim() ? parseInt(budgetMax) : undefined,
         preferred_neighborhoods: preferredNeighborhoods.length > 0 ? preferredNeighborhoods : undefined,

@@ -746,7 +746,7 @@ export const ProfileQuestionnaireScreen = () => {
     await updateUser(buildProfileData());
 
     try {
-      await updateProfile({
+      await updateProfile(user!.id, {
         preferred_neighborhoods: preferredNeighborhoods.length > 0 ? preferredNeighborhoods : undefined,
         zip_code: zipCode.trim() || undefined,
         ideal_roommate_text: idealRoommateTextRef.current.trim() || undefined,

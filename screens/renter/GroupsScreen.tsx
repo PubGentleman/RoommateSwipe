@@ -114,17 +114,17 @@ export const GroupsScreen = () => {
       loadGroups();
       loadLikedGroupState();
       if (user) {
-        getMyPendingInvites()
+        getMyPendingInvites(user.id)
           .then(setPendingInvites)
           .catch(() => {
             StorageService.getPendingGroupInvites(user.id).then(setPendingInvites).catch(() => {});
           });
-        getMyPendingCompanyInvites()
+        getMyPendingCompanyInvites(user.id)
           .then(setCompanyInvites)
           .catch(() => setCompanyInvites([]));
       }
       if (user?.role === 'host') {
-        getMyListings().catch(() => {});
+        getMyListings(user.id).catch(() => {});
       }
     }, [user, activeCity, activeSubArea])
   );
@@ -197,7 +197,7 @@ export const GroupsScreen = () => {
         const [discoverResult, myGroupsResult, inquiryResult] = await withTimeout(
           Promise.allSettled([
             getGroupsFromSupabase(activeCity || undefined, 'roommate'),
-            getMyGroupsFromSupabase('roommate', user.id),
+            getMyGroupsFromSupabase(user.id, 'roommate'),
             getMyInquiryGroupsFromSupabase(user.id),
           ]),
           15000
@@ -439,7 +439,7 @@ export const GroupsScreen = () => {
 
     try {
       const { likeGroup: likeGroupSupabase } = await import('../../services/groupService');
-      await likeGroupSupabase(group.id);
+      await likeGroupSupabase(user.id, group.id);
     } catch {
       await StorageService.addGroupLike(group.id, user.id);
     }
@@ -461,7 +461,7 @@ export const GroupsScreen = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
       const { requestToJoinGroup } = await import('../../services/groupService');
-      await requestToJoinGroup(group.id);
+      await requestToJoinGroup(user.id, group.id);
     } catch {
       await StorageService.likeGroup(group.id, user.id);
     }
@@ -529,7 +529,7 @@ export const GroupsScreen = () => {
       if (action === 'like') {
         try {
           const { unlikeGroupLike } = await import('../../services/groupService');
-          await unlikeGroupLike(groupId);
+          await unlikeGroupLike(user!.id, groupId);
         } catch {
           await StorageService.removeGroupLike(groupId, user!.id);
         }
@@ -707,7 +707,7 @@ export const GroupsScreen = () => {
 
   const handleAcceptInvite = async (invite: any) => {
     try {
-      await respondToInvite(invite.id, 'accepted');
+      await respondToInvite(user!.id, invite.id, 'accepted');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       await showAlert({ title: 'Joined!', message: `You have joined "${invite.groupName}".`, variant: 'success' });
       setPendingInvites(prev => prev.filter(i => i.id !== invite.id));
@@ -719,7 +719,7 @@ export const GroupsScreen = () => {
 
   const handleDeclineInvite = async (invite: any) => {
     try {
-      await respondToInvite(invite.id, 'declined');
+      await respondToInvite(user!.id, invite.id, 'declined');
       setPendingInvites(prev => prev.filter(i => i.id !== invite.id));
     } catch {
       await showAlert({ title: 'Error', message: 'Could not decline invite. Try again.', variant: 'warning' });
@@ -747,7 +747,7 @@ export const GroupsScreen = () => {
     });
     if (confirmed) {
       try {
-        await leaveGroupSupabase(group.id);
+        await leaveGroupSupabase(user.id, group.id);
       } catch (supabaseError) {
         console.warn('[GroupsScreen] Supabase leaveGroup failed, falling back:', supabaseError);
         await StorageService.leaveGroup(group.id, user.id);
@@ -2231,12 +2231,12 @@ export const GroupsScreen = () => {
         userName={reportMemberTarget?.name || 'User'}
         type="user"
         onReport={async (reason) => {
-          try { if (reportMemberTarget) await reportUser(reportMemberTarget.id, reason); } catch {}
+          try { if (reportMemberTarget) await reportUser(user!.id, reportMemberTarget.id, reason); } catch {}
         }}
         onBlock={async () => {
           try {
             if (reportMemberTarget) {
-              await blockUserRemote(reportMemberTarget.id);
+              await blockUserRemote(user!.id, reportMemberTarget.id);
               await blockUserLocal(reportMemberTarget.id);
               setShowMemberReportModal(false);
               setReportMemberTarget(null);

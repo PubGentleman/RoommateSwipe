@@ -54,26 +54,25 @@ export interface UserData {
   role?: string;
 }
 
-export async function getMyProfile() {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
+export async function getMyProfile(userId: string) {
+  if (!userId) return null;
 
   const { data: userData } = await supabase
     .from('users')
     .select('*')
-    .eq('id', user.id)
+    .eq('id', userId)
     .single();
 
   const { data: profileData } = await supabase
     .from('profiles')
     .select('*')
-    .eq('user_id', user.id)
+    .eq('user_id', userId)
     .single();
 
   const { data: subscription } = await supabase
     .from('subscriptions')
     .select('*')
-    .eq('user_id', user.id)
+    .eq('user_id', userId)
     .single();
 
   return { user: userData, profile: profileData, subscription };
@@ -95,14 +94,13 @@ export async function getUserProfile(userId: string) {
   return { user: userData, profile: profileData };
 }
 
-export async function updateUser(updates: UserData) {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not authenticated');
+export async function updateUser(userId: string, updates: UserData) {
+  if (!userId) throw new Error('Not authenticated');
 
   const { data, error } = await supabase
     .from('users')
     .update(updates)
-    .eq('id', user.id)
+    .eq('id', userId)
     .select()
     .single();
 
@@ -110,9 +108,8 @@ export async function updateUser(updates: UserData) {
   return data;
 }
 
-export async function updateProfile(updates: ProfileData) {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not authenticated');
+export async function updateProfile(userId: string, updates: ProfileData) {
+  if (!userId) throw new Error('Not authenticated');
 
   if (updates.photos && Array.isArray(updates.photos) && updates.photos.length < 3) {
     throw new Error('At least 3 photos are required to save your profile');
@@ -121,7 +118,7 @@ export async function updateProfile(updates: ProfileData) {
   const { data: existing } = await supabase
     .from('profiles')
     .select('id')
-    .eq('user_id', user.id)
+    .eq('user_id', userId)
     .single();
 
   let result;
@@ -129,7 +126,7 @@ export async function updateProfile(updates: ProfileData) {
     const { data, error } = await supabase
       .from('profiles')
       .update(updates)
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .select()
       .single();
     if (error) throw error;
@@ -137,7 +134,7 @@ export async function updateProfile(updates: ProfileData) {
   } else {
     const { data, error } = await supabase
       .from('profiles')
-      .insert({ user_id: user.id, ...updates })
+      .insert({ user_id: userId, ...updates })
       .select()
       .single();
     if (error) throw error;
@@ -153,7 +150,7 @@ export async function updateProfile(updates: ProfileData) {
 
   const matchingFieldsChanged = hasMatchingFieldChanges(updates);
   if (matchingFieldsChanged) {
-    triggerPiCacheInvalidation(user.id).catch(() => {});
+    triggerPiCacheInvalidation(userId).catch(() => {});
   }
 
   return result;
@@ -188,13 +185,12 @@ async function triggerPiCacheInvalidation(userId: string): Promise<void> {
   }
 }
 
-export async function uploadProfilePhoto(uri: string, fileName: string) {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not authenticated');
+export async function uploadProfilePhoto(userId: string, uri: string, fileName: string) {
+  if (!userId) throw new Error('Not authenticated');
 
   const response = await fetch(uri);
   const blob = await response.blob();
-  const filePath = `${user.id}/${fileName}`;
+  const filePath = `${userId}/${fileName}`;
 
   const { error: uploadError } = await supabase.storage
     .from('profile-photos')
@@ -209,9 +205,8 @@ export async function uploadProfilePhoto(uri: string, fileName: string) {
   return urlData.publicUrl;
 }
 
-export async function deleteProfilePhoto(photoUrl: string) {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not authenticated');
+export async function deleteProfilePhoto(userId: string, photoUrl: string) {
+  if (!userId) throw new Error('Not authenticated');
 
   const path = photoUrl.split('profile-photos/')[1];
   if (path) {
@@ -219,23 +214,21 @@ export async function deleteProfilePhoto(photoUrl: string) {
   }
 }
 
-export async function recordProfileView(viewedUserId: string) {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user || user.id === viewedUserId) return;
+export async function recordProfileView(userId: string, viewedUserId: string) {
+  if (!userId || userId === viewedUserId) return;
 
   await supabase
     .from('profile_views')
-    .insert({ viewer_id: user.id, viewed_id: viewedUserId });
+    .insert({ viewer_id: userId, viewed_id: viewedUserId });
 }
 
-export async function getProfileViews() {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return [];
+export async function getProfileViews(userId: string) {
+  if (!userId) return [];
 
   const { data } = await supabase
     .from('profile_views')
     .select('*, viewer:users!viewer_id(id, full_name, avatar_url)')
-    .eq('viewed_id', user.id)
+    .eq('viewed_id', userId)
     .order('created_at', { ascending: false })
     .limit(50);
 

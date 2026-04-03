@@ -177,7 +177,7 @@ export const HostDashboardScreen = () => {
 
     let freshListings: Property[] = [];
     try {
-      const supaListings = await getMyListings();
+      const supaListings = await getMyListings(user.id);
       if (supaListings && supaListings.length > 0) {
         freshListings = supaListings.map((l: any) => mapListingToProperty(l, user.name));
         setListings(freshListings);
@@ -218,7 +218,7 @@ export const HostDashboardScreen = () => {
     setMessageCount(unreadMessages);
 
     try {
-      const supaCards = await getReceivedInterestCards();
+      const supaCards = await getReceivedInterestCards(user.id);
       const mapped: InterestCard[] = (supaCards || []).map((c: any) => ({
         id: c.id,
         renterId: c.sender?.id || c.sender_id,
@@ -423,7 +423,7 @@ export const HostDashboardScreen = () => {
 
     let supabaseMatchId: string | undefined;
     try {
-      const result = await acceptInterestCard(card.id, card.renterId);
+      const result = await acceptInterestCard(user!.id, card.id, card.renterId);
       supabaseMatchId = result?.match?.id;
     } catch {
       await StorageService.updateInterestCard(card.id, {
@@ -523,7 +523,7 @@ export const HostDashboardScreen = () => {
     const now = new Date();
 
     try {
-      await rejectInterestCard(card.id);
+      await rejectInterestCard(user!.id, card.id);
     } catch {
       await StorageService.updateInterestCard(card.id, {
         status: 'passed',
