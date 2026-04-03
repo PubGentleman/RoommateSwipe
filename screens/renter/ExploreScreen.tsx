@@ -1301,19 +1301,6 @@ export const ExploreScreen = () => {
                 <Text style={[styles.tagText, { color: '#1a1200', marginLeft: 3 }]}>FEATURED</Text>
               </View>
             ) : null}
-            {item.listingBoost?.isActive &&
-             item.listingBoost?.includesViewCount &&
-             new Date(item.listingBoost.expiresAt) > new Date() ? (
-              <View style={styles.viewCountBadge}>
-                <Feather name="eye" size={9} color="#fff" />
-                <Text style={[styles.tagText, { color: '#fff', marginLeft: 3 }]}>
-                  {(() => {
-                    const seed = item.id.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
-                    return Math.floor(20 + (seed % 80));
-                  })()} views
-                </Text>
-              </View>
-            ) : null}
           </View>
           <Pressable
             style={[styles.saveBtn, saved.has(item.id) ? styles.saveBtnActive : null]}
@@ -4431,14 +4418,6 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: '700',
     letterSpacing: 0.5,
-  },
-  viewCountBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(168,85,247,0.85)',
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: 6,
   },
   topPicksSection: {
     marginBottom: Spacing.lg,

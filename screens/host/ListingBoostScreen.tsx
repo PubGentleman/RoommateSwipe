@@ -12,6 +12,7 @@ import { Property, HostSubscriptionData, ListingBoost, BoostCredits } from '../.
 import { BOOST_OPTIONS, BOOST_PACKS, calculateBoostExpiry, isListingBoosted, getBoostTimeRemaining, isFreePlan, createBoostRecord } from '../../utils/hostPricing';
 import { getListing } from '../../services/listingService';
 import { getPlanLimits, type HostPlan } from '../../constants/planLimits';
+import { getImpressionStats } from '../../services/boostImpressionService';
 
 const isDev = __DEV__;
 const BG = '#111';
@@ -364,10 +365,10 @@ export const ListingBoostScreen = () => {
                   <Text style={styles.activeBoostBadgeText}>Featured badge is showing on your listing</Text>
                 </View>
               ) : null}
-              {listing.listingBoost.includesViewCount ? (
+              {listing.listingBoost.includesAnalytics ? (
                 <View style={styles.activeBoostBadgeRow}>
-                  <Feather name="eye" size={12} color="#a855f7" />
-                  <Text style={styles.activeBoostBadgeText}>View counter visible to renters</Text>
+                  <Feather name="bar-chart-2" size={12} color="#3b82f6" />
+                  <Text style={styles.activeBoostBadgeText}>Impression tracking active</Text>
                 </View>
               ) : null}
               {listing.listingBoost.includesTopPicks ? (
@@ -380,47 +381,8 @@ export const ListingBoostScreen = () => {
           </View>
         ) : null}
 
-        {!isBoosted && listing.listingBoost?.includesAnalytics && listing.listingBoost?.startedAt ? (
-          <View style={styles.analyticsCard}>
-            <View style={styles.analyticsHeader}>
-              <Feather name="bar-chart-2" size={16} color="#3b82f6" />
-              <Text style={styles.analyticsTitle}>Boost Performance</Text>
-            </View>
-            <Text style={styles.analyticsSubtitle}>
-              {new Date(listing.listingBoost.startedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} — {new Date(listing.listingBoost.expiresAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-            </Text>
-            <View style={styles.analyticsStats}>
-              <View style={styles.analyticsStat}>
-                <Text style={styles.analyticsStatValue}>
-                  {(() => {
-                    const seed = listing.id.split('').reduce((a: number, c: string) => a + c.charCodeAt(0), 0);
-                    return Math.floor(40 + (seed % 120));
-                  })()}
-                </Text>
-                <Text style={styles.analyticsStatLabel}>Views</Text>
-              </View>
-              <View style={[styles.analyticsStat, { borderLeftWidth: 1, borderRightWidth: 1, borderColor: 'rgba(255,255,255,0.06)' }]}>
-                <Text style={styles.analyticsStatValue}>
-                  {(() => {
-                    const seed = listing.id.split('').reduce((a: number, c: string) => a + c.charCodeAt(0), 0);
-                    return Math.floor(3 + (seed % 12));
-                  })()}
-                </Text>
-                <Text style={styles.analyticsStatLabel}>Inquiries</Text>
-              </View>
-              <View style={styles.analyticsStat}>
-                <Text style={styles.analyticsStatValue}>
-                  {(() => {
-                    const seed = listing.id.split('').reduce((a: number, c: string) => a + c.charCodeAt(0), 0);
-                    const views = 40 + (seed % 120);
-                    const inquiries = 3 + (seed % 12);
-                    return Math.round((inquiries / views) * 100);
-                  })()}%
-                </Text>
-                <Text style={styles.analyticsStatLabel}>Conversion</Text>
-              </View>
-            </View>
-          </View>
+        {listing.listingBoost?.includesAnalytics && listing.listingBoost?.startedAt ? (
+          <BoostAnalyticsCard listing={listing} isBoosted={isBoosted} />
         ) : null}
 
         {hasReachedBoostLimit ? (
@@ -553,17 +515,6 @@ export const ListingBoostScreen = () => {
                         <Text style={[styles.perkText, { color: 'rgba(255,255,255,0.25)' }]}>No badge</Text>
                       </View>
                     )}
-                    {option.includesViewCount ? (
-                      <View style={styles.perkRow}>
-                        <Feather name="eye" size={12} color="#a855f7" />
-                        <Text style={[styles.perkText, { color: '#a855f7' }]}>Social proof view counter</Text>
-                      </View>
-                    ) : (
-                      <View style={styles.perkRow}>
-                        <Feather name="minus" size={12} color="rgba(255,255,255,0.2)" />
-                        <Text style={[styles.perkText, { color: 'rgba(255,255,255,0.25)' }]}>No view counter</Text>
-                      </View>
-                    )}
                     {option.includesTopPicks ? (
                       <View style={styles.perkRow}>
                         <Feather name="award" size={12} color="#22c55e" />
@@ -573,7 +524,9 @@ export const ListingBoostScreen = () => {
                     {option.includesAnalytics ? (
                       <View style={styles.perkRow}>
                         <Feather name="bar-chart-2" size={12} color="#3b82f6" />
-                        <Text style={[styles.perkText, { color: '#3b82f6' }]}>Boost performance analytics</Text>
+                        <Text style={[styles.perkText, { color: '#3b82f6' }]}>
+                          {option.id === 'extended' ? 'Full analytics dashboard' : 'Impression tracking'}
+                        </Text>
                       </View>
                     ) : null}
                   </View>
@@ -612,10 +565,10 @@ export const ListingBoostScreen = () => {
             Quick Boost = higher ranking in search results.
           </Text>
           <Text style={styles.explainerText}>
-            Standard = Featured badge + view counter showing social proof to renters.
+            Standard = Featured badge + impression tracking so you can see how many renters viewed your listing.
           </Text>
           <Text style={styles.explainerText}>
-            Extended = everything in Standard + Top Picks section placement + boost analytics after it ends.
+            Extended = everything in Standard + Top Picks section placement + full analytics dashboard.
           </Text>
         </View>
 
@@ -634,6 +587,55 @@ export const ListingBoostScreen = () => {
     </View>
   );
 };
+
+function BoostAnalyticsCard({ listing, isBoosted }: { listing: Property; isBoosted: boolean }) {
+  const [stats, setStats] = useState({ totalImpressions: 0, cardViews: 0, detailViews: 0, searchResults: 0 });
+
+  useEffect(() => {
+    getImpressionStats(listing.id).then(setStats);
+  }, [listing.id]);
+
+  const boost = listing.listingBoost;
+  if (!boost?.startedAt) return null;
+
+  const isExtended = boost.includesTopPicks;
+  const dateRange = `${new Date(boost.startedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} — ${new Date(boost.expiresAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+
+  return (
+    <View style={styles.analyticsCard}>
+      <View style={styles.analyticsHeader}>
+        <Feather name="bar-chart-2" size={16} color="#3b82f6" />
+        <Text style={styles.analyticsTitle}>
+          {isExtended ? 'Boost Analytics' : 'Impressions'}
+        </Text>
+        {isBoosted ? (
+          <View style={{ backgroundColor: 'rgba(34,197,94,0.15)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, marginLeft: 'auto' }}>
+            <Text style={{ color: '#22c55e', fontSize: 10, fontWeight: '700' }}>LIVE</Text>
+          </View>
+        ) : null}
+      </View>
+      <Text style={styles.analyticsSubtitle}>{dateRange}</Text>
+      <View style={styles.analyticsStats}>
+        <View style={styles.analyticsStat}>
+          <Text style={styles.analyticsStatValue}>{stats.totalImpressions}</Text>
+          <Text style={styles.analyticsStatLabel}>Impressions</Text>
+        </View>
+        {isExtended ? (
+          <>
+            <View style={[styles.analyticsStat, { borderLeftWidth: 1, borderRightWidth: 1, borderColor: 'rgba(255,255,255,0.06)' }]}>
+              <Text style={styles.analyticsStatValue}>{stats.cardViews}</Text>
+              <Text style={styles.analyticsStatLabel}>Card Views</Text>
+            </View>
+            <View style={styles.analyticsStat}>
+              <Text style={styles.analyticsStatValue}>{stats.detailViews}</Text>
+              <Text style={styles.analyticsStatLabel}>Detail Views</Text>
+            </View>
+          </>
+        ) : null}
+      </View>
+    </View>
+  );
+}
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
