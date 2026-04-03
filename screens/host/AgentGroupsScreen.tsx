@@ -269,7 +269,11 @@ export const AgentGroupsScreen = () => {
             {item.groupStatus === 'assembling' ? (
               <Pressable
                 style={st.addMemberBtn}
-                onPress={() => navigation.navigate('BrowseRenters', { groupId: item.id })}
+                onPress={() => {
+                  const parent = navigation.getParent();
+                  if (parent) parent.navigate('BrowseRenters', { addToGroupId: item.id });
+                  else navigation.navigate('BrowseRenters' as never, { addToGroupId: item.id });
+                }}
               >
                 <Feather name="user-plus" size={12} color="#888" />
                 <Text style={{ fontSize: 12, color: '#888' }}>Add</Text>
@@ -548,7 +552,11 @@ export const AgentGroupsScreen = () => {
         <Text style={st.title}>My Groups</Text>
         <Pressable
           style={st.newGroupBtn}
-          onPress={() => navigation.navigate('AgentGroupBuilder')}
+          onPress={() => {
+            const parent = navigation.getParent();
+            if (parent) parent.navigate('BrowseRenters');
+            else navigation.navigate('BrowseRenters' as never);
+          }}
         >
           <Feather name="plus" size={16} color="#000" />
           <Text style={{ color: '#000', fontWeight: '700', fontSize: 14 }}>New</Text>
