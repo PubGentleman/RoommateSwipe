@@ -23,7 +23,6 @@ import { useConfirm } from '../../contexts/ConfirmContext';
 import { ModeSwitchToggle } from '../../components/ModeSwitchToggle';
 import { getAffiliateForUser } from '../../services/affiliateService';
 import { normalizeRenterPlan, getRenterPlanLimits } from '../../constants/renterPlanLimits';
-import { PlanBadgeInline } from '../../components/LockedFeatureOverlay';
 import { getHostPlanDisplayInfo, resolveEffectiveHostPlan, isFreeTier } from '../../utils/planResolver';
 
 type ProfileScreenNavigationProp = NativeStackNavigationProp<ProfileStackParamList, 'ProfileMain'>;
@@ -443,7 +442,6 @@ export const ProfileScreen = () => {
               <View style={[styles.boostBtn, { backgroundColor: 'rgba(168,85,247,0.15)', borderWidth: 1, borderColor: 'rgba(168,85,247,0.3)' }]}>
                 <Feather name="lock" size={12} color="#a855f7" />
                 <Text style={[styles.boostBtnText, { color: '#a855f7' }]}>Boost Profile</Text>
-                <PlanBadgeInline plan="Elite" locked />
               </View>
             </TouchableOpacity>
           )}
