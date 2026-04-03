@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { View, StyleSheet, Pressable, Image, Modal, ScrollView, Text, TouchableOpacity, Platform, Switch } from 'react-native';
 import Animated, { useSharedValue, useAnimatedScrollHandler, useAnimatedStyle, interpolate, Extrapolation } from 'react-native-reanimated';
 import { Feather } from '../../components/VectorIcons';
@@ -71,7 +71,8 @@ export const ProfileScreen = () => {
     setDevTapTimer(setTimeout(() => setDevTapCount(0), 3000));
   };
 
-  const isHost = activeMode === 'host';
+  const isHost = activeMode === 'host' || user?.role === 'host';
+  const hostPlanInfo = useMemo(() => getHostPlanDisplayInfo(user), [user?.hostSubscription?.plan, user?.hostType]);
   const getRoleLabel = () => {
     if (!user) return 'User';
     if (isHost && user.hostType === 'agent') return 'Agent';
@@ -144,9 +145,11 @@ export const ProfileScreen = () => {
             setInquirySentCount(renterCards.length);
           }
 
-          const cards = await StorageService.getInterestCardsForRenter(userId);
-          if (!isMounted) return;
-          setPendingInterestCount(cards.filter(c => c.status === 'pending').length);
+          if (!isHost) {
+            const cards = await StorageService.getInterestCardsForRenter(userId);
+            if (!isMounted) return;
+            setPendingInterestCount(cards.filter(c => c.status === 'pending').length);
+          }
 
           const { supabase } = await import('../../lib/supabase');
           const { data } = await supabase
@@ -169,7 +172,7 @@ export const ProfileScreen = () => {
       loadData();
 
       return () => { isMounted = false; };
-    }, [userId, userRole])
+    }, [userId, userRole, activeMode])
   );
 
   const [boostTimeLabel, setBoostTimeLabel] = useState('');
@@ -271,7 +274,6 @@ export const ProfileScreen = () => {
         <RhomeLogo variant="icon-only" size="sm" onPress={() => {
           const parent = navigation.getParent?.();
           if (parent) {
-            const isHost = user?.role === 'host' || activeMode === 'host';
             parent.navigate(isHost ? 'Dashboard' : 'Explore');
           }
         }} />
@@ -287,7 +289,7 @@ export const ProfileScreen = () => {
       <AnimatedScrollView ref={scrollRef} style={styles.scrollContent} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 100 }} onScroll={profileScrollHandler} scrollEventThrottle={16}>
         <Animated.View style={profileCollapsibleStyle}>
         <LinearGradient
-          colors={[isHost ? 'rgba(123,94,167,0.08)' : 'rgba(255,107,91,0.08)', 'transparent']}
+          colors={[user?.hostType === 'agent' ? 'rgba(30,120,200,0.08)' : user?.hostType === 'company' ? 'rgba(50,150,80,0.08)' : isHost ? 'rgba(123,94,167,0.08)' : 'rgba(255,107,91,0.08)', 'transparent']}
           start={{ x: 0.5, y: 0 }}
           end={{ x: 0.5, y: 1 }}
           style={styles.profileHeroGradient}
@@ -317,7 +319,7 @@ export const ProfileScreen = () => {
             {user?.licenseVerificationStatus === 'verified' ? (
               <View style={styles.verifiedBadge}>
                 <Feather name="shield" size={14} color="#3ECF8E" />
-                <Text style={styles.verifiedBadgeText}>Verified Agent</Text>
+                <Text style={styles.verifiedBadgeText}>{user?.hostType === 'agent' ? 'Verified Agent' : user?.hostType === 'company' ? 'Verified Company' : 'Verified Host'}</Text>
               </View>
             ) : user?.licenseVerificationStatus === 'manual_review' || user?.licenseVerificationStatus === 'pending' ? (
               <View style={styles.pendingBadge}>
@@ -446,7 +448,7 @@ export const ProfileScreen = () => {
             </TouchableOpacity>
           )}
 
-        {!isHost ? (
+        {(!isHost || user?.hostType === 'agent') ? (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <View style={styles.sectionTitleRow}>
@@ -476,7 +478,7 @@ export const ProfileScreen = () => {
               <Text style={styles.subPlan}>
                 {isHost
                   ? (() => {
-                      const info = getHostPlanDisplayInfo(user);
+                      const info = hostPlanInfo;
                       return info.isFree ? info.label : `${info.label} · ${info.price}`;
                     })()
                   : (user?.subscription?.plan === 'basic' ? 'Basic · Free' : user?.subscription?.plan === 'plus' ? 'Plus' : user?.subscription?.plan === 'elite' ? 'Elite' : 'Basic · Free')
@@ -484,12 +486,12 @@ export const ProfileScreen = () => {
               </Text>
               <Text style={styles.subDesc}>
                 {isHost
-                  ? getHostPlanDisplayInfo(user).description
+                  ? hostPlanInfo.description
                   : (user?.subscription?.plan === 'basic' ? 'Upgrade to unlock unlimited matches' : 'You have full access')
                 }
               </Text>
             </View>
-            {(isHost ? getHostPlanDisplayInfo(user).isFree : user?.subscription?.plan === 'basic') ? (
+            {(isHost ? hostPlanInfo.isFree : user?.subscription?.plan === 'basic') ? (
               <Pressable onPress={() => navigation.navigate(isHost ? 'HostSubscription' : 'Plans')}>
                 <LinearGradient colors={['#ff6b5b', '#e83a2a']} style={styles.upgradeBtn} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
                   <Text style={styles.upgradeBtnText}>Upgrade</Text>
@@ -767,7 +769,7 @@ export const ProfileScreen = () => {
                 title="Contact Support"
                 subtitle={
                   isHost
-                    ? (getHostPlan() === 'business' || user?.hostType === 'company'
+                    ? (['business', 'agent_business', 'company_enterprise'].includes(getHostPlan()) || user?.hostType === 'company'
                       ? 'Priority support — we respond faster'
                       : "We'll get back to you as soon as possible")
                     : (renterLimits.plan === 'elite' || renterLimits.plan === 'plus'

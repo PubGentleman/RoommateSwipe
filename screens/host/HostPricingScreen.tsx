@@ -242,7 +242,9 @@ export const HostPricingScreen = () => {
           {plans.map(plan => {
             const active = selectedTier === plan.id;
             const showSaveBadge = plan.monthlyPrice > 0 && billingCycle !== 'monthly';
-            const saveBadgeLabel = 'SAVE 20%';
+            const savePct = billingCycle === 'annual' && plan.monthlyPrice > 0 && plan.annualPrice > 0
+              ? Math.round(((plan.monthlyPrice * 12 - plan.annualPrice) / (plan.monthlyPrice * 12)) * 100) : 0;
+            const saveBadgeLabel = savePct > 0 ? `SAVE ${savePct}%` : 'SAVE';
             return (
               <Pressable
                 key={plan.id}
@@ -262,7 +264,7 @@ export const HostPricingScreen = () => {
         <View style={s.billingToggle}>
           {([
             { cycle: 'monthly' as BillingCycle, label: 'Monthly', badge: undefined },
-            { cycle: 'annual' as BillingCycle, label: 'Annual', badge: 'SAVE 20%' },
+            { cycle: 'annual' as BillingCycle, label: 'Annual', badge: (() => { const p = plans.find(pp => pp.monthlyPrice > 0); if (!p || !p.annualPrice) return 'SAVE'; const pct = Math.round(((p.monthlyPrice * 12 - p.annualPrice) / (p.monthlyPrice * 12)) * 100); return `SAVE ${pct}%`; })() },
           ]).map(opt => {
             const active = billingCycle === opt.cycle;
             return (
@@ -287,7 +289,8 @@ export const HostPricingScreen = () => {
           const isRec = plan.recommended;
           let priceNote = plan.monthlyNote;
           if (plan.monthlyPrice > 0 && billingCycle === 'annual') {
-            priceNote = `Billed $${plan.annualPrice.toFixed(2)}/yr · Save 20%`;
+            const annualSavePct = plan.monthlyPrice > 0 ? Math.round(((plan.monthlyPrice * 12 - plan.annualPrice) / (plan.monthlyPrice * 12)) * 100) : 0;
+            priceNote = `Billed $${plan.annualPrice.toFixed(2)}/yr · Save ${annualSavePct}%`;
           }
           const ctaStyle = getCTAStyle(plan);
 

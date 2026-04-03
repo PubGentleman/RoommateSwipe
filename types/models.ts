@@ -420,6 +420,7 @@ export interface User {
   licenseVerified?: boolean;
   licenseVerifiedAt?: string;
   licenseVerificationStatus?: 'unverified' | 'pending' | 'verified' | 'failed' | 'manual_review';
+  brokerageName?: string;
   agencyName?: string;
   unitsManaged?: number;
   verifiedBusiness?: boolean;

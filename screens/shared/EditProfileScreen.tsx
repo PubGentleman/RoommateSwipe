@@ -49,6 +49,9 @@ export const EditProfileScreen = () => {
     }
   }, [user?.photos, user?.profilePicture]);
   const [bio, setBio] = useState(user?.profileData?.bio || '');
+  const [licenseNumber, setLicenseNumber] = useState(user?.licenseNumber || '');
+  const [licenseState, setLicenseState] = useState(user?.licenseState || '');
+  const [brokerageName, setBrokerageName] = useState(user?.brokerageName || '');
   const [budget, setBudget] = useState(user?.profileData?.budget?.toString() || '');
   const [lookingFor, setLookingFor] = useState<'room' | 'entire_apartment'>(user?.profileData?.lookingFor || 'room');
   const [location, setLocation] = useState(user?.profileData?.location || '');
@@ -224,6 +227,11 @@ export const EditProfileScreen = () => {
         gender,
         occupation: occupation.trim() || undefined,
         location: location.trim() || undefined,
+        ...(user?.hostType === 'agent' ? {
+          license_number: licenseNumber.trim() || undefined,
+          license_state: licenseState.trim() || undefined,
+          brokerage_name: brokerageName.trim() || undefined,
+        } : {}),
       });
 
       await supabaseUpdateProfile({
@@ -261,6 +269,11 @@ export const EditProfileScreen = () => {
       zodiacSign,
       photos,
       profilePicture: photos[0] || undefined,
+      ...(user?.hostType === 'agent' ? {
+        licenseNumber: licenseNumber.trim() || undefined,
+        licenseState: licenseState.trim() || undefined,
+        brokerageName: brokerageName.trim() || undefined,
+      } : {}),
       profileData: {
         bio: bio.trim() || undefined,
         budget: budget.trim() ? parseInt(budget) : undefined,
@@ -731,6 +744,53 @@ export const EditProfileScreen = () => {
             </View>
           </View>
         </View>
+
+        {user?.hostType === 'agent' ? (
+          <View style={styles.section}>
+            <ThemedText style={[Typography.h3, styles.sectionTitle]}>Agent Credentials</ThemedText>
+            <ThemedText style={[Typography.small, { color: theme.textSecondary, marginBottom: Spacing.lg }]}>
+              Professional details shown to renters
+            </ThemedText>
+            <View style={styles.inputGroup}>
+              <ThemedText style={[Typography.small, { color: theme.textSecondary, marginBottom: Spacing.xs }]}>
+                License Number
+              </ThemedText>
+              <TextInput
+                style={[styles.input, { backgroundColor: theme.backgroundSecondary, color: theme.text, borderColor: theme.border }]}
+                placeholder="e.g. 10401234567"
+                placeholderTextColor={theme.textSecondary}
+                value={licenseNumber}
+                onChangeText={setLicenseNumber}
+              />
+            </View>
+            <View style={styles.inputGroup}>
+              <ThemedText style={[Typography.small, { color: theme.textSecondary, marginBottom: Spacing.xs }]}>
+                License State
+              </ThemedText>
+              <TextInput
+                style={[styles.input, { backgroundColor: theme.backgroundSecondary, color: theme.text, borderColor: theme.border }]}
+                placeholder="e.g. NY"
+                placeholderTextColor={theme.textSecondary}
+                value={licenseState}
+                onChangeText={setLicenseState}
+                autoCapitalize="characters"
+                maxLength={2}
+              />
+            </View>
+            <View style={styles.inputGroup}>
+              <ThemedText style={[Typography.small, { color: theme.textSecondary, marginBottom: Spacing.xs }]}>
+                Brokerage / Agency Name
+              </ThemedText>
+              <TextInput
+                style={[styles.input, { backgroundColor: theme.backgroundSecondary, color: theme.text, borderColor: theme.border }]}
+                placeholder="e.g. Compass Real Estate"
+                placeholderTextColor={theme.textSecondary}
+                value={brokerageName}
+                onChangeText={setBrokerageName}
+              />
+            </View>
+          </View>
+        ) : null}
 
         {/* About You */}
         <View style={styles.section}>

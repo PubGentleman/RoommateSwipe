@@ -102,6 +102,18 @@ export const HostSubscriptionScreen = () => {
   const { user, updateUser, cancelHostSubscriptionAtPeriodEnd, reactivateHostSubscription, isFirstTimeHost, completeHostOnboarding } = useAuth();
   const { confirm, alert: showAlert } = useConfirm();
   const hostType = (user?.hostType as HostType) ?? 'individual';
+  const typePlans = getHostPlans(hostType);
+
+  const getSavingsBadge = (cycle: '3month' | 'annual'): string => {
+    const midPlan = typePlans.find(p => p.id === 'pro') || typePlans[1];
+    if (!midPlan) return cycle === '3month' ? '-10%' : '-17%';
+    const fullPrice = midPlan.monthlyPrice * (cycle === '3month' ? 3 : 12);
+    const actualPrice = cycle === '3month' ? midPlan.threeMonthPrice : midPlan.annualPrice;
+    if (fullPrice <= 0 || actualPrice <= 0) return cycle === '3month' ? '-10%' : '-17%';
+    const pct = Math.round(((fullPrice - actualPrice) / fullPrice) * 100);
+    return `-${pct}%`;
+  };
+
   const planDisplayItems = getHostPlanDisplay(hostType);
   const PLAN_DISPLAY: PlanDisplayInfo[] = planDisplayItems.map(d => ({
     id: d.id as HostPlanType,
@@ -485,7 +497,7 @@ export const HostSubscriptionScreen = () => {
             <Text style={[styles.billingChipText, billingCycle === '3month' ? styles.billingChipTextActive : null]}>
               3 Months
             </Text>
-            {billingCycle !== '3month' ? <View style={styles.saveBadgeInline}><Text style={styles.saveBadgeInlineText}>-10%</Text></View> : null}
+            {billingCycle !== '3month' ? <View style={styles.saveBadgeInline}><Text style={styles.saveBadgeInlineText}>{getSavingsBadge('3month')}</Text></View> : null}
           </Pressable>
           <Pressable
             onPress={() => setBillingCycle('annual')}
@@ -494,7 +506,7 @@ export const HostSubscriptionScreen = () => {
             <Text style={[styles.billingChipText, billingCycle === 'annual' ? styles.billingChipTextActive : null]}>
               Annual
             </Text>
-            {billingCycle !== 'annual' ? <View style={styles.saveBadgeInline}><Text style={styles.saveBadgeInlineText}>-17%</Text></View> : null}
+            {billingCycle !== 'annual' ? <View style={styles.saveBadgeInline}><Text style={styles.saveBadgeInlineText}>{getSavingsBadge('annual')}</Text></View> : null}
           </Pressable>
         </View>
 

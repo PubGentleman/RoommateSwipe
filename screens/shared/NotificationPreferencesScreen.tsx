@@ -107,6 +107,18 @@ export const NotificationPreferencesScreen = () => {
   const { user, updateUser } = useAuth();
   const navigation = useNavigation();
 
+  const isAgent = user?.hostType === 'agent' || user?.hostType === 'company';
+  const AGENT_SECTION: { title: string; items: PreferenceItem[] } = {
+    title: 'Agent',
+    items: [
+      { key: 'agentInviteResponses', label: 'Group Invite Responses', description: 'When renters accept or decline your group invites', icon: 'user-check' },
+      { key: 'agentPlacementConfirmations', label: 'Placement Confirmations', description: 'When a placement is successfully recorded', icon: 'check-circle' },
+      { key: 'agentNewRenterAlerts', label: 'New Renter Alerts', description: 'When new renters match your listing criteria', icon: 'alert-circle' },
+      { key: 'agentResponseWarnings', label: 'Response Time Warnings', description: "When you haven't responded to a renter in 24+ hours", icon: 'clock' },
+    ],
+  };
+  const allSections = isAgent ? [...PREFERENCE_SECTIONS, AGENT_SECTION] : PREFERENCE_SECTIONS;
+
   const [preferences, setPreferences] = useState(
     { ...DEFAULT_PREFERENCES, ...user?.notificationPreferences }
   );
@@ -186,7 +198,7 @@ export const NotificationPreferencesScreen = () => {
           </Pressable>
         </View>
 
-        {PREFERENCE_SECTIONS.map((section) => (
+        {allSections.map((section) => (
           <View key={section.title} style={styles.section}>
             <ThemedText style={[Typography.h3, styles.sectionTitle]}>
               {section.title}

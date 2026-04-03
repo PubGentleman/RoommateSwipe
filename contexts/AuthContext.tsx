@@ -460,7 +460,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                   mappedUser = {
                     ...mappedUser,
                     hostSubscription: { ...mappedUser.hostSubscription, ...savedHostSub },
-                    agentPlan: mappedUser.hostType === 'agent' ? savedBase : mappedUser.agentPlan,
+                    agentPlan: mappedUser.hostType === 'agent' ? savedHostSub.plan : mappedUser.agentPlan,
                   };
                   if (mappedUser.hostType === 'company') {
                     (mappedUser as User & { companyPlan?: string }).companyPlan = savedBase;
@@ -911,7 +911,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = async () => {
     await supabase.auth.signOut();
     await StorageService.logoutAndReset();
-    rcLogout().catch(() => {});
+    rcLogout().catch((e) => console.warn('[Auth] RevenueCat logout failed:', e));
     setUser(null);
   };
 
@@ -1144,14 +1144,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { nextRenewalDate, renewalAmount, billingCycle: cycle, billingHistory };
   };
 
+  const SAFE_UPDATE_FIELDS = new Set([
+    'name', 'firstName', 'lastName', 'bio', 'profilePicture', 'coverPhoto', 'photos',
+    'occupation', 'company', 'school', 'aboutMe', 'zodiacSign',
+    'brokerageName', 'licenseNumber', 'licenseState',
+    'preferredNeighborhoods', 'interestTags', 'profileData',
+    'notificationPreferences', 'privacySettings',
+    'searchPaused', 'searchPausedAt',
+  ]);
+
   const updateUser = async (updates: Partial<User>) => {
     if (!user) return;
 
+    const safeUpdates = Object.fromEntries(
+      Object.entries(updates).filter(([key]) => SAFE_UPDATE_FIELDS.has(key))
+    ) as Partial<User>;
+
+    if (Object.keys(safeUpdates).length === 0) {
+      console.warn('[Auth] No safe fields in update request, ignoring:', Object.keys(updates));
+      return;
+    }
+
     const updatedUser: User = {
       ...user,
-      ...updates,
-      profileData: updates.profileData
-        ? { ...user.profileData, ...updates.profileData }
+      ...safeUpdates,
+      profileData: safeUpdates.profileData
+        ? { ...user.profileData, ...safeUpdates.profileData }
         : user.profileData,
     };
 
