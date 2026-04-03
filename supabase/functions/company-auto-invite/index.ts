@@ -12,16 +12,71 @@ serve(async (req) => {
   }
 
   try {
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const userClient = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_ANON_KEY')!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const { data: { user }, error: authError } = await userClient.auth.getUser();
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
+
+    const { data: userData } = await supabase
+      .from('users')
+      .select('role, host_type')
+      .eq('id', user.id)
+      .single();
+
+    if (userData?.host_type !== 'company') {
+      return new Response(JSON.stringify({ error: 'Not authorized — company hosts only' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     const { listingId, groupId, companyHostId, matchScore, aiReason } = await req.json();
 
     if (!listingId || !groupId || !companyHostId) {
       return new Response(JSON.stringify({ error: 'listingId, groupId, and companyHostId required' }), {
         status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (companyHostId !== user.id) {
+      return new Response(JSON.stringify({ error: 'Cannot act on behalf of another company' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const { data: listingOwner } = await supabase
+      .from('listings')
+      .select('created_by')
+      .eq('id', listingId)
+      .single();
+
+    if (!listingOwner || listingOwner.created_by !== user.id) {
+      return new Response(JSON.stringify({ error: 'Listing does not belong to this company' }), {
+        status: 403,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }

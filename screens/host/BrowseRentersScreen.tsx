@@ -35,7 +35,7 @@ import {
   filterRentersForListing,
   TransitFilterSummary,
 } from '../../utils/transitMatching';
-import { isWithinActivityCutoff, getRecencyMultiplier } from '../../utils/activityDecay';
+import { getRecencyMultiplier } from '../../utils/activityDecay';
 import {
   shortlistRenter as companyShortlistRenter,
   removeFromShortlist as companyRemoveFromShortlist,
@@ -112,7 +112,12 @@ export const BrowseRentersScreen = () => {
           `)
           .eq('role', 'renter')
           .eq('onboarding_step', 'complete')
-          .neq('id', user?.id || '')
+          .neq('id', user?.id || '');
+
+        const cutoffDate = new Date();
+        cutoffDate.setDate(cutoffDate.getDate() - 90);
+        query = query
+          .gte('last_active_at', cutoffDate.toISOString())
           .order('last_active_at', { ascending: false })
           .limit(100);
 
@@ -122,7 +127,7 @@ export const BrowseRentersScreen = () => {
 
         const { data: supaRenters } = await query;
 
-        const renterData = (supaRenters || []).filter((u: any) => isWithinActivityCutoff(u.last_active_at));
+        const renterData = supaRenters || [];
         renterData.sort((a: any, b: any) => {
           const scoreA = getRecencyMultiplier(a.last_active_at);
           const scoreB = getRecencyMultiplier(b.last_active_at);

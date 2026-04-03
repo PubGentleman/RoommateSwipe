@@ -473,28 +473,38 @@ export async function respondToInvite(inviteId: string, accept: boolean): Promis
     return;
   }
 
-  const now = new Date().toISOString();
-  const { error } = await supabase
-    .from('agent_group_invites')
-    .update({
-      status: accept ? 'accepted' : 'declined',
-      responded_at: now,
-    })
-    .eq('id', inviteId);
+  const newStatus = accept ? 'accepted' : 'declined';
 
-  if (error) {
-    console.warn('[AgentService] respondToInvite error:', error.message);
-    return;
-  }
+  const { data: rpcResult, error: rpcError } = await supabase.rpc('respond_to_invite', {
+    p_invite_id: inviteId,
+    p_status: newStatus,
+  });
 
-  if (accept) {
-    const { data: invite } = await supabase
+  if (rpcError) {
+    const now = new Date().toISOString();
+    const { data: invite, error: fetchError } = await supabase
       .from('agent_group_invites')
       .select('group_id, renter_id')
       .eq('id', inviteId)
       .single();
 
-    if (invite) {
+    if (fetchError || !invite) {
+      console.warn('[AgentService] respondToInvite: invite not found');
+      return;
+    }
+
+    const { error: updateError } = await supabase
+      .from('agent_group_invites')
+      .update({ status: newStatus, responded_at: now })
+      .eq('id', inviteId)
+      .eq('status', 'pending');
+
+    if (updateError) {
+      console.warn('[AgentService] respondToInvite error:', updateError.message);
+      return;
+    }
+
+    if (accept) {
       await supabase
         .from('group_members')
         .upsert({
