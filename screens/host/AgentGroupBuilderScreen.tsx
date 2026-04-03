@@ -309,8 +309,39 @@ export const AgentGroupBuilderScreen = () => {
     });
   };
 
+  const generatePiInviteMessage = useCallback(() => {
+    if (!user) return '';
+    const agentFirst = user.name?.split(' ')[0] || 'Your agent';
+    const memberNames = selectedRenters.map(r => r.name?.split(' ')[0] || 'a renter');
+    const listingInfo = selectedListing
+      ? `${selectedListing.title} ($${selectedListing.price?.toLocaleString()}/mo, ${selectedListing.bedrooms}BR in ${selectedListing.neighborhood || selectedListing.city || 'the area'})`
+      : null;
+
+    const compatNote = avgCompatibility > 0
+      ? ` Based on your profiles and preferences, this group has a ${avgCompatibility}% compatibility score`
+      : '';
+
+    const othersText = memberNames.length > 1
+      ? `I've carefully matched you with ${memberNames.join(', ')} as potential roommates.`
+      : `I've found a great potential roommate match for you.`;
+
+    let msg = `Hi there! I'm ${agentFirst}, your housing agent on Rhome. ${othersText}`;
+
+    if (listingInfo) {
+      msg += ` I have a listing that could be a perfect fit for your group: ${listingInfo}.`;
+    }
+
+    msg += `${compatNote ? compatNote + '.' : ''} I'd love to help you all connect and find your next home together. Looking forward to hearing from you!`;
+
+    return msg;
+  }, [user, selectedRenters, selectedListing, avgCompatibility]);
+
   const handleSendInvites = async () => {
-    if (!user || selectedRenters.length < 2) return;
+    if (!user) return;
+    if (selectedRenters.length < 2) {
+      showAlert({ title: 'Not Enough Members', message: 'You need at least 2 renters to create a group. Go back and select members first.' });
+      return;
+    }
 
     const existingGroups = await getAgentGroups(user.id);
     const activeGroupCount = existingGroups.filter(
@@ -489,7 +520,16 @@ export const AgentGroupBuilderScreen = () => {
             </View>
           ) : null}
 
-          <Text style={styles.sectionTitle}>Your Message (optional)</Text>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Text style={styles.sectionTitle}>Your Message</Text>
+            <Pressable
+              onPress={() => setAgentMessage(generatePiInviteMessage())}
+              style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 4, paddingHorizontal: 8, backgroundColor: '#2a1f3d', borderRadius: 8 }}
+            >
+              <Feather name="zap" size={13} color="#a78bfa" />
+              <Text style={{ color: '#a78bfa', fontSize: 12, fontWeight: '600', marginLeft: 4 }}>Rewrite with Pi</Text>
+            </Pressable>
+          </View>
           <TextInput
             style={styles.messageInput}
             placeholder="Add a personal note to your invites..."
@@ -713,7 +753,12 @@ export const AgentGroupBuilderScreen = () => {
 
       {selectedIds.size >= 2 ? (
         <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 80 }]}>
-          <Pressable style={styles.reviewBtn} onPress={() => setStep('review')}>
+          <Pressable style={styles.reviewBtn} onPress={() => {
+            if (!agentMessage) {
+              setAgentMessage(generatePiInviteMessage());
+            }
+            setStep('review');
+          }}>
             <Text style={styles.reviewBtnText}>Review Group ({selectedIds.size} members)</Text>
             <Feather name="arrow-right" size={18} color="#fff" />
           </Pressable>
