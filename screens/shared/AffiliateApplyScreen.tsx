@@ -17,24 +17,24 @@ const SURFACE = '#1a1a1a';
 const ACCENT = '#f59e0b';
 
 const EARNINGS_EXAMPLES = [
-  { label: 'Refer a Plus renter', amount: '$6.99' },
+  { label: 'Refer a Plus renter', amount: '$10.49' },
   { label: 'Refer a Pro host', amount: '$34.99' },
   { label: 'Refer a Business agent', amount: '$104.30' },
 ];
 
-const TERMS_TEXT = `ROOMMATESWIPE AFFILIATE PROGRAM
+const TERMS_TEXT = `RHOME AFFILIATE PROGRAM
 TERMS & CONDITIONS
 
 Last updated: ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
 
 1. PROGRAM OVERVIEW
 
-The RoommateSwipe Affiliate Program ("Program") allows registered users ("Affiliates") to earn referral commissions by referring new users to the RoommateSwipe platform. By participating in this Program, you agree to be bound by these Terms & Conditions.
+The Rhome Affiliate Program ("Program") allows registered users ("Affiliates") to earn referral commissions by referring new users to the Rhome platform. By participating in this Program, you agree to be bound by these Terms & Conditions.
 
 2. ELIGIBILITY
 
 To participate in the Program, you must:
-  a) Be a registered RoommateSwipe user in good standing
+  a) Be a registered Rhome user in good standing
   b) Have an active account with a verified email address
   c) Be at least 18 years of age
   d) Not have been previously removed from the Program for violations
@@ -42,8 +42,8 @@ To participate in the Program, you must:
 3. REFERRAL CODE
 
 Upon acceptance into the Program, you will receive a unique referral code ("Code") linked directly to your account. You may share this Code through personal channels, social media, word of mouth, or other lawful means. You may NOT:
-  a) Use paid advertising that bids on RoommateSwipe branded keywords
-  b) Misrepresent yourself as a RoommateSwipe employee or official representative
+  a) Use paid advertising that bids on Rhome branded keywords
+  b) Misrepresent yourself as a Rhome employee or official representative
   c) Send unsolicited bulk messages (spam) containing your Code
   d) Create fake accounts to generate referral commissions
   e) Offer cashback, rebates, or kickbacks from your commission to incentivize signups
@@ -58,8 +58,8 @@ Upon acceptance into the Program, you will receive a unique referral code ("Code
   c) Commission amounts by plan:
 
      RENTER PLANS:
-     - Plus ($9.99/mo): You earn $6.99
-     - Elite ($19.99/mo): You earn $13.99
+     - Plus ($14.99/mo): You earn $10.49
+     - Elite ($29.99/mo): You earn $20.99
 
      HOST PLANS:
      - Starter ($19.99/mo): You earn $13.99
@@ -93,29 +93,29 @@ Upon acceptance into the Program, you will receive a unique referral code ("Code
 
   a) Self-referrals are prohibited. You may not refer your own accounts or accounts you control.
   b) Referrals from the same household or IP address may be flagged for review.
-  c) RoommateSwipe reserves the right to withhold or reverse commissions if fraud, manipulation, or abuse is detected.
-  d) You may not create content that is misleading, defamatory, or harmful to the RoommateSwipe brand.
+  c) Rhome reserves the right to withhold or reverse commissions if fraud, manipulation, or abuse is detected.
+  d) You may not create content that is misleading, defamatory, or harmful to the Rhome brand.
 
 8. TERMINATION
 
   a) You may leave the Program at any time by deactivating your affiliate status in the app.
-  b) RoommateSwipe may suspend or terminate your participation at any time for violation of these Terms, fraudulent activity, or at its sole discretion.
+  b) Rhome may suspend or terminate your participation at any time for violation of these Terms, fraudulent activity, or at its sole discretion.
   c) Upon termination, any pending commissions that have passed the 31-day Qualification Period will still be paid out. Unqualified commissions are forfeited.
-  d) RoommateSwipe reserves the right to modify, suspend, or discontinue the Program at any time with 30 days written notice to active Affiliates.
+  d) Rhome reserves the right to modify, suspend, or discontinue the Program at any time with 30 days written notice to active Affiliates.
 
 9. TAX RESPONSIBILITY
 
   a) You are solely responsible for reporting and paying any taxes owed on commissions earned through the Program.
-  b) If you earn $600 or more in a calendar year, RoommateSwipe may require a W-9 form and will issue a 1099-NEC.
+  b) If you earn $600 or more in a calendar year, Rhome may require a W-9 form and will issue a 1099-NEC.
 
 10. LIABILITY
 
-  a) RoommateSwipe is not liable for any indirect, incidental, or consequential damages arising from your participation in the Program.
+  a) Rhome is not liable for any indirect, incidental, or consequential damages arising from your participation in the Program.
   b) The Program is provided "as is" without warranty of any kind.
 
 11. MODIFICATIONS
 
-  a) RoommateSwipe reserves the right to modify these Terms at any time.
+  a) Rhome reserves the right to modify these Terms at any time.
   b) Continued participation in the Program after modifications constitutes acceptance of the updated Terms.
   c) Material changes to commission rates will be communicated with at least 30 days notice.
 

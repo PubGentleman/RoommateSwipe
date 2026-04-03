@@ -30,8 +30,8 @@ export interface AffiliateReferral {
 }
 
 export const COMMISSION_TABLE: Record<string, { label: string; monthlyCost: number; commission: number }> = {
-  plus: { label: 'Renter Plus', monthlyCost: 9.99, commission: 6.99 },
-  elite: { label: 'Renter Elite', monthlyCost: 19.99, commission: 13.99 },
+  plus: { label: 'Renter Plus', monthlyCost: 14.99, commission: 10.49 },
+  elite: { label: 'Renter Elite', monthlyCost: 29.99, commission: 20.99 },
   starter: { label: 'Host Starter', monthlyCost: 19.99, commission: 13.99 },
   pro: { label: 'Host Pro', monthlyCost: 49.99, commission: 34.99 },
   business: { label: 'Host Business', monthlyCost: 99.99, commission: 69.99 },
