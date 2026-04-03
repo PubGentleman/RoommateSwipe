@@ -15,6 +15,8 @@ import {
   recordPlacement,
   chargeAgentPlacementFee,
   getMonthlyPlacementCount,
+  sendAgentInvites,
+  createAgentGroup,
   type AgentGroupsResult,
 } from '../../services/agentMatchmakerService';
 import { getAgentPlanLimits, canAgentPlace, type AgentPlan } from '../../constants/planLimits';
@@ -153,12 +155,60 @@ export const AgentGroupsScreen = () => {
   };
 
   const handleSendInvites = async (group: AgentGroup) => {
-    setActionStates(prev => ({ ...prev, [group.id]: 'invited' }));
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    navigation.navigate('AgentGroupBuilder', {
-      preselectedIds: group.memberIds,
-      listingId: group.targetListingId,
+    if (!user) return;
+    const eligible = group.members.filter(m => (m as any).acceptAgentOffers !== false);
+    if (eligible.length < 2) {
+      showAlert({ title: 'Not Enough', message: 'Not enough eligible renters.' });
+      return;
+    }
+    const ok = await confirm({
+      title: 'Send Invites',
+      message: `Send invites to ${eligible.length} renters?\n\n${eligible.map(r => r.name).join(', ')}`,
     });
+    if (!ok) return;
+    setActionStates(prev => ({ ...prev, [group.id]: 'sending' }));
+    try {
+      await updateAgentGroupStatus(group.id, 'invited');
+      await sendAgentInvites(
+        user.id, user.name ?? '', group.id,
+        eligible.map(r => r.id), group.targetListing || null, '',
+        eligible.map(r => ({ id: r.id, name: r.name, photo: r.photos?.[0] }))
+      );
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setActionStates(prev => ({ ...prev, [group.id]: 'invited' }));
+      loadGroups();
+    } catch (e) {
+      showAlert({ title: 'Error', message: 'Failed to send invites.' });
+      setActionStates(prev => ({ ...prev, [group.id]: '' }));
+    }
+  };
+
+  const handleRecreateGroup = async (group: AgentGroup) => {
+    if (!user) return;
+    try {
+      const newGroup: AgentGroup = {
+        id: `ag_${Date.now()}`,
+        name: `${group.name} (v2)`,
+        agentId: user.id,
+        targetListingId: group.targetListingId,
+        targetListing: group.targetListing,
+        members: group.members,
+        memberIds: group.memberIds,
+        groupStatus: 'assembling',
+        avgCompatibility: group.avgCompatibility,
+        combinedBudgetMin: group.combinedBudgetMin,
+        combinedBudgetMax: group.combinedBudgetMax,
+        coversRent: group.coversRent,
+        invites: [],
+        createdAt: new Date().toISOString(),
+      };
+      await createAgentGroup(newGroup);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      showAlert({ title: 'Group Recreated', message: `"${newGroup.name}" saved to Assembling.` });
+      loadGroups();
+    } catch (e) {
+      showAlert({ title: 'Error', message: 'Failed to recreate group.' });
+    }
   };
 
   const filteredGroups = useMemo(() => {
@@ -329,12 +379,18 @@ export const AgentGroupsScreen = () => {
               <Pressable
                 style={[st.primaryBtn, actionState === 'invited' ? { backgroundColor: '#1a3a1a' } : { backgroundColor: ACCENT }]}
                 onPress={() => handleSendInvites(item)}
-                disabled={actionState === 'invited'}
+                disabled={actionState === 'invited' || actionState === 'sending'}
               >
-                <Feather name={actionState === 'invited' ? 'check-circle' : 'send'} size={15} color={actionState === 'invited' ? GREEN : '#000'} />
-                <Text style={[st.primaryBtnText, actionState === 'invited' ? { color: GREEN } : { color: '#000' }]}>
-                  {actionState === 'invited' ? 'Invites Sent' : 'Send Invites'}
-                </Text>
+                {actionState === 'sending' ? (
+                  <ActivityIndicator color="#000" size="small" />
+                ) : (
+                  <>
+                    <Feather name={actionState === 'invited' ? 'check-circle' : 'send'} size={15} color={actionState === 'invited' ? GREEN : '#000'} />
+                    <Text style={[st.primaryBtnText, actionState === 'invited' ? { color: GREEN } : { color: '#000' }]}>
+                      {actionState === 'invited' ? 'Invites Sent' : 'Send Invites'}
+                    </Text>
+                  </>
+                )}
               </Pressable>
               <Pressable
                 style={st.secondaryBtn}
@@ -417,10 +473,7 @@ export const AgentGroupsScreen = () => {
             <>
               <Pressable
                 style={[st.primaryBtn, { flex: 1, backgroundColor: 'rgba(245,158,11,0.12)', borderWidth: 1, borderColor: ACCENT + '40' }]}
-                onPress={() => navigation.navigate('AgentGroupBuilder', {
-                  preselectedIds: item.memberIds,
-                  listingId: item.targetListingId,
-                })}
+                onPress={() => handleRecreateGroup(item)}
               >
                 <Feather name="copy" size={15} color={ACCENT} />
                 <Text style={[st.primaryBtnText, { color: ACCENT }]}>Recreate Group</Text>
