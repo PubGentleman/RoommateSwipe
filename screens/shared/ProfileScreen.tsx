@@ -91,6 +91,8 @@ export const ProfileScreen = () => {
   const [hostListingCount, setHostListingCount] = useState(0);
   const [hostInquiryCount, setHostInquiryCount] = useState(0);
   const [hostViewCount, setHostViewCount] = useState(0);
+  const [agentGroupCount, setAgentGroupCount] = useState(0);
+  const [agentPlacementCount, setAgentPlacementCount] = useState(0);
 
   const scrollRef = useRef<any>(null);
 
@@ -115,6 +117,14 @@ export const ProfileScreen = () => {
             const interestCards = await StorageService.getInterestCardsForHost(userId);
             if (!isMounted) return;
             setHostInquiryCount(interestCards.length);
+
+            if (user?.hostType === 'agent' || user?.hostType === 'company') {
+              const groups = await StorageService.getGroups();
+              if (!isMounted) return;
+              const myGroups = groups.filter((g: any) => g.createdByAgent === userId || g.agentId === userId);
+              setAgentGroupCount(myGroups.length);
+              setAgentPlacementCount(myListings.filter(p => p.rentedDate).length);
+            }
           } else {
             const matches = await StorageService.getMatches();
             if (!isMounted) return;
@@ -317,12 +327,34 @@ export const ProfileScreen = () => {
             ) : (user?.purchases?.hostVerificationBadge === true || (user?.role === 'host' && !isFreeTier(user?.hostSubscription?.plan))) ? (
               <View style={styles.verifiedBadge}>
                 <Feather name="shield" size={14} color="#3ECF8E" />
-                <Text style={styles.verifiedBadgeText}>Verified</Text>
+                <Text style={styles.verifiedBadgeText}>{isHost ? 'Verified Host' : 'Verified'}</Text>
               </View>
             ) : null}
           </View>
           <View style={styles.statsRow}>
-            {isHost ? (
+            {isHost && (user?.hostType === 'agent' || user?.hostType === 'company') ? (
+              <>
+                <Pressable style={styles.statBox}>
+                  <Text style={[styles.statValue, styles.statPurple]}>{hostListingCount}</Text>
+                  <Text style={styles.statLabel}>Listings</Text>
+                </Pressable>
+                <View style={styles.statDivider} />
+                <Pressable style={styles.statBox}>
+                  <Text style={styles.statValue}>{agentGroupCount}</Text>
+                  <Text style={styles.statLabel}>Groups</Text>
+                </Pressable>
+                <View style={styles.statDivider} />
+                <Pressable style={styles.statBox}>
+                  <Text style={[styles.statValue, styles.statPurple]}>{agentPlacementCount}</Text>
+                  <Text style={styles.statLabel}>Placements</Text>
+                </Pressable>
+                <View style={styles.statDivider} />
+                <Pressable style={styles.statBox}>
+                  <Text style={styles.statValue}>{hostInquiryCount}</Text>
+                  <Text style={styles.statLabel}>Inquiries</Text>
+                </Pressable>
+              </>
+            ) : isHost ? (
               <>
                 <Pressable style={styles.statBox}>
                   <Text style={[styles.statValue, styles.statPurple]}>{hostListingCount}</Text>
@@ -470,6 +502,18 @@ export const ProfileScreen = () => {
               <Feather name="info" size={14} color="#ff6b5b" />
               <Text style={styles.cancellingText}>
                 Your plan ends on {user?.subscription?.expiresAt ? new Date(user.subscription.expiresAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'end of period'}. Resubscribe anytime.
+              </Text>
+            </View>
+          ) : null}
+          {isHost && (user?.hostSubscription?.status === 'cancelling' || user?.hostSubscription?.status === 'cancelled') ? (
+            <View style={styles.cancellingBanner}>
+              <Feather name="alert-circle" size={14} color="#F59E0B" />
+              <Text style={styles.cancellingText}>
+                {user.hostSubscription.status === 'cancelled' ? 'Host plan cancelled.' : 'Cancellation scheduled.'}{' '}
+                {user.hostSubscription.scheduledChangeDate
+                  ? `Reverts to Free on ${new Date(user.hostSubscription.scheduledChangeDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}.`
+                  : 'Reverts to Free at end of billing period.'}{' '}
+                Reactivate from the subscription page.
               </Text>
             </View>
           ) : null}

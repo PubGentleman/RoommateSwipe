@@ -28,7 +28,7 @@ const GOLD = '#ffd700';
 const PURPLE = '#a855f7';
 const ROOMDR_PURPLE = '#7B5EA7';
 
-type BillingCycle = 'monthly' | 'quarterly' | 'annual';
+type BillingCycle = 'monthly' | '3month' | 'annual';
 
 interface PlanDisplayInfo {
   id: HostPlanType;
@@ -89,10 +89,10 @@ const DEFAULT_PLAN_DISPLAY: PlanDisplayInfo[] = [
   },
 ];
 
-function billingPrice(base: number, cycle: BillingCycle): number {
-  if (base === 0) return 0;
-  if (cycle === 'quarterly') return +(base * 0.9).toFixed(2);
-  if (cycle === 'annual') return +(base * 0.83).toFixed(2);
+function getDisplayPrice(typePlanConfig: { monthlyPrice: number; threeMonthPrice: number; annualPrice: number } | undefined, base: number, cycle: BillingCycle): number {
+  if (!typePlanConfig || base === 0) return base;
+  if (cycle === '3month') return typePlanConfig.threeMonthPrice > 0 ? +(typePlanConfig.threeMonthPrice / 3).toFixed(2) : +(base * 0.9).toFixed(2);
+  if (cycle === 'annual') return typePlanConfig.annualPrice > 0 ? +(typePlanConfig.annualPrice / 12).toFixed(2) : +(base * 0.83).toFixed(2);
   return base;
 }
 
@@ -218,7 +218,8 @@ export const HostSubscriptionScreen = () => {
         : rawPlan as HostPlanType;
       const basePlan = rawPlan.replace(/^(agent_|company_)/, '') as HostPlanType;
       const planData = HOST_PLANS[storedPlan] || HOST_PLANS[basePlan];
-      const price = billingPrice(planData.price, billingCycle);
+      const matchedTypePlan = hostTypePlans.find(p => p.id === selectedPlan || p.id === basePlan);
+    const price = getDisplayPrice(matchedTypePlan, planData.price, billingCycle);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       const newSub = subscriptionFromPlan(storedPlan, hostSub);
       await StorageService.updateHostSubscription(user.id, newSub);
@@ -297,7 +298,7 @@ export const HostSubscriptionScreen = () => {
 
     const planLabel = typePlanConfig?.name ?? hostPlanConfig?.label ?? display.badge;
     const planPrice = isContactSales ? 0 : (hostPlanConfig?.price ?? typePlanConfig?.monthlyPrice ?? 0);
-    const price = billingPrice(planPrice, billingCycle);
+    const price = getDisplayPrice(typePlanConfig, planPrice, billingCycle);
     const planFeatures = hostPlanConfig?.features ?? { included: typePlanConfig?.features.filter(f => f.included).map(f => f.label) ?? [], locked: typePlanConfig?.features.filter(f => !f.included).map(f => f.label) ?? [] };
     const listingsIncluded = hostPlanConfig?.listingsIncluded ?? 0;
 
@@ -349,7 +350,7 @@ export const HostSubscriptionScreen = () => {
 
         {!isContactSales && !isFreePlan(planKey as HostPlanType) && billingCycle !== 'monthly' ? (
           <Text style={styles.billedTotal}>
-            {billingCycle === 'quarterly'
+            {billingCycle === '3month'
               ? `$${planPrice.toFixed(2)}/mo · Billed $${(price * 3).toFixed(2)} every 3 months`
               : `$${planPrice.toFixed(2)}/mo · Billed $${(price * 12).toFixed(2)}/yr`}
           </Text>
@@ -478,13 +479,13 @@ export const HostSubscriptionScreen = () => {
             </Text>
           </Pressable>
           <Pressable
-            onPress={() => setBillingCycle('quarterly')}
-            style={[styles.billingChip, billingCycle === 'quarterly' ? styles.billingChipActive : null]}
+            onPress={() => setBillingCycle('3month')}
+            style={[styles.billingChip, billingCycle === '3month' ? styles.billingChipActive : null]}
           >
-            <Text style={[styles.billingChipText, billingCycle === 'quarterly' ? styles.billingChipTextActive : null]}>
+            <Text style={[styles.billingChipText, billingCycle === '3month' ? styles.billingChipTextActive : null]}>
               3 Months
             </Text>
-            {billingCycle !== 'quarterly' ? <View style={styles.saveBadgeInline}><Text style={styles.saveBadgeInlineText}>-10%</Text></View> : null}
+            {billingCycle !== '3month' ? <View style={styles.saveBadgeInline}><Text style={styles.saveBadgeInlineText}>-10%</Text></View> : null}
           </Pressable>
           <Pressable
             onPress={() => setBillingCycle('annual')}
@@ -559,7 +560,7 @@ export const HostSubscriptionScreen = () => {
             <Text style={styles.costTitle}>Monthly Cost Summary</Text>
             <View style={styles.costRow}>
               <Text style={styles.costLabel}>Plan base</Text>
-              <Text style={styles.costValue}>${billingPrice((HOST_PLANS[hostSub.plan as HostPlanType] || HOST_PLANS[(hostSub.plan || '').replace(/^(agent_|company_)/, '') as HostPlanType])?.price ?? 0, billingCycle).toFixed(2)}</Text>
+              <Text style={styles.costValue}>${getDisplayPrice(hostTypePlans.find(p => p.id === hostSub.plan || p.id === (hostSub.plan || '').replace(/^(agent_|company_)/, '')), (HOST_PLANS[hostSub.plan as HostPlanType] || HOST_PLANS[(hostSub.plan || '').replace(/^(agent_|company_)/, '') as HostPlanType])?.price ?? 0, billingCycle).toFixed(2)}</Text>
             </View>
             {((hostSub.plan || '').replace(/^(agent_|company_)/, '') === 'business') && hostSub.activeListingCount > hostSub.listingsIncluded ? (
               <View style={styles.costRow}>
@@ -574,7 +575,7 @@ export const HostSubscriptionScreen = () => {
             <View style={[styles.costRow, styles.costTotal]}>
               <Text style={[styles.costLabel, { fontWeight: '700' }]}>Total</Text>
               <Text style={[styles.costValue, { fontWeight: '700', color: '#fff' }]}>
-                ${billingPrice(calculateHostMonthlyCost(hostSub.plan, hostSub.activeListingCount), billingCycle).toFixed(2)}/mo
+                ${getDisplayPrice(hostTypePlans.find(p => p.id === hostSub.plan || p.id === (hostSub.plan || '').replace(/^(agent_|company_)/, '')), calculateHostMonthlyCost(hostSub.plan, hostSub.activeListingCount), billingCycle).toFixed(2)}/mo
               </Text>
             </View>
           </View>

@@ -21,6 +21,23 @@ export const DownloadDataScreen = () => {
     const userId = user?.id;
     if (!userId) return null;
 
+    const isAgent = user?.hostType === 'agent' || user?.hostType === 'company';
+
+    const baseFetches = [
+      supabase.from('users').select('*').eq('id', userId).single(),
+      supabase.from('profiles').select('*').eq('user_id', userId).single(),
+      supabase.from('matches').select('*').or(`user_id_1.eq.${userId},user_id_2.eq.${userId}`),
+      supabase.from('messages').select('*').or(`sender_id.eq.${userId},recipient_id.eq.${userId}`),
+      supabase.from('group_members').select('group_id').eq('user_id', userId).then(async ({ data: memberships }) => {
+        if (!memberships || memberships.length === 0) return { data: [] };
+        const ids = memberships.map(m => m.group_id);
+        return supabase.from('groups').select('*').in('id', ids);
+      }),
+      supabase.from('notifications').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(100),
+      supabase.from('listings').select('*').eq('created_by', userId),
+      supabase.from('interest_cards').select('*').or(`sender_id.eq.${userId},recipient_id.eq.${userId}`),
+    ];
+
     const [
       { data: userData },
       { data: profileData },
@@ -30,20 +47,28 @@ export const DownloadDataScreen = () => {
       { data: notificationsData },
       { data: listingsData },
       { data: interestCardsData },
-    ] = await Promise.all([
-      supabase.from('users').select('*').eq('id', userId).single(),
-      supabase.from('profiles').select('*').eq('user_id', userId).single(),
-      supabase.from('matches').select('*').or(`user_id_1.eq.${userId},user_id_2.eq.${userId}`),
-      supabase.from('messages').select('*').eq('sender_id', userId),
-      supabase.from('group_members').select('group_id').eq('user_id', userId).then(async ({ data: memberships }) => {
-        if (!memberships || memberships.length === 0) return { data: [] };
-        const ids = memberships.map(m => m.group_id);
-        return supabase.from('groups').select('*').in('id', ids);
-      }),
-      supabase.from('notifications').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(100),
-      supabase.from('listings').select('*').eq('host_id', userId),
-      supabase.from('interest_cards').select('*').or(`sender_id.eq.${userId},recipient_id.eq.${userId}`),
-    ]);
+    ] = await Promise.all(baseFetches as any);
+
+    let agentData: any = null;
+    if (isAgent) {
+      const [
+        { data: shortlists },
+        { data: agentGroupInvites },
+        { data: teamMembers },
+        { data: agentGroups },
+      ] = await Promise.all([
+        supabase.from('agent_shortlists').select('*').eq('agent_id', userId),
+        supabase.from('agent_group_invites').select('*').eq('invited_by', userId),
+        supabase.from('company_team_members').select('*').eq('user_id', userId),
+        supabase.from('groups').select('*').eq('created_by_agent', userId),
+      ]);
+      agentData = {
+        shortlists: shortlists || [],
+        agentGroupInvites: agentGroupInvites || [],
+        teamMemberships: teamMembers || [],
+        agentCreatedGroups: agentGroups || [],
+      };
+    }
 
     return {
       user: userData,
@@ -54,6 +79,7 @@ export const DownloadDataScreen = () => {
       notifications: notificationsData || [],
       listings: listingsData || [],
       interestCards: interestCardsData || [],
+      ...(agentData ? { agentData } : {}),
     };
   };
 
@@ -81,6 +107,7 @@ export const DownloadDataScreen = () => {
             notifications: supabaseData.notifications,
             listings: supabaseData.listings,
             interestCards: supabaseData.interestCards,
+            ...(supabaseData.agentData ? { agentData: supabaseData.agentData } : {}),
           };
         }
       } catch (supabaseError) {

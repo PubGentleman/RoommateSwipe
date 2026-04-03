@@ -1,5 +1,5 @@
 export type RenterTier = 'free' | 'plus' | 'elite';
-export type HostTier = 'none' | 'starter' | 'pro' | 'business' | 'agent_starter' | 'agent_pro' | 'agent_business' | 'company_starter' | 'company_pro';
+export type HostTier = 'none' | 'starter' | 'pro' | 'business' | 'agent_starter' | 'agent_pro' | 'agent_business' | 'company_starter' | 'company_pro' | 'company_enterprise';
 
 export interface UserEntitlements {
   hostTier: HostTier;
@@ -17,6 +17,7 @@ export const HOST_TO_RENTER_BUNDLE: Record<string, RenterTier> = {
   agent_business: 'free',
   company_starter: 'free',
   company_pro: 'free',
+  company_enterprise: 'free',
   none: 'free',
 };
 
@@ -79,6 +80,7 @@ export function getSubscriptionLabel(
     agent_business: 'Agent Business',
     company_starter: 'Company Starter',
     company_pro: 'Company Pro',
+    company_enterprise: 'Company Enterprise',
   };
 
   if (hostTier !== 'none') {

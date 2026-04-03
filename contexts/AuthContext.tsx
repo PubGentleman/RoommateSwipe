@@ -841,8 +841,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const cleanupAgentData = async (userId: string) => {
+    try {
+      await Promise.allSettled([
+        supabase.from('agent_shortlists').delete().eq('agent_id', userId),
+        supabase.from('groups').update({ group_status: 'dissolved' }).eq('created_by_agent', userId),
+        supabase.from('agent_group_invites').update({ status: 'cancelled' }).eq('invited_by', userId).eq('status', 'pending'),
+        supabase.from('listings').update({ assigned_agent_id: null }).eq('assigned_agent_id', userId),
+        supabase.from('company_team_members').delete().eq('user_id', userId),
+      ]);
+    } catch (e) {
+      console.warn('[Auth] Agent data cleanup partial failure:', e);
+    }
+  };
+
   const softDeleteAccount = async () => {
     if (!user) return;
+
+    if (user.hostType === 'agent' || user.hostType === 'company') {
+      await cleanupAgentData(user.id);
+    }
+
     const updatedUser: User = {
       ...user,
       isDeleted: true,
@@ -1345,8 +1364,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { success: false, message: 'Not logged in' };
     }
 
-    const plan = user.subscription?.plan || 'basic';
-    const defaultDuration = plan === 'elite' ? 24 : plan === 'plus' ? 12 : 6;
+    const isHostMode = !!user.hostType && (user.activeMode === 'host' || user.hostType === 'agent' || user.hostType === 'company');
+    const hostPlan = user.hostSubscription?.plan || 'free';
+    const renterPlan = user.subscription?.plan || 'basic';
+    const plan = isHostMode ? hostPlan : renterPlan;
+    const defaultDuration = isHostMode
+      ? (plan.includes('business') || plan.includes('enterprise') ? 48 : plan.includes('pro') ? 24 : plan.includes('starter') ? 12 : 6)
+      : (renterPlan === 'elite' ? 24 : renterPlan === 'plus' ? 12 : 6);
     const durationHours = durationHoursParam || defaultDuration;
 
     const now = new Date();
@@ -2306,9 +2330,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const getHostPlan = (): string => {
     const plan = user?.hostSubscription?.plan;
-    if (!plan) return 'free';
-    const base = plan.replace(/^(agent_|company_)/, '');
-    return base || 'free';
+    return plan || 'free';
   };
 
   const upgradeHostPlan = async (plan: string, billingCycle: 'monthly' | '3month' | 'annual' = 'monthly') => {
@@ -2413,14 +2435,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { allowed: true, limit };
     }
     const hostPlan = getHostPlan();
-    const planLimitsMap: Record<string, number> = { free: 1, none: 1, starter: 5, pro: -1, business: -1 };
+    const planLimitsMap: Record<string, number> = {
+      free: 1, none: 1, starter: 5, pro: -1, business: -1,
+      agent_starter: 10, agent_pro: 30, agent_business: -1,
+      company_starter: 25, company_pro: 100, company_enterprise: -1,
+    };
     const limit = planLimitsMap[hostPlan] ?? 1;
     if (limit === -1) {
       return { allowed: true, limit: -1 };
     }
     if (currentCount >= limit) {
-      const nextPlan = hostPlan === 'free' || hostPlan === 'none' ? 'Host Starter' : hostPlan === 'starter' ? 'Host Pro' : 'Host Business';
-      return { allowed: false, limit, reason: `Your ${hostPlan === 'free' || hostPlan === 'none' ? 'Free' : hostPlan.charAt(0).toUpperCase() + hostPlan.slice(1)} plan allows up to ${limit} active listing${limit > 1 ? 's' : ''}. Upgrade to ${nextPlan} to add more listings.` };
+      const planLabel = hostPlan === 'free' || hostPlan === 'none' ? 'Free' : hostPlan.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+      return { allowed: false, limit, reason: `Your ${planLabel} plan allows up to ${limit} active listing${limit > 1 ? 's' : ''}. Upgrade to add more listings.` };
     }
     return { allowed: true, limit };
   };
@@ -2428,7 +2454,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const canRespondToInquiry = async (): Promise<{ allowed: boolean; remaining: number; limit: number; reason?: string }> => {
     if (!user) return { allowed: false, remaining: 0, limit: 0, reason: 'Not logged in' };
     const hostPlan = getHostPlan();
-    if (hostPlan === 'pro' || hostPlan === 'business') return { allowed: true, remaining: -1, limit: -1 };
+    if (['pro', 'business', 'agent_pro', 'agent_business', 'company_pro', 'company_enterprise'].includes(hostPlan)) return { allowed: true, remaining: -1, limit: -1 };
+    const starterLimit = (hostPlan === 'agent_starter' || hostPlan === 'company_starter') ? 20 : 5;
     const used = user.hostSubscription?.inquiryResponsesUsed || 0;
     const lastReset = user.hostSubscription?.lastInquiryResetDate;
     const now = new Date();
@@ -2442,12 +2469,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await StorageService.setCurrentUser(updated);
         await StorageService.addOrUpdateUser(updated);
         setUser(updated);
-        return { allowed: true, remaining: 5, limit: 5 };
+        return { allowed: true, remaining: starterLimit, limit: starterLimit };
       }
     }
-    const remaining = Math.max(0, 5 - used);
-    if (remaining <= 0) return { allowed: false, remaining: 0, limit: 5, reason: 'Free plan allows 5 inquiry responses per month. Upgrade to Starter or Pro for more.' };
-    return { allowed: true, remaining, limit: 5 };
+    const remaining = Math.max(0, starterLimit - used);
+    if (remaining <= 0) return { allowed: false, remaining: 0, limit: starterLimit, reason: `Your plan allows ${starterLimit} inquiry responses per month. Upgrade for more.` };
+    return { allowed: true, remaining, limit: starterLimit };
   };
 
   const useInquiryResponse = async () => {
@@ -2520,7 +2547,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const hostType = user?.hostType as 'individual' | 'agent' | 'company' | null | undefined;
   const hasCompletedHostOnboarding = user?.hasCompletedHostOnboarding ?? false;
-  const canSwitchMode = hostType === 'individual' && user?.role === 'host';
+  const canSwitchMode = user?.role === 'host' && hostType === 'individual' && hostType !== 'agent' && hostType !== 'company';
   const isFirstTimeHost = !hasCompletedHostOnboarding && hostType !== 'agent' && hostType !== 'company' && user?.role !== 'host';
   const effectiveMode: 'renter' | 'host' =
     hostType === 'agent' || hostType === 'company'
