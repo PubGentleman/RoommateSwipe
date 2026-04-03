@@ -56,15 +56,44 @@ const ACCENT = '#f59e0b';
 const GREEN = '#22c55e';
 const RED = '#ef4444';
 
-const FILTER_OPTIONS: Record<string, string[]> = {
+const ROOM_FILTER_OPTIONS: Record<string, string[]> = {
   budget: ['Under $1K', '$1K-$1.5K', '$1.5K-$2K', '$2K+'],
   moveIn: ['This month', 'Next month', 'Flexible'],
   lifestyle: ['Non-smoker', 'Has pets', 'No pets', 'Early bird', 'Night owl'],
   clean: ['8+ (Very clean)', '6-7 (Average)', 'Under 6'],
 };
 
+const ENTIRE_FILTER_OPTIONS: Record<string, string[]> = {
+  budget: ['Under $2K', '$2K-$3K', '$3K-$4K', '$4K+'],
+  moveIn: ['This month', 'Next month', 'Flexible'],
+  bedrooms: ['1BR', '2BR', '3BR+'],
+};
+
+function isEntireSeekerFn(renter: AgentRenter) {
+  return renter.roomType === 'entire_apartment' || renter.roomType === 'entire' || renter.roomType === 'apartment';
+}
+
 function getQuickTags(renter: AgentRenter) {
   const tags: { label: string; color: string }[] = [];
+
+  if (isEntireSeekerFn(renter)) {
+    if (renter.desiredBedrooms) {
+      tags.push({ label: `${renter.desiredBedrooms}BR+`, color: '#3b82f6' });
+    }
+    if (renter.preferredNeighborhoods && renter.preferredNeighborhoods.length > 0) {
+      renter.preferredNeighborhoods.slice(0, 2).forEach(n => {
+        tags.push({ label: n, color: '#888' });
+      });
+    }
+    if (renter.locationFlexible) {
+      tags.push({ label: 'Flexible location', color: GREEN });
+    }
+    if ((renter as any).responseRate != null && (renter as any).responseRate >= 90) {
+      tags.push({ label: `${(renter as any).responseRate}% response`, color: GREEN });
+    }
+    return tags;
+  }
+
   if (renter.cleanliness != null) {
     tags.push({
       label: `Clean: ${renter.cleanliness}/10`,
@@ -223,6 +252,9 @@ export const BrowseRentersScreen = () => {
             workLocation: p?.work_location || (p?.wfh ? 'remote' : undefined),
             hasPets: p?.pets === 'yes' || p?.pets === true,
             noPetsAllergy: p?.no_pets_allergy,
+            desiredBedrooms: p?.desired_bedrooms,
+            locationFlexible: p?.location_flexible,
+            apartmentPrefsComplete: p?.apartment_prefs_complete,
           };
         });
 
@@ -307,6 +339,9 @@ export const BrowseRentersScreen = () => {
           roomType: p.lookingFor,
           gender: p.gender,
           bio: p.bio,
+          desiredBedrooms: p.apartmentPrefs?.desiredBedrooms,
+          locationFlexible: p.apartmentPrefs?.locationFlexible,
+          apartmentPrefsComplete: p.apartmentPrefs?.apartmentPrefsComplete,
         }));
 
         const props = await StorageService.getProperties();
@@ -456,6 +491,10 @@ export const BrowseRentersScreen = () => {
         else if (val === '$1K-$1.5K') filtered = filtered.filter(r => (r.budgetMax ?? 0) >= 1000 && (r.budgetMin ?? 0) <= 1500);
         else if (val === '$1.5K-$2K') filtered = filtered.filter(r => (r.budgetMax ?? 0) >= 1500 && (r.budgetMin ?? 0) <= 2000);
         else if (val === '$2K+') filtered = filtered.filter(r => (r.budgetMax ?? 0) >= 2000);
+        else if (val === 'Under $2K') filtered = filtered.filter(r => (r.budgetMax ?? Infinity) < 2000);
+        else if (val === '$2K-$3K') filtered = filtered.filter(r => (r.budgetMax ?? 0) >= 2000 && (r.budgetMin ?? 0) <= 3000);
+        else if (val === '$3K-$4K') filtered = filtered.filter(r => (r.budgetMax ?? 0) >= 3000 && (r.budgetMin ?? 0) <= 4000);
+        else if (val === '$4K+') filtered = filtered.filter(r => (r.budgetMax ?? 0) >= 4000);
       } else if (cat === 'lifestyle') {
         if (val === 'Non-smoker') filtered = filtered.filter(r => !r.smoking || r.smoking === 'no' || r.smoking === 'never');
         else if (val === 'Has pets') filtered = filtered.filter(r => r.hasPets || r.pets);
@@ -481,6 +520,10 @@ export const BrowseRentersScreen = () => {
         if (val === '8+ (Very clean)') filtered = filtered.filter(r => (r.cleanliness ?? 0) >= 8);
         else if (val === '6-7 (Average)') filtered = filtered.filter(r => (r.cleanliness ?? 0) >= 6 && (r.cleanliness ?? 10) <= 7);
         else if (val === 'Under 6') filtered = filtered.filter(r => (r.cleanliness ?? 10) < 6);
+      } else if (cat === 'bedrooms') {
+        if (val === '1BR') filtered = filtered.filter(r => r.desiredBedrooms === 1);
+        else if (val === '2BR') filtered = filtered.filter(r => r.desiredBedrooms === 2);
+        else if (val === '3BR+') filtered = filtered.filter(r => (r.desiredBedrooms ?? 0) >= 3);
       }
     }
 
@@ -589,7 +632,7 @@ export const BrowseRentersScreen = () => {
     });
   }, []);
 
-  const isEntireSeeker = (renter: AgentRenter) => renter.roomType === 'entire_apartment' || renter.roomType === 'entire' || renter.roomType === 'apartment';
+  const isEntireSeeker = isEntireSeekerFn;
   const isRoomSeeker = (renter: AgentRenter) => !isEntireSeeker(renter);
 
   const handleSendGroupInvite = async () => {
@@ -704,6 +747,7 @@ export const BrowseRentersScreen = () => {
     const inGroup = selectedForGroup.has(item.id);
     const inMatrix = matrixRenters.has(item.id);
     const photo = item.photos?.[0];
+    const wantsEntire = isEntireSeeker(item);
 
     return (
       <View key={item.id} style={st.compactRow}>
@@ -728,15 +772,23 @@ export const BrowseRentersScreen = () => {
               : ''}
           </Text>
         </View>
-        <Pressable
-          onPress={() => toggleMatrix(item.id)}
-          style={[st.matrixToggle, inMatrix ? st.matrixToggleActive : null]}
-        >
-          <Feather name="grid" size={14} color={inMatrix ? GREEN : '#555'} />
-          <Text style={{ fontSize: 10, color: inMatrix ? GREEN : '#555', fontWeight: '600' }}>
-            {inMatrix ? 'In Matrix' : 'Match'}
-          </Text>
-        </Pressable>
+        {wantsEntire ? (
+          item.desiredBedrooms ? (
+            <View style={{ backgroundColor: 'rgba(59,130,246,0.1)', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 }}>
+              <Text style={{ fontSize: 11, fontWeight: '600', color: '#3b82f6' }}>{item.desiredBedrooms}BR+</Text>
+            </View>
+          ) : null
+        ) : (
+          <Pressable
+            onPress={() => toggleMatrix(item.id)}
+            style={[st.matrixToggle, inMatrix ? st.matrixToggleActive : null]}
+          >
+            <Feather name="grid" size={14} color={inMatrix ? GREEN : '#555'} />
+            <Text style={{ fontSize: 10, color: inMatrix ? GREEN : '#555', fontWeight: '600' }}>
+              {inMatrix ? 'In Matrix' : 'Match'}
+            </Text>
+          </Pressable>
+        )}
       </View>
     );
   };
@@ -813,15 +865,17 @@ export const BrowseRentersScreen = () => {
             </View>
           </View>
 
-          <Pressable
-            onPress={() => optedOut ? showAlert({ title: 'Not Available', message: 'This renter is not accepting offers from agents.' }) : toggleMatrix(item.id)}
-            style={[st.matrixToggle, inMatrix ? st.matrixToggleActive : null, { alignSelf: 'flex-start' }]}
-          >
-            <Feather name="grid" size={18} color={inMatrix ? GREEN : '#555'} />
-            <Text style={{ fontSize: 9, color: inMatrix ? GREEN : '#555', fontWeight: '600' }}>
-              {inMatrix ? 'In Matrix' : 'Match'}
-            </Text>
-          </Pressable>
+          {!wantsEntire ? (
+            <Pressable
+              onPress={() => optedOut ? showAlert({ title: 'Not Available', message: 'This renter is not accepting offers from agents.' }) : toggleMatrix(item.id)}
+              style={[st.matrixToggle, inMatrix ? st.matrixToggleActive : null, { alignSelf: 'flex-start' }]}
+            >
+              <Feather name="grid" size={18} color={inMatrix ? GREEN : '#555'} />
+              <Text style={{ fontSize: 9, color: inMatrix ? GREEN : '#555', fontWeight: '600' }}>
+                {inMatrix ? 'In Matrix' : 'Match'}
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
 
         {piRecommendedIds.has(item.id) ? (
@@ -852,17 +906,15 @@ export const BrowseRentersScreen = () => {
             <Feather name="message-circle" size={16} color="#ccc" />
             <Text style={st.actionBtnText}>Message</Text>
           </Pressable>
-          {!wantsEntire ? (
-            <Pressable
-              style={[st.actionBtn, inGroup ? st.actionBtnAccent : st.actionBtnAccentOutline]}
-              onPress={() => toggleGroup(item.id)}
-            >
-              <Feather name={inGroup ? 'check' : 'user-plus'} size={16} color={inGroup ? '#000' : ACCENT} />
-              <Text style={[st.actionBtnText, { color: inGroup ? '#000' : ACCENT }]}>
-                {inGroup ? 'In Group' : 'Add to Group'}
-              </Text>
-            </Pressable>
-          ) : null}
+          <Pressable
+            style={[st.actionBtn, inGroup ? st.actionBtnAccent : st.actionBtnAccentOutline]}
+            onPress={() => toggleGroup(item.id)}
+          >
+            <Feather name={inGroup ? 'check' : 'user-plus'} size={16} color={inGroup ? '#000' : ACCENT} />
+            <Text style={[st.actionBtnText, { color: inGroup ? '#000' : ACCENT }]}>
+              {inGroup ? 'In Group' : 'Add to Group'}
+            </Text>
+          </Pressable>
           <Pressable
             style={[st.actionBtn, { paddingHorizontal: 12 }]}
             onPress={() => setExpandedCard(isExpanded ? null : item.id)}
@@ -873,45 +925,92 @@ export const BrowseRentersScreen = () => {
 
         {isExpanded ? (
           <View style={{ paddingHorizontal: 16, paddingBottom: 16, borderTopWidth: 1, borderTopColor: '#222', paddingTop: 14 }}>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
-              {item.sleepSchedule ? (
-                <View style={st.detailItem}>
-                  <Feather name="moon" size={13} color="#888" />
-                  <Text style={st.detailText}>Sleep: {item.sleepSchedule}</Text>
-                </View>
-              ) : null}
-              {item.cleanliness != null ? (
-                <View style={st.detailItem}>
-                  <Feather name="star" size={13} color="#888" />
-                  <Text style={st.detailText}>Clean: {item.cleanliness}/10</Text>
-                </View>
-              ) : null}
-              {item.noiseTolerance != null ? (
-                <View style={st.detailItem}>
-                  <Feather name="volume-2" size={13} color="#888" />
-                  <Text style={st.detailText}>Noise: {item.noiseTolerance}/10</Text>
-                </View>
-              ) : null}
-              {item.guestPolicy ? (
-                <View style={st.detailItem}>
-                  <Feather name="home" size={13} color="#888" />
-                  <Text style={st.detailText}>Guests: {item.guestPolicy}</Text>
-                </View>
-              ) : null}
-              <View style={st.detailItem}>
-                <Feather name="heart" size={13} color="#888" />
-                <Text style={st.detailText}>
-                  {item.hasPets || item.pets ? 'Has pets' : item.noPetsAllergy ? 'Pet allergy' : 'No pets'}
-                </Text>
+            {wantsEntire ? (
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+                {item.desiredBedrooms ? (
+                  <View style={st.detailItem}>
+                    <Feather name="home" size={13} color="#3b82f6" />
+                    <Text style={st.detailText}>Bedrooms: {item.desiredBedrooms}+</Text>
+                  </View>
+                ) : null}
+                {item.preferredNeighborhoods && item.preferredNeighborhoods.length > 0 ? (
+                  <View style={st.detailItem}>
+                    <Feather name="map-pin" size={13} color="#3b82f6" />
+                    <Text style={st.detailText} numberOfLines={1}>
+                      {item.preferredNeighborhoods.join(', ')}
+                    </Text>
+                  </View>
+                ) : null}
+                {item.moveInDate ? (
+                  <View style={st.detailItem}>
+                    <Feather name="calendar" size={13} color="#888" />
+                    <Text style={st.detailText}>
+                      Move-in: {new Date(item.moveInDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    </Text>
+                  </View>
+                ) : null}
+                {item.locationFlexible ? (
+                  <View style={st.detailItem}>
+                    <Feather name="navigation" size={13} color={GREEN} />
+                    <Text style={st.detailText}>Flexible on location</Text>
+                  </View>
+                ) : null}
+                {item.budgetMax ? (
+                  <View style={st.detailItem}>
+                    <Feather name="dollar-sign" size={13} color="#888" />
+                    <Text style={st.detailText}>Max budget: ${item.budgetMax.toLocaleString()}/mo</Text>
+                  </View>
+                ) : null}
+                {item.workLocation ? (
+                  <View style={st.detailItem}>
+                    <Feather name="briefcase" size={13} color="#888" />
+                    <Text style={st.detailText}>
+                      {({ remote: 'Remote', hybrid: 'Hybrid', office: 'In-office', shifts: 'Shift work', wfh: 'Remote' } as Record<string, string>)[item.workLocation] || item.workLocation}
+                    </Text>
+                  </View>
+                ) : null}
               </View>
-              <View style={st.detailItem}>
-                <Feather name="wind" size={13} color="#888" />
-                <Text style={st.detailText}>
-                  {typeof item.smoking === 'string' ? (item.smoking === 'no' || item.smoking === 'never' ? 'Non-smoker' : item.smoking) : (item.smoking ? 'Smoker' : 'Non-smoker')}
-                </Text>
+            ) : (
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+                {item.sleepSchedule ? (
+                  <View style={st.detailItem}>
+                    <Feather name="moon" size={13} color="#888" />
+                    <Text style={st.detailText}>Sleep: {item.sleepSchedule}</Text>
+                  </View>
+                ) : null}
+                {item.cleanliness != null ? (
+                  <View style={st.detailItem}>
+                    <Feather name="star" size={13} color="#888" />
+                    <Text style={st.detailText}>Clean: {item.cleanliness}/10</Text>
+                  </View>
+                ) : null}
+                {item.noiseTolerance != null ? (
+                  <View style={st.detailItem}>
+                    <Feather name="volume-2" size={13} color="#888" />
+                    <Text style={st.detailText}>Noise: {item.noiseTolerance}/10</Text>
+                  </View>
+                ) : null}
+                {item.guestPolicy ? (
+                  <View style={st.detailItem}>
+                    <Feather name="home" size={13} color="#888" />
+                    <Text style={st.detailText}>Guests: {item.guestPolicy}</Text>
+                  </View>
+                ) : null}
+                <View style={st.detailItem}>
+                  <Feather name="heart" size={13} color="#888" />
+                  <Text style={st.detailText}>
+                    {item.hasPets || item.pets ? 'Has pets' : item.noPetsAllergy ? 'Pet allergy' : 'No pets'}
+                  </Text>
+                </View>
+                <View style={st.detailItem}>
+                  <Feather name="wind" size={13} color="#888" />
+                  <Text style={st.detailText}>
+                    {typeof item.smoking === 'string' ? (item.smoking === 'no' || item.smoking === 'never' ? 'Non-smoker' : item.smoking) : (item.smoking ? 'Smoker' : 'Non-smoker')}
+                  </Text>
+                </View>
               </View>
-            </View>
-            {item.interests && item.interests.length > 0 ? (
+            )}
+            {!wantsEntire && item.interests && item.interests.length > 0 ? (
               <View style={{ marginTop: 10, flexDirection: 'row', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
                 <Text style={{ fontSize: 11, color: '#666' }}>Interests:</Text>
                 {item.interests.slice(0, 6).map(i => (
@@ -1024,7 +1123,7 @@ export const BrowseRentersScreen = () => {
 
       {showFilters ? (
         <View style={st.filterPanel}>
-          {Object.entries(FILTER_OPTIONS).map(([category, options]) => (
+          {Object.entries(roomTypeFilter === 'entire_apartment' ? ENTIRE_FILTER_OPTIONS : ROOM_FILTER_OPTIONS).map(([category, options]) => (
             <View key={category} style={{ marginBottom: 12 }}>
               <Text style={st.filterCatLabel}>{category.toUpperCase()}</Text>
               <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
@@ -1090,7 +1189,7 @@ export const BrowseRentersScreen = () => {
           {['room', 'entire_apartment'].map(type => (
             <Pressable
               key={type}
-              onPress={() => setRoomTypeFilter(type)}
+              onPress={() => { setRoomTypeFilter(type); setActiveFilters(new Set()); }}
               style={[st.roomToggleBtn, roomTypeFilter === type ? st.roomToggleBtnActive : null]}
             >
               <Text style={[st.roomToggleBtnText, roomTypeFilter === type ? st.roomToggleBtnTextActive : null]}>

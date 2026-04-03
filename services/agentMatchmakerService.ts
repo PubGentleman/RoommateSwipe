@@ -41,6 +41,9 @@ export interface AgentRenter {
   noiseTolerance?: number;
   workLocation?: string;
   lastActiveAt?: string;
+  desiredBedrooms?: number;
+  locationFlexible?: boolean;
+  apartmentPrefsComplete?: boolean;
 }
 
 export interface AgentGroup {
