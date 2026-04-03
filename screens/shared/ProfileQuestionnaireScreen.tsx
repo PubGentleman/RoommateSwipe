@@ -470,6 +470,7 @@ export const ProfileQuestionnaireScreen = () => {
   const [selectedCity, setSelectedCity] = useState(user?.profileData?.city || '');
   const [selectedNeighborhood, setSelectedNeighborhood] = useState(user?.profileData?.neighborhood || '');
   const [preferredNeighborhoods, setPreferredNeighborhoods] = useState<string[]>(user?.profileData?.preferred_neighborhoods || []);
+  const [neighborhoodDropdownOpen, setNeighborhoodDropdownOpen] = useState(false);
   const [zipCode, setZipCode] = useState(user?.profileData?.zip_code || user?.zip_code || '');
   const [occupation, setOccupation] = useState(user?.profileData?.occupation || '');
   const [gender, setGender] = useState<'male' | 'female' | 'other' | undefined>(user?.profileData?.gender);
@@ -1033,21 +1034,45 @@ export const ProfileQuestionnaireScreen = () => {
             <ThemedText style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginBottom: 12 }}>
               {preferredNeighborhoods.length}/3 selected
             </ThemedText>
-            <ScrollView style={{ maxHeight: 200 }} showsVerticalScrollIndicator={false} nestedScrollEnabled>
-              {Object.entries(BOROUGH_NEIGHBORHOODS).map(([borough, hoods]) => (
-                <View key={borough} style={{ marginBottom: 12 }}>
-                  <ThemedText style={{ fontSize: 13, fontWeight: '700', color: '#ff6b5b', marginBottom: 6 }}>{borough}</ThemedText>
-                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-                    {hoods.map(hood => {
+
+            {preferredNeighborhoods.length > 0 ? (
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
+                {preferredNeighborhoods.map(hood => (
+                  <View key={hood} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,107,91,0.15)', borderRadius: 10, paddingVertical: 6, paddingHorizontal: 10, borderWidth: 1, borderColor: '#ff6b5b' }}>
+                    <ThemedText style={{ fontSize: 12, color: '#ff6b5b', marginRight: 6 }}>{hood}</ThemedText>
+                    <Pressable onPress={() => setPreferredNeighborhoods(prev => prev.filter(x => x !== hood))} hitSlop={8}>
+                      <Feather name="x" size={12} color="#ff6b5b" />
+                    </Pressable>
+                  </View>
+                ))}
+              </View>
+            ) : null}
+
+            <Pressable
+              onPress={() => { if (preferredNeighborhoods.length < 3) setNeighborhoodDropdownOpen(prev => !prev); }}
+              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#1c1c1c', borderRadius: 12, borderWidth: 1.5, borderColor: '#2a2a2a', paddingVertical: 14, paddingHorizontal: 16, opacity: preferredNeighborhoods.length >= 3 ? 0.4 : 1 }}
+            >
+              <ThemedText style={{ fontSize: 14, color: neighborhoodDropdownOpen ? '#fff' : 'rgba(255,255,255,0.4)' }}>
+                {neighborhoodDropdownOpen ? 'Tap to close' : 'Select neighborhoods...'}
+              </ThemedText>
+              <Feather name={neighborhoodDropdownOpen ? 'chevron-up' : 'chevron-down'} size={16} color="rgba(255,255,255,0.4)" />
+            </Pressable>
+
+            {neighborhoodDropdownOpen ? (
+              <ScrollView style={{ maxHeight: 280, backgroundColor: '#1a1a1a', borderRadius: 12, borderWidth: 1, borderColor: '#2a2a2a', marginTop: 6 }} showsVerticalScrollIndicator={false} nestedScrollEnabled>
+                {Object.entries(BOROUGH_NEIGHBORHOODS).map(([borough, hoods]) => (
+                  <View key={borough}>
+                    <View style={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 6 }}>
+                      <ThemedText style={{ fontSize: 13, fontWeight: '700', color: '#ff6b5b', textTransform: 'uppercase', letterSpacing: 0.5 }}>{borough}</ThemedText>
+                    </View>
+                    {hoods.map((hood, idx) => {
                       const isSelected = preferredNeighborhoods.includes(hood);
+                      const atMax = preferredNeighborhoods.length >= 3;
+                      const disabled = !isSelected && atMax;
                       return (
                         <Pressable
                           key={hood}
-                          style={{
-                            backgroundColor: isSelected ? 'rgba(255,107,91,0.15)' : '#1c1c1c',
-                            borderRadius: 10, paddingVertical: 7, paddingHorizontal: 11,
-                            borderWidth: 1.5, borderColor: isSelected ? '#ff6b5b' : '#2a2a2a',
-                          }}
+                          disabled={disabled}
                           onPress={() => {
                             setPreferredNeighborhoods(prev => {
                               if (prev.includes(hood)) return prev.filter(x => x !== hood);
@@ -1055,17 +1080,17 @@ export const ProfileQuestionnaireScreen = () => {
                               return [...prev, hood];
                             });
                           }}
+                          style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: idx < hoods.length - 1 ? 1 : 0, borderBottomColor: 'rgba(255,255,255,0.06)', opacity: disabled ? 0.3 : 1 }}
                         >
-                          <ThemedText style={{ fontSize: 12, color: isSelected ? '#ff6b5b' : '#ccc' }}>
-                            {hood}
-                          </ThemedText>
+                          <ThemedText style={{ fontSize: 14, color: isSelected ? '#ff6b5b' : 'rgba(255,255,255,0.8)' }}>{hood}</ThemedText>
+                          {isSelected ? <Feather name="check" size={16} color="#ff6b5b" /> : null}
                         </Pressable>
                       );
                     })}
                   </View>
-                </View>
-              ))}
-            </ScrollView>
+                ))}
+              </ScrollView>
+            ) : null}
 
             <View style={{ marginTop: 16 }}>
               <ThemedText style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginBottom: 6 }}>Zip code (optional)</ThemedText>
