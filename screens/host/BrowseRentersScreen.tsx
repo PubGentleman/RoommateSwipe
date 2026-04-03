@@ -73,6 +73,27 @@ function isEntireSeekerFn(renter: AgentRenter) {
   return renter.roomType === 'entire_apartment' || renter.roomType === 'entire' || renter.roomType === 'apartment';
 }
 
+function suggestGroupName(members: AgentRenter[], listing?: Property | null): string {
+  if (listing) {
+    const hood = listing.neighborhood || listing.city || '';
+    const size = members.length === 2 ? 'Duo' : members.length === 3 ? 'Trio' : `${members.length}-Group`;
+    if (hood) return `${hood} ${size}`;
+    return `${listing.title?.split(' ')[0] || ''} ${size}`.trim();
+  }
+  const hoods = members.map(m => m.neighborhood || m.preferredNeighborhoods?.[0]).filter(Boolean) as string[];
+  if (hoods.length > 0) {
+    const freq: Record<string, number> = {};
+    hoods.forEach(h => { freq[h] = (freq[h] || 0) + 1; });
+    const top = Object.entries(freq).sort((a, b) => b[1] - a[1])[0][0];
+    const size = members.length === 2 ? 'Duo' : members.length === 3 ? 'Trio' : `${members.length}-Group`;
+    return `${top} ${size}`;
+  }
+  if (members.length <= 3) {
+    return members.map(m => m.name?.split(' ')[0]).join(' & ');
+  }
+  return `New Group (${members.length})`;
+}
+
 function getQuickTags(renter: AgentRenter) {
   const tags: { label: string; color: string }[] = [];
 
@@ -170,6 +191,9 @@ export const BrowseRentersScreen = () => {
   const [matrixRenters, setMatrixRenters] = useState<Set<string>>(new Set());
   const [expandedCard, setExpandedCard] = useState<string | null>(null);
   const [groupInviteSent, setGroupInviteSent] = useState(false);
+  const [showGroupNameModal, setShowGroupNameModal] = useState(false);
+  const [groupNameInput, setGroupNameInput] = useState('');
+  const [groupNameAction, setGroupNameAction] = useState<'build' | 'invite'>('build');
 
   const agentPlan = resolveEffectiveAgentPlan(user) as AgentPlan;
   const planLimits = getAgentPlanLimits(agentPlan);
@@ -635,19 +659,24 @@ export const BrowseRentersScreen = () => {
   const isEntireSeeker = isEntireSeekerFn;
   const isRoomSeeker = (renter: AgentRenter) => !isEntireSeeker(renter);
 
-  const handleSendGroupInvite = async () => {
-    if (!user || selectedForGroup.size < 2 || groupInviteSent || sendingNow) return;
+  const openGroupNamePrompt = (action: 'build' | 'invite') => {
+    if (!user || selectedForGroup.size < 2) return;
+    const members = renters.filter(r => selectedForGroup.has(r.id));
+    const suggested = suggestGroupName(members, selectedListing);
+    setGroupNameInput(suggested);
+    setGroupNameAction(action);
+    setShowGroupNameModal(true);
+  };
+
+  const handleGroupNameConfirm = async () => {
+    if (!user || !groupNameInput.trim()) return;
+    setShowGroupNameModal(false);
     const members = renters.filter(r => selectedForGroup.has(r.id));
     const eligible = members.filter(r => r.acceptAgentOffers !== false);
     if (eligible.length < 2) {
       showAlert({ title: 'Not Enough', message: 'Not enough eligible renters.' });
       return;
     }
-    const ok = await confirm({
-      title: 'Send Group Invite',
-      message: `Send invites to ${eligible.length} renters?\n\n${eligible.map(r => r.name).join(', ')}`,
-    });
-    if (!ok) return;
     setSendingNow(true);
     try {
       const { groups: existingGroups } = await getAgentGroups(user.id);
@@ -659,15 +688,16 @@ export const BrowseRentersScreen = () => {
       }
       const matrix = calculatePairMatrix(eligible);
       const avgCompat = matrix.length > 0 ? Math.round(matrix.reduce((s, p) => s + p.score, 0) / matrix.length) : 0;
+      const status: 'assembling' | 'invited' = groupNameAction === 'build' ? 'assembling' : 'invited';
       const group: AgentGroup = {
         id: `ag_${Date.now()}`,
-        name: selectedListing ? `${selectedListing.title} - Agent Group` : `Agent Group ${Date.now()}`,
+        name: groupNameInput.trim(),
         agentId: user.id,
         targetListingId: selectedListing?.id,
         targetListing: selectedListing || undefined,
         members: eligible,
         memberIds: eligible.map(r => r.id),
-        groupStatus: 'invited',
+        groupStatus: status,
         avgCompatibility: avgCompat,
         combinedBudgetMin: eligible.reduce((s, r) => s + (r.budgetMin ?? 0), 0),
         combinedBudgetMax: eligible.reduce((s, r) => s + (r.budgetMax ?? 0), 0),
@@ -676,15 +706,26 @@ export const BrowseRentersScreen = () => {
         createdAt: new Date().toISOString(),
       };
       const created = await createAgentGroup(group);
-      await sendAgentInvites(
-        user.id, user.name ?? '', created.id,
-        eligible.map(r => r.id), selectedListing || null, '',
-        eligible.map(r => ({ id: r.id, name: r.name, photo: r.photos?.[0] }))
-      );
+
+      if (groupNameAction === 'invite') {
+        await sendAgentInvites(
+          user.id, user.name ?? '', created.id,
+          eligible.map(r => r.id), selectedListing || null, '',
+          eligible.map(r => ({ id: r.id, name: r.name, photo: r.photos?.[0] }))
+        );
+      }
+
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setGroupInviteSent(true);
+      setSelectedForGroup(new Set());
+      setGroupInviteSent(false);
+
+      if (groupNameAction === 'build') {
+        showAlert({ title: 'Group Saved', message: `"${groupNameInput.trim()}" saved to My Groups \u2192 Assembling` });
+      } else {
+        showAlert({ title: 'Invites Sent', message: `"${groupNameInput.trim()}" created and invites sent to ${eligible.length} renters.` });
+      }
     } catch (e) {
-      Alert.alert('Error', 'Failed to send invite. Please try again.');
+      showAlert({ title: 'Error', message: groupNameAction === 'build' ? 'Failed to save group.' : 'Failed to send invites.' });
     }
     setSendingNow(false);
   };
@@ -1301,20 +1342,32 @@ export const BrowseRentersScreen = () => {
               ))}
             </View>
           </ScrollView>
-          <Pressable
-            onPress={handleSendGroupInvite}
-            disabled={groupInviteSent || sendingNow || selectedForGroup.size < 2}
-            style={[st.sendInviteBtn, groupInviteSent ? st.sendInviteBtnSent : null]}
-          >
-            {sendingNow ? <ActivityIndicator color={groupInviteSent ? GREEN : '#000'} size="small" /> : (
-              <>
-                <Feather name={groupInviteSent ? 'check-circle' : 'users'} size={15} color={groupInviteSent ? GREEN : '#000'} />
-                <Text style={[st.sendInviteBtnText, groupInviteSent ? { color: GREEN } : null]}>
-                  {groupInviteSent ? `Invite Sent to ${selectedForGroup.size} Renters` : `Send Group Invite (${selectedForGroup.size})`}
-                </Text>
-              </>
-            )}
-          </Pressable>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <Pressable
+              onPress={() => openGroupNamePrompt('build')}
+              disabled={sendingNow || selectedForGroup.size < 2}
+              style={[st.sendInviteBtn, { flex: 1, backgroundColor: 'transparent', borderWidth: 1.5, borderColor: ACCENT }]}
+            >
+              <Feather name="folder-plus" size={15} color={ACCENT} />
+              <Text style={[st.sendInviteBtnText, { color: ACCENT }]}>
+                Build Group ({selectedForGroup.size})
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => openGroupNamePrompt('invite')}
+              disabled={sendingNow || selectedForGroup.size < 2}
+              style={[st.sendInviteBtn, { flex: 1 }]}
+            >
+              {sendingNow ? <ActivityIndicator color="#000" size="small" /> : (
+                <>
+                  <Feather name="send" size={15} color="#000" />
+                  <Text style={st.sendInviteBtnText}>
+                    Send Invite ({selectedForGroup.size})
+                  </Text>
+                </>
+              )}
+            </Pressable>
+          </View>
         </View>
       ) : null}
 
@@ -1369,15 +1422,7 @@ export const BrowseRentersScreen = () => {
       <View style={st.header}>
         <Text style={st.title}>Browse Renters</Text>
         {selectedForGroup.size > 0 ? (
-          <Pressable
-            onPress={() => {
-              const ids = Array.from(selectedForGroup);
-              navigation.navigate('AgentGroupBuilder', {
-                preselectedIds: ids,
-                listingId: selectedListing?.id,
-              });
-            }}
-          >
+          <Pressable onPress={() => openGroupNamePrompt('build')}>
             <LinearGradient
               colors={[ACCENT, RED]}
               start={{ x: 0, y: 0 }}
@@ -1481,6 +1526,51 @@ export const BrowseRentersScreen = () => {
                 </View>
               ) : null}
             </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showGroupNameModal} transparent animationType="fade" onRequestClose={() => setShowGroupNameModal(false)}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+          <View style={{ backgroundColor: '#1a1a1a', borderRadius: 18, width: '100%', maxWidth: 360, padding: 24, borderWidth: 1, borderColor: '#333' }}>
+            <Text style={{ color: '#fff', fontSize: 18, fontWeight: '700', marginBottom: 4 }}>
+              {groupNameAction === 'build' ? 'Name Your Group' : 'Name & Send Invites'}
+            </Text>
+            <Text style={{ color: '#888', fontSize: 13, marginBottom: 16 }}>
+              {groupNameAction === 'build'
+                ? 'Save this group to Assembling. You can add more members and send invites later.'
+                : `Create group and send invites to ${selectedForGroup.size} renters immediately.`}
+            </Text>
+            <TextInput
+              value={groupNameInput}
+              onChangeText={setGroupNameInput}
+              placeholder="Group name..."
+              placeholderTextColor="#555"
+              style={{ backgroundColor: '#111', borderRadius: 10, borderWidth: 1, borderColor: '#333', color: '#fff', fontSize: 15, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 16 }}
+              autoFocus
+              selectTextOnFocus
+            />
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <Pressable
+                onPress={() => setShowGroupNameModal(false)}
+                style={{ flex: 1, paddingVertical: 12, borderRadius: 10, borderWidth: 1, borderColor: '#333', alignItems: 'center' }}
+              >
+                <Text style={{ color: '#888', fontSize: 14, fontWeight: '600' }}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                onPress={handleGroupNameConfirm}
+                disabled={!groupNameInput.trim() || sendingNow}
+                style={{ flex: 1, paddingVertical: 12, borderRadius: 10, backgroundColor: groupNameAction === 'build' ? ACCENT : ACCENT, alignItems: 'center', opacity: !groupNameInput.trim() ? 0.5 : 1 }}
+              >
+                {sendingNow ? (
+                  <ActivityIndicator color="#000" size="small" />
+                ) : (
+                  <Text style={{ color: '#000', fontSize: 14, fontWeight: '700' }}>
+                    {groupNameAction === 'build' ? 'Save Group' : 'Send Invites'}
+                  </Text>
+                )}
+              </Pressable>
+            </View>
           </View>
         </View>
       </Modal>
