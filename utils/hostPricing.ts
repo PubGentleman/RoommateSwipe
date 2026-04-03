@@ -131,11 +131,18 @@ export const HOST_PLANS: Record<HostPlanType, {
     price: 49,
     listingsIncluded: 10,
     overagePerListing: 0,
-    freeBoosts: 0,
-    freeBoostDuration: null,
-    simultaneousBoosts: 0,
+    freeBoosts: 2,
+    freeBoostDuration: '12h',
+    simultaneousBoosts: 3,
     features: {
-      included: ['Up to 10 active listings', 'Client management', 'AI renter matching', 'Agent badge'],
+      included: [
+        'Up to 10 active listings',
+        'Client management',
+        'AI renter matching',
+        'Agent badge',
+        '2 free 12-hr boosts per month',
+        'Up to 3 simultaneous boosts',
+      ],
       locked: ['Priority placement', 'Advanced analytics'],
     },
   },
@@ -144,11 +151,18 @@ export const HOST_PLANS: Record<HostPlanType, {
     price: 99,
     listingsIncluded: Infinity,
     overagePerListing: 0,
-    freeBoosts: 0,
-    freeBoostDuration: null,
-    simultaneousBoosts: 0,
+    freeBoosts: 3,
+    freeBoostDuration: '24h',
+    simultaneousBoosts: 5,
     features: {
-      included: ['Unlimited listings', 'Priority placement', 'Advanced analytics', 'Priority support'],
+      included: [
+        'Unlimited listings',
+        'Priority placement',
+        'Advanced analytics',
+        'Priority support',
+        '3 free 24-hr boosts per month',
+        'Up to 5 simultaneous boosts',
+      ],
       locked: [],
     },
   },
@@ -157,11 +171,76 @@ export const HOST_PLANS: Record<HostPlanType, {
     price: 149,
     listingsIncluded: Infinity,
     overagePerListing: 0,
-    freeBoosts: 0,
-    freeBoostDuration: null,
-    simultaneousBoosts: 0,
+    freeBoosts: 5,
+    freeBoostDuration: '24h',
+    simultaneousBoosts: 15,
     features: {
-      included: ['Unlimited listings', 'Full CRM', 'Max visibility', 'Dedicated account manager'],
+      included: [
+        'Unlimited listings',
+        'Full CRM',
+        'Max visibility',
+        'Dedicated account manager',
+        '5 free 24-hr boosts per month',
+        'Up to 15 simultaneous boosts',
+      ],
+      locked: [],
+    },
+  },
+  company_starter: {
+    label: 'Company Starter',
+    price: 199,
+    listingsIncluded: Infinity,
+    overagePerListing: 0,
+    freeBoosts: 3,
+    freeBoostDuration: '12h',
+    simultaneousBoosts: 5,
+    features: {
+      included: [
+        'Unlimited listings',
+        'Team management',
+        'Company branding',
+        '3 free 12-hr boosts per month',
+        'Up to 5 simultaneous boosts',
+      ],
+      locked: ['Advanced analytics', 'Dedicated support'],
+    },
+  },
+  company_pro: {
+    label: 'Company Pro',
+    price: 399,
+    listingsIncluded: Infinity,
+    overagePerListing: 0,
+    freeBoosts: 5,
+    freeBoostDuration: '24h',
+    simultaneousBoosts: 10,
+    features: {
+      included: [
+        'Unlimited listings',
+        'Advanced analytics',
+        'Company branding',
+        'Priority support',
+        '5 free 24-hr boosts per month',
+        'Up to 10 simultaneous boosts',
+      ],
+      locked: [],
+    },
+  },
+  company_enterprise: {
+    label: 'Company Enterprise',
+    price: 0,
+    listingsIncluded: Infinity,
+    overagePerListing: 0,
+    freeBoosts: 10,
+    freeBoostDuration: '24h',
+    simultaneousBoosts: -1,
+    features: {
+      included: [
+        'Unlimited everything',
+        'Dedicated account manager',
+        '10 free 24-hr boosts per month',
+        'Unlimited simultaneous boosts',
+        'Custom integrations',
+      ],
       locked: [],
     },
   },
@@ -221,6 +300,27 @@ export const BOOST_OPTIONS = [
   },
 ];
 
+export const BOOST_PACKS = {
+  quick: [
+    { id: 'quick_1', quantity: 1, pricePerBoost: 2.99, totalPrice: 2.99, discount: 0, label: '1 Quick Boost', badge: null as string | null },
+    { id: 'quick_3', quantity: 3, pricePerBoost: 2.49, totalPrice: 7.47, discount: 17, label: '3 Quick Boosts', badge: null as string | null },
+    { id: 'quick_5', quantity: 5, pricePerBoost: 1.99, totalPrice: 9.95, discount: 33, label: '5 Quick Boosts', badge: 'Popular' as string | null },
+    { id: 'quick_10', quantity: 10, pricePerBoost: 1.49, totalPrice: 14.90, discount: 50, label: '10 Quick Boosts', badge: 'Best Value' as string | null },
+  ],
+  standard: [
+    { id: 'std_1', quantity: 1, pricePerBoost: 4.99, totalPrice: 4.99, discount: 0, label: '1 Standard Boost', badge: null as string | null },
+    { id: 'std_3', quantity: 3, pricePerBoost: 3.99, totalPrice: 11.97, discount: 20, label: '3 Standard Boosts', badge: null as string | null },
+    { id: 'std_5', quantity: 5, pricePerBoost: 3.49, totalPrice: 17.45, discount: 30, label: '5 Standard Boosts', badge: 'Popular' as string | null },
+    { id: 'std_10', quantity: 10, pricePerBoost: 2.99, totalPrice: 29.90, discount: 40, label: '10 Standard Boosts', badge: 'Best Value' as string | null },
+  ],
+  extended: [
+    { id: 'ext_1', quantity: 1, pricePerBoost: 7.99, totalPrice: 7.99, discount: 0, label: '1 Extended Boost', badge: null as string | null },
+    { id: 'ext_3', quantity: 3, pricePerBoost: 6.49, totalPrice: 19.47, discount: 19, label: '3 Extended Boosts', badge: null as string | null },
+    { id: 'ext_5', quantity: 5, pricePerBoost: 5.99, totalPrice: 29.95, discount: 25, label: '5 Extended Boosts', badge: 'Popular' as string | null },
+    { id: 'ext_10', quantity: 10, pricePerBoost: 4.99, totalPrice: 49.90, discount: 38, label: '10 Extended Boosts', badge: 'Best Value' as string | null },
+  ],
+};
+
 export const AGENT_VERIFICATION_FEE = 9.99;
 
 export function isFreePlan(plan: HostPlanType | string): boolean {
@@ -230,7 +330,7 @@ export function isFreePlan(plan: HostPlanType | string): boolean {
 
 export function calculateHostMonthlyCost(plan: HostPlanType, activeListings: number): number {
   if (isFreePlan(plan)) return 0;
-  const p = HOST_PLANS[plan] || HOST_PLANS[(plan || '').replace(/^(agent_|company_)/, '') as HostPlanType];
+  const p = HOST_PLANS[plan];
   if (!p) return 0;
   const base = p.price;
   const overage = Math.max(0, activeListings - p.listingsIncluded) * p.overagePerListing;
@@ -238,15 +338,17 @@ export function calculateHostMonthlyCost(plan: HostPlanType, activeListings: num
 }
 
 export function canAddListingCheck(subscription: HostSubscriptionData): { allowed: boolean; message: string; upgradeRequired?: boolean } {
-  const basePlan = (subscription.plan || '').replace(/^(agent_|company_)/, '');
-  const plan = HOST_PLANS[subscription.plan as HostPlanType] || HOST_PLANS[basePlan as HostPlanType] || HOST_PLANS.free;
-  if (basePlan === 'pro' || basePlan === 'business') {
+  const plan = HOST_PLANS[subscription.plan as HostPlanType] || HOST_PLANS.free;
+  if (plan.listingsIncluded === Infinity) {
     return { allowed: true, message: '' };
   }
   if (subscription.activeListingCount >= plan.listingsIncluded) {
     const isAgentPlan = subscription.plan.startsWith('agent_');
+    const isCompanyPlan = subscription.plan.startsWith('company_');
     const upgradeTo = isAgentPlan
       ? (subscription.plan === 'agent_starter' ? 'Agent Pro' : 'Agent Business')
+      : isCompanyPlan
+      ? (subscription.plan === 'company_starter' ? 'Company Pro' : 'Company Enterprise')
       : (isFreePlan(subscription.plan) ? 'Host Starter' : 'Host Pro');
     return {
       allowed: false,
@@ -306,6 +408,7 @@ export function getDefaultHostSubscription(): HostSubscriptionData {
     freeBoostDuration: HOST_PLANS.free.freeBoostDuration,
     isVerifiedAgent: false,
     agentVerificationPaid: false,
+    boostCredits: { quick: 0, standard: 0, extended: 0 },
   };
 }
 
@@ -322,6 +425,7 @@ export function subscriptionFromPlan(plan: HostPlanType, existing?: Partial<Host
     isVerifiedAgent: existing?.isVerifiedAgent || false,
     agentVerificationPaid: existing?.agentVerificationPaid || false,
     renewalDate: isFreePlan(plan) ? undefined : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+    boostCredits: existing?.boostCredits || { quick: 0, standard: 0, extended: 0 },
   };
 }
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Pressable, Text, ScrollView } from 'react-native';
+import { View, StyleSheet, Pressable, Text, ScrollView, Alert } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -8,8 +8,8 @@ import * as Haptics from 'expo-haptics';
 import { useAuth } from '../../contexts/AuthContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { StorageService } from '../../utils/storage';
-import { Property, HostSubscriptionData, ListingBoost } from '../../types/models';
-import { BOOST_OPTIONS, calculateBoostExpiry, isListingBoosted, getBoostTimeRemaining, isFreePlan, createBoostRecord } from '../../utils/hostPricing';
+import { Property, HostSubscriptionData, ListingBoost, BoostCredits } from '../../types/models';
+import { BOOST_OPTIONS, BOOST_PACKS, calculateBoostExpiry, isListingBoosted, getBoostTimeRemaining, isFreePlan, createBoostRecord } from '../../utils/hostPricing';
 import { getListing } from '../../services/listingService';
 import { getPlanLimits, type HostPlan } from '../../constants/planLimits';
 
@@ -20,6 +20,20 @@ const ACCENT = '#ff6b5b';
 const PURPLE = '#a855f7';
 const GOLD = '#ffd700';
 const ROOMDR_PURPLE = '#7B5EA7';
+const GREEN = '#22c55e';
+const BLUE = '#60a5fa';
+
+const CREDIT_COLORS: Record<string, string> = {
+  quick: BLUE,
+  standard: PURPLE,
+  extended: GREEN,
+};
+
+const BOOST_TYPE_MAP: Record<string, 'quick' | 'standard' | 'extended'> = {
+  quick: 'quick',
+  standard: 'standard',
+  extended: 'extended',
+};
 
 export const ListingBoostScreen = () => {
   const navigation = useNavigation<any>();
@@ -33,6 +47,7 @@ export const ListingBoostScreen = () => {
   const [hostSub, setHostSub] = useState<HostSubscriptionData | null>(null);
   const [activeBoostCount, setActiveBoostCount] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [boostCredits, setBoostCredits] = useState<BoostCredits>({ quick: 0, standard: 0, extended: 0 });
 
   useEffect(() => {
     if (!user) return;
@@ -56,6 +71,7 @@ export const ListingBoostScreen = () => {
             neighborhood: supaListing.neighborhood,
             address: supaListing.address || '',
             photos: supaListing.photos || [],
+            amenities: supaListing.amenities || [],
             available: true,
             hostId: supaListing.host_id || user.id,
             hostName: user.name,
@@ -69,6 +85,9 @@ export const ListingBoostScreen = () => {
       if (found) setListing(found);
       const sub = await StorageService.getHostSubscription(user.id);
       setHostSub(sub);
+      if (sub?.boostCredits) {
+        setBoostCredits(sub.boostCredits);
+      }
       const boostCount = await StorageService.getActiveBoostCountForHost(user.id);
       setActiveBoostCount(boostCount);
     };
@@ -76,22 +95,20 @@ export const ListingBoostScreen = () => {
   }, [user, listingId]);
 
   const isAgent = user?.hostType === 'agent';
-  const rawAgentPlan = user?.agentPlan || (user as any)?.agent_plan || '';
-  const agentSubPlan = user?.hostSubscription?.plan || '';
-  const agentPlan = (rawAgentPlan && rawAgentPlan !== 'pay_per_use' && rawAgentPlan !== 'free') ? rawAgentPlan : agentSubPlan;
-  const agentPlanBase = (agentPlan || '').replace(/^(agent_|company_)/, '');
-  const isAgentFree = isAgent && (!agentPlanBase || agentPlanBase === 'pay_per_use' || agentPlanBase === 'free');
+  const isCompany = user?.hostType === 'company';
+  const hostPlan = getHostPlan() as HostPlan;
+  const planLimits = getPlanLimits(hostPlan);
+  const isAgentFree = isAgent && (hostPlan === 'free' || hostPlan === 'none' || (hostPlan as string) === 'pay_per_use');
   const canPayPerBoost = isAgentFree;
 
   const isBoosted = listing ? isListingBoosted(listing) : false;
-  const planLimits = getPlanLimits(getHostPlan() as HostPlan);
   const maxSimultaneous = canPayPerBoost ? 1 : planLimits.simultaneousBoosts;
   const boostsExcludingThis = isBoosted ? activeBoostCount - 1 : activeBoostCount;
   const hasReachedBoostLimit = maxSimultaneous > 0 && boostsExcludingThis >= maxSimultaneous;
   const hasFreeBoosts = hostSub && hostSub.freeBoostsRemaining > 0;
-  const isOnFreePlan = hostSub && isFreePlan(hostSub.plan);
+  const hasAnyCredits = boostCredits.quick > 0 || boostCredits.standard > 0 || boostCredits.extended > 0;
 
-  if (isOnFreePlan && hostSub && !canPayPerBoost) {
+  if (!planLimits.hasBoosts && !canPayPerBoost) {
     return (
       <View style={[{ flex: 1, backgroundColor: BG }, { paddingTop: insets.top }]}>
         <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, gap: 12 }}>
@@ -175,7 +192,130 @@ export const ListingBoostScreen = () => {
     }
   };
 
+  const useCredit = async (boostType: 'quick' | 'standard' | 'extended') => {
+    if (!user || !listing || !hostSub) return;
+    if (boostCredits[boostType] <= 0) return;
+
+    if (hasReachedBoostLimit) {
+      await showAlert({ title: 'Boost Limit Reached', message: `Your ${planLimits.label} plan allows up to ${maxSimultaneous} simultaneous boost${maxSimultaneous !== 1 ? 's' : ''}. Upgrade your plan for more.`, variant: 'warning' });
+      return;
+    }
+
+    const option = BOOST_OPTIONS.find(o => o.id === boostType);
+    if (!option) return;
+
+    const confirmed = await confirm({
+      title: 'Use Boost Credit',
+      message: `Use 1 ${option.label.replace(' Boost', '')} credit to boost "${listing.title}" for ${option.duration}? You have ${boostCredits[boostType]} credit${boostCredits[boostType] !== 1 ? 's' : ''} remaining.`,
+      confirmText: 'Use Credit',
+      variant: 'info',
+    });
+    if (!confirmed) return;
+
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    const boost = createBoostRecord(listing.id, option, false);
+    await StorageService.applyListingBoost(listing.id, boost);
+
+    const newCredits = { ...boostCredits, [boostType]: boostCredits[boostType] - 1 };
+    setBoostCredits(newCredits);
+    await StorageService.updateHostSubscription(user.id, { boostCredits: newCredits });
+
+    const durationLabel = option.duration === '6h' ? '6 hours' : option.duration === '12h' ? '12 hours' : '24 hours';
+    await showAlert({ title: 'Boost Applied!', message: `Your listing has been boosted for ${durationLabel} using a credit.`, variant: 'success' });
+    navigation.goBack();
+  };
+
+  const purchaseBoostPack = async (packId: string) => {
+    const allPacks = [...BOOST_PACKS.quick, ...BOOST_PACKS.standard, ...BOOST_PACKS.extended];
+    const pack = allPacks.find(p => p.id === packId);
+    if (!pack || !user) return;
+
+    const boostType: 'quick' | 'standard' | 'extended' = packId.startsWith('quick') ? 'quick'
+      : packId.startsWith('std') ? 'standard'
+      : 'extended';
+
+    const savings = (pack.quantity * BOOST_OPTIONS.find(o => o.id === boostType)!.price) - pack.totalPrice;
+
+    const confirmed = await confirm({
+      title: `Purchase ${pack.label}`,
+      message: `$${pack.totalPrice.toFixed(2)} ($${pack.pricePerBoost.toFixed(2)}/ea)${savings > 0 ? `\nYou save $${savings.toFixed(2)} (${pack.discount}%)` : ''}\n\nCredits never expire.`,
+      confirmText: `Purchase $${pack.totalPrice.toFixed(2)}`,
+      variant: 'info',
+    });
+    if (!confirmed) return;
+
+    if (isDev) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      const newCredits = { ...boostCredits, [boostType]: boostCredits[boostType] + pack.quantity };
+      setBoostCredits(newCredits);
+      await StorageService.updateHostSubscription(user.id, { boostCredits: newCredits });
+      await showAlert({
+        title: 'Credits Added!',
+        message: `${pack.quantity} ${boostType.charAt(0).toUpperCase() + boostType.slice(1)} Boost credit${pack.quantity > 1 ? 's' : ''} added!\nYou now have ${newCredits[boostType]} ${boostType} credit${newCredits[boostType] !== 1 ? 's' : ''}.`,
+        variant: 'success',
+      });
+    } else {
+      await showAlert({ title: 'Payment Required', message: 'Payment processing will be available soon.', variant: 'info' });
+    }
+  };
+
   if (!listing || !hostSub) return null;
+
+  const renderCreditsBar = () => {
+    if (!hasAnyCredits) return null;
+    return (
+      <View style={styles.creditsSection}>
+        <Text style={styles.creditsSectionTitle}>Your Boost Credits</Text>
+        <View style={styles.creditsRow}>
+          {(['quick', 'standard', 'extended'] as const).map(type => (
+            <View key={type} style={[styles.creditCard, { borderTopColor: CREDIT_COLORS[type] }]}>
+              <Text style={[styles.creditCount, { color: CREDIT_COLORS[type] }]}>{boostCredits[type]}</Text>
+              <Text style={styles.creditLabel}>{type.charAt(0).toUpperCase() + type.slice(1)}</Text>
+            </View>
+          ))}
+        </View>
+      </View>
+    );
+  };
+
+  const renderBoostPackSection = () => {
+    const tiers: { key: 'quick' | 'standard' | 'extended'; label: string; duration: string }[] = [
+      { key: 'quick', label: 'Quick Boosts', duration: '6h' },
+      { key: 'standard', label: 'Standard Boosts', duration: '12h' },
+      { key: 'extended', label: 'Extended Boosts', duration: '24h' },
+    ];
+
+    return (
+      <View style={styles.bulkSection}>
+        <View style={styles.bulkDivider} />
+        <Text style={styles.bulkTitle}>Buy Boost Packs</Text>
+        <Text style={styles.bulkSubtitle}>Save up to 50% when you buy in bulk</Text>
+
+        {tiers.map(tier => (
+          <View key={tier.key} style={styles.bulkTierSection}>
+            <Text style={styles.bulkTierLabel}>{tier.label} ({tier.duration})</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.bulkPacksRow}>
+              {BOOST_PACKS[tier.key].filter(p => p.quantity > 1).map(pack => (
+                <Pressable key={pack.id} style={styles.bulkPackCard} onPress={() => purchaseBoostPack(pack.id)}>
+                  {pack.badge ? (
+                    <View style={[styles.packBadge, { backgroundColor: pack.badge === 'Best Value' ? ACCENT : GREEN }]}>
+                      <Text style={styles.packBadgeText}>{pack.badge}</Text>
+                    </View>
+                  ) : null}
+                  <Text style={styles.packSize}>{pack.quantity}-Pack</Text>
+                  <Text style={styles.packPrice}>${pack.totalPrice.toFixed(2)}</Text>
+                  <Text style={styles.packPerUnit}>${pack.pricePerBoost.toFixed(2)}/ea</Text>
+                  {pack.discount > 0 ? (
+                    <Text style={styles.packDiscount}>-{pack.discount}%</Text>
+                  ) : null}
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+        ))}
+      </View>
+    );
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: BG }]}>
@@ -279,7 +419,9 @@ export const ListingBoostScreen = () => {
           <View style={styles.warningCard}>
             <Feather name="alert-circle" size={16} color={GOLD} />
             <Text style={styles.warningText}>
-              You have reached your {maxSimultaneous} simultaneous boost limit. Upgrade your plan for more.
+              {maxSimultaneous === -1
+                ? 'Unlimited simultaneous boosts available.'
+                : `You have reached your ${maxSimultaneous} simultaneous boost limit. Upgrade your plan for more.`}
             </Text>
           </View>
         ) : null}
@@ -333,11 +475,15 @@ export const ListingBoostScreen = () => {
           </View>
         ) : null}
 
+        {renderCreditsBar()}
+
         {!isBoosted ? (
           <View style={styles.optionsSection}>
             <Text style={styles.sectionTitle}>Boost Options</Text>
             {BOOST_OPTIONS.map(option => {
               const isSelected = selectedId === option.id;
+              const creditType = BOOST_TYPE_MAP[option.id];
+              const creditCount = creditType ? boostCredits[creditType] : 0;
               return (
                 <Pressable
                   key={option.id}
@@ -423,6 +569,15 @@ export const ListingBoostScreen = () => {
                       </View>
                     ) : null}
                   </View>
+
+                  {creditCount > 0 && !hasReachedBoostLimit ? (
+                    <Pressable
+                      style={styles.useCreditBtn}
+                      onPress={() => useCredit(creditType)}
+                    >
+                      <Text style={styles.useCreditText}>Use Credit ({creditCount} left)</Text>
+                    </Pressable>
+                  ) : null}
                 </Pressable>
               );
             })}
@@ -456,9 +611,13 @@ export const ListingBoostScreen = () => {
           </Text>
         </View>
 
+        {renderBoostPackSection()}
+
         <Text style={styles.notice}>
           {canPayPerBoost
             ? 'Pay-per-boost: 1 active boost at a time. Upgrade your plan for more simultaneous boosts. Boosts cannot be cancelled once applied.'
+            : maxSimultaneous === -1
+            ? 'Unlimited simultaneous boosts on your plan. Boosts cannot be cancelled once applied.'
             : `Your plan allows up to ${maxSimultaneous} simultaneous boost${maxSimultaneous !== 1 ? 's' : ''}. Boosts cannot be cancelled once applied.`}
         </Text>
 
@@ -597,6 +756,35 @@ const styles = StyleSheet.create({
   },
   freeBoostTitle: { fontSize: 15, fontWeight: '700', color: PURPLE },
   freeBoostSub: { fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 1 },
+  creditsSection: { marginBottom: 16 },
+  creditsSectionTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.7)',
+    marginBottom: 8,
+  },
+  creditsRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  creditCard: {
+    flex: 1,
+    backgroundColor: CARD_BG,
+    borderRadius: 12,
+    padding: 12,
+    alignItems: 'center',
+    borderTopWidth: 3,
+  },
+  creditCount: {
+    fontSize: 22,
+    fontWeight: '800',
+  },
+  creditLabel: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.5)',
+    marginTop: 2,
+    fontWeight: '600',
+  },
   optionsSection: { marginBottom: 16 },
   sectionTitle: { fontSize: 16, fontWeight: '700', color: '#fff', marginBottom: 12 },
   optionCard: {
@@ -653,6 +841,19 @@ const styles = StyleSheet.create({
   optionPerks: { gap: 6 },
   perkRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   perkText: { fontSize: 12, color: 'rgba(255,255,255,0.55)', fontWeight: '500' },
+  useCreditBtn: {
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 8,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  useCreditText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.7)',
+  },
   purchaseBtn: {
     height: 48,
     borderRadius: 14,
@@ -709,10 +910,90 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginTop: 12,
+    marginTop: 10,
     paddingTop: 10,
     borderTopWidth: 1,
     borderTopColor: 'rgba(255,255,255,0.06)',
   },
-  payPerBoostUpgradeText: { fontSize: 11, color: 'rgba(255,255,255,0.35)', flex: 1 },
+  payPerBoostUpgradeText: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.35)',
+    flex: 1,
+  },
+  bulkSection: {
+    marginTop: 24,
+  },
+  bulkDivider: {
+    borderTopWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+    marginBottom: 16,
+  },
+  bulkTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#fff',
+    marginBottom: 4,
+  },
+  bulkSubtitle: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.4)',
+    marginBottom: 16,
+  },
+  bulkTierSection: {
+    marginBottom: 16,
+  },
+  bulkTierLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.7)',
+    marginBottom: 8,
+  },
+  bulkPacksRow: {
+    gap: 10,
+    paddingRight: 4,
+  },
+  bulkPackCard: {
+    width: 100,
+    backgroundColor: CARD_BG,
+    borderRadius: 12,
+    padding: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+  },
+  packBadge: {
+    position: 'absolute',
+    top: -6,
+    right: -4,
+    borderRadius: 4,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+  },
+  packBadgeText: {
+    fontSize: 8,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  packSize: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#fff',
+    marginBottom: 4,
+  },
+  packPrice: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#fff',
+  },
+  packPerUnit: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.5)',
+    marginTop: 2,
+  },
+  packDiscount: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: GREEN,
+    marginTop: 4,
+  },
 });

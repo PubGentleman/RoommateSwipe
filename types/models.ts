@@ -90,6 +90,12 @@ export type HostPlanType = 'free' | 'none' | 'starter' | 'pro' | 'business' | 'e
 export type AgentPlanType = 'pay_per_use' | 'starter' | 'pro' | 'business';
 export type AgentGroupStatus = 'assembling' | 'invited' | 'active' | 'placed' | 'dissolved';
 
+export interface BoostCredits {
+  quick: number;
+  standard: number;
+  extended: number;
+}
+
 export interface HostSubscriptionData {
   plan: HostPlanType;
   listingsIncluded: number;
@@ -101,6 +107,7 @@ export interface HostSubscriptionData {
   isVerifiedAgent: boolean;
   agentVerificationPaid: boolean;
   renewalDate?: string;
+  boostCredits?: BoostCredits;
 }
 
 export interface ListingBoost {

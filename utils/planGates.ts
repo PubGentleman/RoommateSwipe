@@ -38,6 +38,7 @@ export function canAccessDedicatedSupport(plan: string): boolean {
 
 export function canUseBoosts(plan: string): boolean {
   if (isAgentPlan(plan)) return getAgentLimits(plan).hasBoosts;
+  if (plan.startsWith('company_')) return getPlanLimits(plan as any).hasBoosts;
   return getPlanLimits(resolveHostPlan(plan)).hasBoosts;
 }
 
