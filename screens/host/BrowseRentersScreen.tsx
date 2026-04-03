@@ -82,6 +82,9 @@ function getQuickTags(renter: AgentRenter) {
   if (renter.hasPets || renter.pets) tags.push({ label: 'Has pets', color: ACCENT });
   else if (renter.noPetsAllergy) tags.push({ label: 'Pet allergy', color: RED });
   else tags.push({ label: 'No pets', color: '#888' });
+  if ((renter as any).responseRate != null && (renter as any).responseRate >= 90) {
+    tags.push({ label: `${(renter as any).responseRate}% response`, color: GREEN });
+  }
   return tags;
 }
 
@@ -135,6 +138,7 @@ export const BrowseRentersScreen = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [activeFilters, setActiveFilters] = useState<Set<string>>(new Set());
   const [selectedForGroup, setSelectedForGroup] = useState<Set<string>>(new Set());
+  const [matrixRenters, setMatrixRenters] = useState<Set<string>>(new Set());
   const [expandedCard, setExpandedCard] = useState<string | null>(null);
   const [groupInviteSent, setGroupInviteSent] = useState(false);
 
@@ -566,6 +570,16 @@ export const BrowseRentersScreen = () => {
     setGroupInviteSent(false);
   }, []);
 
+  const toggleMatrix = useCallback((id: string) => {
+    setMatrixRenters(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  }, []);
+
   const toggleFilter = useCallback((key: string) => {
     setActiveFilters(prev => {
       const next = new Set(prev);
@@ -688,7 +702,7 @@ export const BrowseRentersScreen = () => {
 
   const renderCompactRow = (item: AgentRenter) => {
     const inGroup = selectedForGroup.has(item.id);
-    const isShortlisted = shortlistedIds.has(item.id);
+    const inMatrix = matrixRenters.has(item.id);
     const photo = item.photos?.[0];
 
     return (
@@ -715,12 +729,12 @@ export const BrowseRentersScreen = () => {
           </Text>
         </View>
         <Pressable
-          onPress={() => handleShortlist(item)}
-          style={[st.matrixToggle, isShortlisted ? st.matrixToggleActive : null]}
+          onPress={() => toggleMatrix(item.id)}
+          style={[st.matrixToggle, inMatrix ? st.matrixToggleActive : null]}
         >
-          <Feather name="grid" size={14} color={isShortlisted ? GREEN : '#555'} />
-          <Text style={{ fontSize: 10, color: isShortlisted ? GREEN : '#555', fontWeight: '600' }}>
-            {isShortlisted ? 'Saved' : 'Match'}
+          <Feather name="grid" size={14} color={inMatrix ? GREEN : '#555'} />
+          <Text style={{ fontSize: 10, color: inMatrix ? GREEN : '#555', fontWeight: '600' }}>
+            {inMatrix ? 'In Matrix' : 'Match'}
           </Text>
         </Pressable>
       </View>
@@ -728,7 +742,7 @@ export const BrowseRentersScreen = () => {
   };
 
   const renderRenterCard = ({ item }: { item: AgentRenter }) => {
-    const isShortlisted = shortlistedIds.has(item.id);
+    const inMatrix = matrixRenters.has(item.id);
     const photo = item.photos?.[0];
     const optedOut = item.acceptAgentOffers === false;
     const wantsEntire = isEntireSeeker(item);
@@ -800,12 +814,12 @@ export const BrowseRentersScreen = () => {
           </View>
 
           <Pressable
-            onPress={() => optedOut ? showAlert({ title: 'Not Available', message: 'This renter is not accepting offers from agents.' }) : handleShortlist(item)}
-            style={[st.matrixToggle, isShortlisted ? st.matrixToggleActive : null, { alignSelf: 'flex-start' }]}
+            onPress={() => optedOut ? showAlert({ title: 'Not Available', message: 'This renter is not accepting offers from agents.' }) : toggleMatrix(item.id)}
+            style={[st.matrixToggle, inMatrix ? st.matrixToggleActive : null, { alignSelf: 'flex-start' }]}
           >
-            <Feather name="grid" size={18} color={isShortlisted ? GREEN : '#555'} />
-            <Text style={{ fontSize: 9, color: isShortlisted ? GREEN : '#555', fontWeight: '600' }}>
-              {isShortlisted ? 'In Matrix' : 'Match'}
+            <Feather name="grid" size={18} color={inMatrix ? GREEN : '#555'} />
+            <Text style={{ fontSize: 9, color: inMatrix ? GREEN : '#555', fontWeight: '600' }}>
+              {inMatrix ? 'In Matrix' : 'Match'}
             </Text>
           </Pressable>
         </View>
@@ -1132,32 +1146,30 @@ export const BrowseRentersScreen = () => {
                 showAlert({ title: 'Pro Feature', message: 'Compatibility Matrix is available on Pro and Business plans.' });
                 return;
               }
-              let shortlisted = renters.filter(r => shortlistedIds.has(r.id));
+              let matrixList = renters.filter(r => matrixRenters.has(r.id));
               if (selectedListing) {
                 const perPersonRent = selectedListing.bedrooms > 0
                   ? Math.ceil(selectedListing.price / selectedListing.bedrooms)
                   : selectedListing.price;
-                shortlisted = shortlisted.filter(r => {
+                matrixList = matrixList.filter(r => {
                   const canAfford = !r.budgetMax || r.budgetMax >= perPersonRent * 0.7;
                   const rightType = !r.roomType || r.roomType === 'room' || r.roomType === 'private_room' || r.roomType === 'shared_room';
                   return canAfford && rightType;
                 });
               }
-              if (shortlisted.length < 2) {
+              if (matrixList.length < 2) {
                 showAlert({
                   title: 'Not Enough Matches',
-                  message: selectedListing
-                    ? `Only ${shortlisted.length} shortlisted renter${shortlisted.length === 1 ? '' : 's'} match "${selectedListing.title}". Shortlist more compatible renters first.`
-                    : 'Shortlist at least 2 renters to view the compatibility matrix.',
+                  message: 'Tap "Match" on at least 2 renters to compare them in the compatibility matrix.',
                 });
                 return;
               }
-              navigation.navigate('RenterCompatibility', { renters: shortlisted, listingId: selectedListing?.id, listing: selectedListing });
+              navigation.navigate('RenterCompatibility', { renters: matrixList, listingId: selectedListing?.id, listing: selectedListing });
             }}
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+            style={st.matrixNavBtn}
           >
             <Feather name="grid" size={14} color={GREEN} />
-            <Text style={{ color: GREEN, fontSize: 13, fontWeight: '600' }}>Matrix ({shortlistedIds.size})</Text>
+            <Text style={{ color: GREEN, fontSize: 13, fontWeight: '600' }}>Matrix ({matrixRenters.size})</Text>
           </Pressable>
         ) : null}
       </View>
@@ -1259,7 +1271,6 @@ export const BrowseRentersScreen = () => {
         <Text style={st.title}>Browse Renters</Text>
         {selectedForGroup.size > 0 ? (
           <Pressable
-            style={st.buildGroupHeaderBtn}
             onPress={() => {
               const ids = Array.from(selectedForGroup);
               navigation.navigate('AgentGroupBuilder', {
@@ -1268,33 +1279,17 @@ export const BrowseRentersScreen = () => {
               });
             }}
           >
-            <Feather name="users" size={16} color="#fff" />
-            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>Build Group ({selectedForGroup.size})</Text>
-          </Pressable>
-        ) : roomTypeFilter !== 'entire_apartment' ? (() => {
-          const roomShortlistCount = renters.filter(r => shortlistedIds.has(r.id) && isRoomSeeker(r)).length;
-          return (
-            <Pressable
-              style={[st.buildGroupHeaderBtn, roomShortlistCount >= 2 ? { backgroundColor: ACCENT } : { backgroundColor: '#333' }]}
-              onPress={() => {
-                const roomShortlisted = renters.filter(r => shortlistedIds.has(r.id) && isRoomSeeker(r));
-                if (roomShortlisted.length < 2) {
-                  showAlert({ title: 'Need More', message: 'Tap Match on at least 2 room-seeking renters, then tap Build Group.' });
-                  return;
-                }
-                navigation.navigate('AgentGroupBuilder', {
-                  preselectedIds: roomShortlisted.map(r => r.id),
-                  listingId: selectedListing?.id,
-                });
-              }}
+            <LinearGradient
+              colors={[ACCENT, RED]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={st.buildGroupGradient}
             >
               <Feather name="users" size={16} color="#fff" />
-              <Text style={{ color: '#fff', fontWeight: '600', fontSize: 13 }}>
-                Build Group{roomShortlistCount > 0 ? ` (${roomShortlistCount})` : ''}
-              </Text>
-            </Pressable>
-          );
-        })() : null}
+              <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>Build Group ({selectedForGroup.size})</Text>
+            </LinearGradient>
+          </Pressable>
+        ) : null}
       </View>
 
       {loading ? (
@@ -1398,7 +1393,8 @@ const st = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 12 },
   title: { fontSize: 28, fontWeight: '800', color: '#fff' },
-  buildGroupHeaderBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 24 },
+  buildGroupGradient: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 24 },
+  matrixNavBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(34,197,94,0.08)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 },
 
   searchRow: { flexDirection: 'row', gap: 10, marginBottom: 14 },
   searchInput: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: SURFACE, borderRadius: 14, paddingHorizontal: 14, borderWidth: 1, borderColor: '#2a2a2a' },
