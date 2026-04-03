@@ -18,6 +18,8 @@ import { OccupationBarSelector } from '../../components/OccupationBarSelector';
 import { dispatchInsightTrigger } from '../../utils/insightRefresh';
 import { InterestCategoryBars } from '../../components/InterestCategoryBars';
 import { useConfirm } from '../../contexts/ConfirmContext';
+import { BOROUGH_NEIGHBORHOODS } from '../../constants/transitData';
+import { LocationPicker } from '../../components/LocationPicker';
 
 export const EditProfileScreen = () => {
   const { theme } = useTheme();
@@ -53,8 +55,18 @@ export const EditProfileScreen = () => {
   const [licenseState, setLicenseState] = useState(user?.licenseState || '');
   const [brokerageName, setBrokerageName] = useState(user?.brokerageName || '');
   const [budget, setBudget] = useState(user?.profileData?.budget?.toString() || '');
+  const [budgetMin, setBudgetMin] = useState(user?.profileData?.budgetMin?.toString() || user?.profileData?.budget?.toString() || '');
+  const [budgetMax, setBudgetMax] = useState(user?.profileData?.budgetMax?.toString() || user?.profileData?.budget?.toString() || '');
   const [lookingFor, setLookingFor] = useState<'room' | 'entire_apartment'>(user?.profileData?.lookingFor || 'room');
   const [location, setLocation] = useState(user?.profileData?.location || '');
+  const [selectedState, setSelectedState] = useState(user?.profileData?.state || '');
+  const [selectedCity, setSelectedCity] = useState(user?.profileData?.city || '');
+  const [selectedNeighborhood, setSelectedNeighborhood] = useState(user?.profileData?.neighborhood || '');
+  const [preferredNeighborhoods, setPreferredNeighborhoods] = useState<string[]>(
+    user?.preferredNeighborhoods || user?.profileData?.preferred_neighborhoods || []
+  );
+  const [expandedEditBoroughs, setExpandedEditBoroughs] = useState<string[]>([]);
+  const [zipCode, setZipCode] = useState(user?.profileData?.zip_code || '');
   const [occupation, setOccupation] = useState(user?.profileData?.occupation || '');
   const [interests, setInterests] = useState<string[]>(
     Array.isArray(user?.profileData?.interests) ? user.profileData.interests : []
@@ -235,7 +247,10 @@ export const EditProfileScreen = () => {
       });
 
       await supabaseUpdateProfile({
-        budget_min: budget.trim() ? parseInt(budget) : undefined,
+        budget_min: budgetMin.trim() ? parseInt(budgetMin) : (budget.trim() ? parseInt(budget) : undefined),
+        budget_max: budgetMax.trim() ? parseInt(budgetMax) : undefined,
+        preferred_neighborhoods: preferredNeighborhoods.length > 0 ? preferredNeighborhoods : undefined,
+        zip_code: zipCode.trim() || undefined,
         looking_for: lookingFor,
         interests: interests.length > 0 ? interests : undefined,
         photos: uploadedPhotoUrls,
@@ -274,11 +289,19 @@ export const EditProfileScreen = () => {
         licenseState: licenseState.trim() || undefined,
         brokerageName: brokerageName.trim() || undefined,
       } : {}),
+      preferredNeighborhoods: preferredNeighborhoods.length > 0 ? preferredNeighborhoods : undefined,
       profileData: {
         bio: bio.trim() || undefined,
-        budget: budget.trim() ? parseInt(budget) : undefined,
+        budget: budgetMax.trim() ? parseInt(budgetMax) : (budget.trim() ? parseInt(budget) : undefined),
+        budgetMin: budgetMin.trim() ? parseInt(budgetMin) : undefined,
+        budgetMax: budgetMax.trim() ? parseInt(budgetMax) : undefined,
         lookingFor,
-        location: location.trim() || undefined,
+        location: selectedNeighborhood || selectedCity || location.trim() || undefined,
+        neighborhood: selectedNeighborhood || undefined,
+        city: selectedCity || undefined,
+        state: selectedState || undefined,
+        preferred_neighborhoods: preferredNeighborhoods.length > 0 ? preferredNeighborhoods : undefined,
+        zip_code: zipCode.trim() || undefined,
         occupation: occupation.trim() || undefined,
         interests: interests.length > 0 ? interests : undefined,
         gender,
@@ -702,12 +725,106 @@ export const EditProfileScreen = () => {
             <ThemedText style={[Typography.small, { color: theme.textSecondary, marginBottom: Spacing.xs }]}>
               Location
             </ThemedText>
+            <LocationPicker
+              selectedState={selectedState}
+              selectedCity={selectedCity}
+              selectedNeighborhood={selectedNeighborhood}
+              onStateChange={setSelectedState}
+              onCityChange={setSelectedCity}
+              onNeighborhoodChange={(n) => {
+                setSelectedNeighborhood(n);
+                if (n && !preferredNeighborhoods.includes(n) && preferredNeighborhoods.length < 3) {
+                  setPreferredNeighborhoods(prev => [...prev, n]);
+                }
+              }}
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <ThemedText style={[Typography.small, { color: theme.textSecondary, marginBottom: Spacing.xs }]}>
+              Preferred neighborhoods (pick up to 3)
+            </ThemedText>
+            <ThemedText style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginBottom: 8 }}>
+              {preferredNeighborhoods.length}/3 selected
+            </ThemedText>
+            {preferredNeighborhoods.length > 0 ? (
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
+                {preferredNeighborhoods.map(hood => (
+                  <View key={hood} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,107,91,0.15)', borderRadius: 10, paddingVertical: 6, paddingHorizontal: 10, borderWidth: 1, borderColor: '#ff6b5b' }}>
+                    <ThemedText style={{ fontSize: 12, color: '#ff6b5b', marginRight: 6 }}>{hood}</ThemedText>
+                    <Pressable onPress={() => setPreferredNeighborhoods(prev => prev.filter(x => x !== hood))} hitSlop={8}>
+                      <Feather name="x" size={12} color="#ff6b5b" />
+                    </Pressable>
+                  </View>
+                ))}
+              </View>
+            ) : null}
+            {Object.entries(BOROUGH_NEIGHBORHOODS).map(([borough, hoods]) => {
+              const isExpanded = expandedEditBoroughs.includes(borough);
+              const selectedCount = hoods.filter(h => preferredNeighborhoods.includes(h)).length;
+              return (
+                <View key={borough} style={{ marginBottom: 4, backgroundColor: '#1a1a1a', borderRadius: 12, borderWidth: 1, borderColor: '#2a2a2a', overflow: 'hidden' }}>
+                  <Pressable
+                    onPress={() => setExpandedEditBoroughs(prev => prev.includes(borough) ? prev.filter(b => b !== borough) : [...prev, borough])}
+                    style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, paddingHorizontal: 16 }}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <ThemedText style={{ fontSize: 14, fontWeight: '700', color: '#ff6b5b' }}>{borough}</ThemedText>
+                      {selectedCount > 0 ? (
+                        <View style={{ backgroundColor: 'rgba(255,107,91,0.2)', borderRadius: 10, paddingHorizontal: 7, paddingVertical: 1 }}>
+                          <ThemedText style={{ fontSize: 11, fontWeight: '700', color: '#ff6b5b' }}>{selectedCount}</ThemedText>
+                        </View>
+                      ) : null}
+                    </View>
+                    <Feather name={isExpanded ? 'chevron-up' : 'chevron-down'} size={16} color="rgba(255,255,255,0.4)" />
+                  </Pressable>
+                  {isExpanded ? (
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingHorizontal: 12, paddingBottom: 12 }}>
+                      {hoods.map(hood => {
+                        const isSelected = preferredNeighborhoods.includes(hood);
+                        const atMax = preferredNeighborhoods.length >= 3;
+                        const disabled = !isSelected && atMax;
+                        return (
+                          <Pressable
+                            key={hood}
+                            disabled={disabled}
+                            onPress={() => {
+                              setPreferredNeighborhoods(prev => {
+                                if (prev.includes(hood)) return prev.filter(x => x !== hood);
+                                if (prev.length >= 3) return prev;
+                                return [...prev, hood];
+                              });
+                            }}
+                            style={{
+                              backgroundColor: isSelected ? 'rgba(255,107,91,0.15)' : '#1c1c1c',
+                              borderRadius: 10, paddingVertical: 7, paddingHorizontal: 11,
+                              borderWidth: 1.5, borderColor: isSelected ? '#ff6b5b' : '#2a2a2a',
+                              opacity: disabled ? 0.3 : 1,
+                            }}
+                          >
+                            <ThemedText style={{ fontSize: 12, color: isSelected ? '#ff6b5b' : '#ccc' }}>{hood}</ThemedText>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  ) : null}
+                </View>
+              );
+            })}
+          </View>
+
+          <View style={styles.inputGroup}>
+            <ThemedText style={[Typography.small, { color: theme.textSecondary, marginBottom: Spacing.xs }]}>
+              Zip Code
+            </ThemedText>
             <TextInput
               style={[styles.input, { backgroundColor: theme.backgroundSecondary, color: theme.text, borderColor: theme.border }]}
-              placeholder="e.g., Downtown, Brooklyn"
+              placeholder="e.g., 10001"
               placeholderTextColor={theme.textSecondary}
-              value={location}
-              onChangeText={setLocation}
+              value={zipCode}
+              onChangeText={setZipCode}
+              keyboardType="numeric"
+              maxLength={10}
             />
           </View>
 
@@ -892,14 +1009,30 @@ export const EditProfileScreen = () => {
             <ThemedText style={[Typography.body, { marginBottom: Spacing.sm }]}>
               What is your monthly budget range?
             </ThemedText>
-            <TextInput
-              style={[styles.input, { backgroundColor: theme.backgroundSecondary, color: theme.text, borderColor: theme.border }]}
-              placeholder="e.g., 1200"
-              placeholderTextColor={theme.textSecondary}
-              value={budget}
-              onChangeText={setBudget}
-              keyboardType="numeric"
-            />
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <View style={{ flex: 1 }}>
+                <ThemedText style={{ fontSize: 12, color: theme.textSecondary, marginBottom: 4 }}>Min ($)</ThemedText>
+                <TextInput
+                  style={[styles.input, { backgroundColor: theme.backgroundSecondary, color: theme.text, borderColor: theme.border }]}
+                  placeholder="e.g., 800"
+                  placeholderTextColor={theme.textSecondary}
+                  value={budgetMin}
+                  onChangeText={setBudgetMin}
+                  keyboardType="numeric"
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <ThemedText style={{ fontSize: 12, color: theme.textSecondary, marginBottom: 4 }}>Max ($)</ThemedText>
+                <TextInput
+                  style={[styles.input, { backgroundColor: theme.backgroundSecondary, color: theme.text, borderColor: theme.border }]}
+                  placeholder="e.g., 2000"
+                  placeholderTextColor={theme.textSecondary}
+                  value={budgetMax}
+                  onChangeText={setBudgetMax}
+                  keyboardType="numeric"
+                />
+              </View>
+            </View>
           </View>
 
           {/* Looking For */}

@@ -469,8 +469,11 @@ export const ProfileQuestionnaireScreen = () => {
   const [selectedState, setSelectedState] = useState(user?.profileData?.state || '');
   const [selectedCity, setSelectedCity] = useState(user?.profileData?.city || '');
   const [selectedNeighborhood, setSelectedNeighborhood] = useState(user?.profileData?.neighborhood || '');
-  const [preferredNeighborhoods, setPreferredNeighborhoods] = useState<string[]>(user?.profileData?.preferred_neighborhoods || []);
+  const [preferredNeighborhoods, setPreferredNeighborhoods] = useState<string[]>(
+    user?.preferredNeighborhoods || user?.profileData?.preferred_neighborhoods || []
+  );
   const [neighborhoodDropdownOpen, setNeighborhoodDropdownOpen] = useState(false);
+  const [expandedBoroughs, setExpandedBoroughs] = useState<string[]>([]);
   const [zipCode, setZipCode] = useState(user?.profileData?.zip_code || user?.zip_code || '');
   const [occupation, setOccupation] = useState(user?.profileData?.occupation || '');
   const [gender, setGender] = useState<'male' | 'female' | 'other' | undefined>(user?.profileData?.gender);
@@ -656,6 +659,7 @@ export const ProfileQuestionnaireScreen = () => {
         agencyName: agencyName.trim() || undefined,
         licenseDocumentUrl: licensePhoto || undefined,
       } : {}),
+      preferredNeighborhoods: preferredNeighborhoods.length > 0 ? preferredNeighborhoods : undefined,
       profileData: {
         ...user?.profileData,
         bio: bio.trim() || undefined,
@@ -1048,49 +1052,58 @@ export const ProfileQuestionnaireScreen = () => {
               </View>
             ) : null}
 
-            <Pressable
-              onPress={() => { if (preferredNeighborhoods.length < 3) setNeighborhoodDropdownOpen(prev => !prev); }}
-              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#1c1c1c', borderRadius: 12, borderWidth: 1.5, borderColor: '#2a2a2a', paddingVertical: 14, paddingHorizontal: 16, opacity: preferredNeighborhoods.length >= 3 ? 0.4 : 1 }}
-            >
-              <ThemedText style={{ fontSize: 14, color: neighborhoodDropdownOpen ? '#fff' : 'rgba(255,255,255,0.4)' }}>
-                {neighborhoodDropdownOpen ? 'Tap to close' : 'Select neighborhoods...'}
-              </ThemedText>
-              <Feather name={neighborhoodDropdownOpen ? 'chevron-up' : 'chevron-down'} size={16} color="rgba(255,255,255,0.4)" />
-            </Pressable>
-
-            {neighborhoodDropdownOpen ? (
-              <ScrollView style={{ maxHeight: 280, backgroundColor: '#1a1a1a', borderRadius: 12, borderWidth: 1, borderColor: '#2a2a2a', marginTop: 6 }} showsVerticalScrollIndicator={false} nestedScrollEnabled>
-                {Object.entries(BOROUGH_NEIGHBORHOODS).map(([borough, hoods]) => (
-                  <View key={borough}>
-                    <View style={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 6 }}>
-                      <ThemedText style={{ fontSize: 13, fontWeight: '700', color: '#ff6b5b', textTransform: 'uppercase', letterSpacing: 0.5 }}>{borough}</ThemedText>
+            {Object.entries(BOROUGH_NEIGHBORHOODS).map(([borough, hoods]) => {
+              const isExpanded = expandedBoroughs.includes(borough);
+              const selectedCount = hoods.filter(h => preferredNeighborhoods.includes(h)).length;
+              return (
+                <View key={borough} style={{ marginBottom: 4, backgroundColor: '#1a1a1a', borderRadius: 12, borderWidth: 1, borderColor: '#2a2a2a', overflow: 'hidden' }}>
+                  <Pressable
+                    onPress={() => setExpandedBoroughs(prev => prev.includes(borough) ? prev.filter(b => b !== borough) : [...prev, borough])}
+                    style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, paddingHorizontal: 16 }}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <ThemedText style={{ fontSize: 14, fontWeight: '700', color: '#ff6b5b' }}>{borough}</ThemedText>
+                      {selectedCount > 0 ? (
+                        <View style={{ backgroundColor: 'rgba(255,107,91,0.2)', borderRadius: 10, paddingHorizontal: 7, paddingVertical: 1 }}>
+                          <ThemedText style={{ fontSize: 11, fontWeight: '700', color: '#ff6b5b' }}>{selectedCount}</ThemedText>
+                        </View>
+                      ) : null}
                     </View>
-                    {hoods.map((hood, idx) => {
-                      const isSelected = preferredNeighborhoods.includes(hood);
-                      const atMax = preferredNeighborhoods.length >= 3;
-                      const disabled = !isSelected && atMax;
-                      return (
-                        <Pressable
-                          key={hood}
-                          disabled={disabled}
-                          onPress={() => {
-                            setPreferredNeighborhoods(prev => {
-                              if (prev.includes(hood)) return prev.filter(x => x !== hood);
-                              if (prev.length >= 3) return prev;
-                              return [...prev, hood];
-                            });
-                          }}
-                          style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: idx < hoods.length - 1 ? 1 : 0, borderBottomColor: 'rgba(255,255,255,0.06)', opacity: disabled ? 0.3 : 1 }}
-                        >
-                          <ThemedText style={{ fontSize: 14, color: isSelected ? '#ff6b5b' : 'rgba(255,255,255,0.8)' }}>{hood}</ThemedText>
-                          {isSelected ? <Feather name="check" size={16} color="#ff6b5b" /> : null}
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-                ))}
-              </ScrollView>
-            ) : null}
+                    <Feather name={isExpanded ? 'chevron-up' : 'chevron-down'} size={16} color="rgba(255,255,255,0.4)" />
+                  </Pressable>
+                  {isExpanded ? (
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingHorizontal: 12, paddingBottom: 12 }}>
+                      {hoods.map(hood => {
+                        const isSelected = preferredNeighborhoods.includes(hood);
+                        const atMax = preferredNeighborhoods.length >= 3;
+                        const disabled = !isSelected && atMax;
+                        return (
+                          <Pressable
+                            key={hood}
+                            disabled={disabled}
+                            onPress={() => {
+                              setPreferredNeighborhoods(prev => {
+                                if (prev.includes(hood)) return prev.filter(x => x !== hood);
+                                if (prev.length >= 3) return prev;
+                                return [...prev, hood];
+                              });
+                            }}
+                            style={{
+                              backgroundColor: isSelected ? 'rgba(255,107,91,0.15)' : '#1c1c1c',
+                              borderRadius: 10, paddingVertical: 7, paddingHorizontal: 11,
+                              borderWidth: 1.5, borderColor: isSelected ? '#ff6b5b' : '#2a2a2a',
+                              opacity: disabled ? 0.3 : 1,
+                            }}
+                          >
+                            <ThemedText style={{ fontSize: 12, color: isSelected ? '#ff6b5b' : '#ccc' }}>{hood}</ThemedText>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  ) : null}
+                </View>
+              );
+            })}
 
             <View style={{ marginTop: 16 }}>
               <ThemedText style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginBottom: 6 }}>Zip code (optional)</ThemedText>

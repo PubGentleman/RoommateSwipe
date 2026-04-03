@@ -7,7 +7,7 @@ import { Feather } from '../../../components/VectorIcons';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useTheme } from '../../../hooks/useTheme';
 import { supabase } from '../../../lib/supabase';
-import { getNeighborhoodsByBorough, getNeighborhoodsForCity } from '../../../constants/neighborhoods';
+import { BOROUGH_NEIGHBORHOODS } from '../../../constants/transitData';
 import { getRenterPreferenceAmenities } from '../../../constants/amenities';
 import OnboardingHeader from '../../../components/OnboardingHeader';
 import { PricePickerPair } from '../../../components/PricePicker';
@@ -80,10 +80,8 @@ export default function PlaceSeekerOnboardingScreen() {
     );
   };
 
-  const userCity = user?.profileData?.city || user?.profileData?.neighborhood || '';
-  const boroughGroups = getNeighborhoodsByBorough(userCity);
-  const allNeighborhoods = getNeighborhoodsForCity(userCity);
-  const hasBoroughs = boroughGroups.size > 0;
+  const boroughEntries = Object.entries(BOROUGH_NEIGHBORHOODS);
+  const hasBoroughs = boroughEntries.length > 0;
 
   const toggleNeighborhood = (id: string) => {
     setSelectedNeighborhoods(prev =>
@@ -175,9 +173,9 @@ export default function PlaceSeekerOnboardingScreen() {
           <Text style={[styles.sectionHint, { color: theme.textTertiary }]}>
             Pick up to 5 — we'll prioritize listings in these areas
           </Text>
-          {Array.from(boroughGroups.entries()).map(([borough, neighborhoods]) => {
+          {boroughEntries.map(([borough, hoods]) => {
             const isExpanded = expandedBoroughs.includes(borough);
-            const selectedCount = neighborhoods.filter(n => selectedNeighborhoods.includes(n.id)).length;
+            const selectedCount = hoods.filter(h => selectedNeighborhoods.includes(h)).length;
             return (
               <View key={borough} style={styles.boroughDropdown}>
                 <Pressable
@@ -196,23 +194,23 @@ export default function PlaceSeekerOnboardingScreen() {
                 </Pressable>
                 {isExpanded ? (
                   <View style={styles.boroughChips}>
-                    {neighborhoods.map(area => {
-                      const isActive = selectedNeighborhoods.includes(area.id);
+                    {hoods.map(hood => {
+                      const isActive = selectedNeighborhoods.includes(hood);
                       return (
                         <Pressable
-                          key={area.id}
+                          key={hood}
                           style={[
                             styles.chip,
                             { borderColor: isActive ? theme.primary : 'rgba(255,255,255,0.15)' },
                             isActive && { backgroundColor: `${theme.primary}20` },
                           ]}
-                          onPress={() => toggleNeighborhood(area.id)}
+                          onPress={() => toggleNeighborhood(hood)}
                         >
                           <Text style={[
                             styles.chipText,
                             { color: isActive ? theme.primary : theme.textSecondary },
                           ]}>
-                            {area.label}
+                            {hood}
                           </Text>
                         </Pressable>
                       );
@@ -421,6 +419,7 @@ export default function PlaceSeekerOnboardingScreen() {
           budgetMax: budgetMax,
           roomType: roomTypeVal,
           lookingFor: lookingForVal,
+          preferred_neighborhoods: selectedNeighborhoods,
         },
       });
 
