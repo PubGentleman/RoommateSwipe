@@ -448,7 +448,7 @@ export const ProfileScreen = () => {
             </TouchableOpacity>
           )}
 
-        {(!isHost || user?.hostType === 'agent') ? (
+        {!isHost ? (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <View style={styles.sectionTitleRow}>
