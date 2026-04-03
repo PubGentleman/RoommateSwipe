@@ -978,7 +978,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
     await StorageService.setCurrentUser(updatedUser);
     await StorageService.addOrUpdateUser(updatedUser);
-    const updatePayload: any = { plan: 'plus', billing_cycle: billingCycle, status: 'active', current_period_end: expiresAt.toISOString(), cancel_at_period_end: false };
+    const updatePayload: Record<string, string | boolean> = { plan: 'plus', billing_cycle: billingCycle, status: 'active', current_period_end: expiresAt.toISOString(), cancel_at_period_end: false };
     if (stripeSubscriptionId) updatePayload.stripe_subscription_id = stripeSubscriptionId;
     await supabase.from('subscriptions').update(updatePayload).eq('user_id', user.id);
     setUser(updatedUser);
@@ -1005,7 +1005,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
     await StorageService.setCurrentUser(updatedUser);
     await StorageService.addOrUpdateUser(updatedUser);
-    const updatePayload: any = { plan: 'elite', billing_cycle: billingCycle, status: 'active', current_period_end: expiresAt.toISOString(), cancel_at_period_end: false };
+    const updatePayload: Record<string, string | boolean> = { plan: 'elite', billing_cycle: billingCycle, status: 'active', current_period_end: expiresAt.toISOString(), cancel_at_period_end: false };
     if (stripeSubscriptionId) updatePayload.stripe_subscription_id = stripeSubscriptionId;
     await supabase.from('subscriptions').update(updatePayload).eq('user_id', user.id);
     setUser(updatedUser);
@@ -1749,7 +1749,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           ...user,
           undoPassData: {
             hasUndoPass: false,
-            undoPassExpiresAt: null as unknown as Date,
+            undoPassExpiresAt: undefined,
           },
         };
 
@@ -2351,7 +2351,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const basePlan = plan.replace(/^(agent_|company_)/, '');
     const isAgentPlan = plan.startsWith('agent_');
     const isCompanyPlan = plan.startsWith('company_');
-    const updated: any = {
+    const updated: User = {
       ...user,
       hostSubscription: {
         ...user.hostSubscription,
@@ -2368,13 +2368,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           ...prevHistory.slice(0, 2),
         ],
       },
+      ...(isAgentPlan || user.hostType === 'agent' ? { agentPlan: basePlan } : {}),
+      ...(isCompanyPlan || user.hostType === 'company' ? { companyPlan: basePlan } : {}),
     };
-    if (isAgentPlan || user.hostType === 'agent') {
-      updated.agentPlan = basePlan;
-    }
-    if (isCompanyPlan || user.hostType === 'company') {
-      updated.companyPlan = basePlan;
-    }
     await StorageService.setCurrentUser(updated);
     await StorageService.addOrUpdateUser(updated);
     setUser(updated);
