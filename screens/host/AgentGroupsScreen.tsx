@@ -23,6 +23,8 @@ import { getAgentPlanLimits, canAgentPlace, type AgentPlan } from '../../constan
 import { resolveEffectiveAgentPlan } from '../../utils/planResolver';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { shouldLoadMockData } from '../../utils/dataUtils';
+import { InvitePreviewSheet } from '../../components/InvitePreviewSheet';
+import { AgentRenter } from '../../services/agentMatchmakerService';
 
 const BG = '#0d0d0d';
 const CARD_BG = '#151515';
@@ -72,6 +74,8 @@ export const AgentGroupsScreen = () => {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
   const [actionStates, setActionStates] = useState<Record<string, string>>({});
+  const [inviteSheetVisible, setInviteSheetVisible] = useState(false);
+  const [inviteSheetGroup, setInviteSheetGroup] = useState<AgentGroup | null>(null);
 
   const agentPlan = resolveEffectiveAgentPlan(user) as AgentPlan;
   const planLimits = getAgentPlanLimits(agentPlan);
@@ -154,32 +158,37 @@ export const AgentGroupsScreen = () => {
     }
   };
 
-  const handleSendInvites = async (group: AgentGroup) => {
+  const handleSendInvites = (group: AgentGroup) => {
     if (!user) return;
     const eligible = group.members.filter(m => (m as any).acceptAgentOffers !== false);
     if (eligible.length < 2) {
       showAlert({ title: 'Not Enough', message: 'Not enough eligible renters.' });
       return;
     }
-    const ok = await confirm({
-      title: 'Send Invites',
-      message: `Send invites to ${eligible.length} renters?\n\n${eligible.map(r => r.name).join(', ')}`,
-    });
-    if (!ok) return;
-    setActionStates(prev => ({ ...prev, [group.id]: 'sending' }));
+    setInviteSheetGroup(group);
+    setInviteSheetVisible(true);
+  };
+
+  const handleInviteSheetSend = async (messages: Record<string, string>) => {
+    if (!user || !inviteSheetGroup) return;
+    const group = inviteSheetGroup;
+    const eligible = group.members.filter(m => (m as any).acceptAgentOffers !== false);
     try {
       await updateAgentGroupStatus(group.id, 'invited');
+      const firstMsg = Object.values(messages)[0] || '';
       await sendAgentInvites(
         user.id, user.name ?? '', group.id,
-        eligible.map(r => r.id), group.targetListing || null, '',
+        eligible.map(r => r.id), group.targetListing || null, firstMsg,
         eligible.map(r => ({ id: r.id, name: r.name, photo: r.photos?.[0] }))
       );
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setActionStates(prev => ({ ...prev, [group.id]: 'invited' }));
+      setInviteSheetVisible(false);
+      setInviteSheetGroup(null);
+      showAlert({ title: 'Invites Sent', message: `Invites sent to ${eligible.length} renters.` });
       loadGroups();
     } catch (e) {
       showAlert({ title: 'Error', message: 'Failed to send invites.' });
-      setActionStates(prev => ({ ...prev, [group.id]: '' }));
     }
   };
 
@@ -695,6 +704,16 @@ export const AgentGroupsScreen = () => {
           showsVerticalScrollIndicator={false}
         />
       )}
+
+      <InvitePreviewSheet
+        visible={inviteSheetVisible}
+        onClose={() => { setInviteSheetVisible(false); setInviteSheetGroup(null); }}
+        onSend={handleInviteSheetSend}
+        members={(inviteSheetGroup?.members || []) as AgentRenter[]}
+        groupName={inviteSheetGroup?.name || ''}
+        listing={inviteSheetGroup?.targetListing ? { id: inviteSheetGroup.targetListing.id, title: inviteSheetGroup.targetListing.title, price: inviteSheetGroup.targetListing.price, bedrooms: inviteSheetGroup.targetListing.bedrooms, neighborhood: inviteSheetGroup.targetListing.neighborhood } : null}
+        agentName={user?.name || 'Your Agent'}
+      />
     </View>
   );
 };

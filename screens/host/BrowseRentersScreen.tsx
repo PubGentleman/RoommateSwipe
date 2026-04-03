@@ -48,6 +48,7 @@ import {
 } from '../../services/companyMatchmakerService';
 import { NEIGHBORHOOD_TRAINS } from '../../constants/transitData';
 import { resolveEffectiveAgentPlan } from '../../utils/planResolver';
+import { InvitePreviewSheet } from '../../components/InvitePreviewSheet';
 
 const BG = '#0d0d0d';
 const CARD_BG = '#151515';
@@ -194,6 +195,9 @@ export const BrowseRentersScreen = () => {
   const [showGroupNameModal, setShowGroupNameModal] = useState(false);
   const [groupNameInput, setGroupNameInput] = useState('');
   const [groupNameAction, setGroupNameAction] = useState<'build' | 'invite'>('build');
+  const [inviteSheetVisible, setInviteSheetVisible] = useState(false);
+  const [inviteSheetMembers, setInviteSheetMembers] = useState<AgentRenter[]>([]);
+  const [inviteSheetGroupName, setInviteSheetGroupName] = useState('');
 
   const agentPlan = resolveEffectiveAgentPlan(user) as AgentPlan;
   const planLimits = getAgentPlanLimits(agentPlan);
@@ -708,26 +712,37 @@ export const BrowseRentersScreen = () => {
       const created = await createAgentGroup(group);
 
       if (groupNameAction === 'invite') {
-        await sendAgentInvites(
-          user.id, user.name ?? '', created.id,
-          eligible.map(r => r.id), selectedListing || null, '',
-          eligible.map(r => ({ id: r.id, name: r.name, photo: r.photos?.[0] }))
-        );
+        setInviteSheetGroupName(groupNameInput.trim());
+        setInviteSheetMembers(eligible);
+        setSelectedForGroup(new Set());
+        setGroupInviteSent(false);
+        setSendingNow(false);
+        setInviteSheetVisible(true);
+        return;
       }
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setSelectedForGroup(new Set());
       setGroupInviteSent(false);
-
-      if (groupNameAction === 'build') {
-        showAlert({ title: 'Group Saved', message: `"${groupNameInput.trim()}" saved to My Groups \u2192 Assembling` });
-      } else {
-        showAlert({ title: 'Invites Sent', message: `"${groupNameInput.trim()}" created and invites sent to ${eligible.length} renters.` });
-      }
+      showAlert({ title: 'Group Saved', message: `"${groupNameInput.trim()}" saved to My Groups \u2192 Assembling` });
     } catch (e) {
       showAlert({ title: 'Error', message: groupNameAction === 'build' ? 'Failed to save group.' : 'Failed to send invites.' });
     }
     setSendingNow(false);
+  };
+
+  const handleInviteSheetSend = async (messages: Record<string, string>) => {
+    if (!user) return;
+    const memberIds = inviteSheetMembers.map(m => m.id);
+    const firstMsg = Object.values(messages)[0] || '';
+    await sendAgentInvites(
+      user.id, user.name ?? '', `ag_${Date.now()}`,
+      memberIds, selectedListing || null, firstMsg,
+      inviteSheetMembers.map(r => ({ id: r.id, name: r.name, photo: r.photos?.[0] }))
+    );
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setInviteSheetVisible(false);
+    showAlert({ title: 'Invites Sent', message: `"${inviteSheetGroupName}" created and invites sent to ${inviteSheetMembers.length} renters.` });
   };
 
   const handleSendNow = async () => {
@@ -1529,6 +1544,16 @@ export const BrowseRentersScreen = () => {
           </View>
         </View>
       </Modal>
+
+      <InvitePreviewSheet
+        visible={inviteSheetVisible}
+        onClose={() => setInviteSheetVisible(false)}
+        onSend={handleInviteSheetSend}
+        members={inviteSheetMembers}
+        groupName={inviteSheetGroupName}
+        listing={selectedListing ? { id: selectedListing.id, title: selectedListing.title, price: selectedListing.price, bedrooms: selectedListing.bedrooms, neighborhood: selectedListing.neighborhood } : null}
+        agentName={user?.name || 'Your Agent'}
+      />
 
       <Modal visible={showGroupNameModal} transparent animationType="fade" onRequestClose={() => setShowGroupNameModal(false)}>
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', padding: 24 }}>
