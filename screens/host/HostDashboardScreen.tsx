@@ -93,7 +93,7 @@ export const HostDashboardScreen = () => {
   const isAgent = user?.hostType === 'agent';
   const isCompany = user?.hostType === 'company';
   const { badge: hostBadge } = useHostBadge(user?.id);
-  const VALID_AGENT_PLANS = ['pay_per_use', 'starter', 'pro', 'business'] as const;
+  const VALID_AGENT_PLANS = ['pay_per_use', 'agent_starter', 'agent_pro', 'agent_business', 'starter', 'pro', 'business'] as const;
   const rawResolvedPlan = isAgent ? resolveEffectiveAgentPlan(user) : '';
   const agentPlan = isAgent
     ? (VALID_AGENT_PLANS.includes(rawResolvedPlan as any) ? (rawResolvedPlan as AgentPlan) : 'pay_per_use')
@@ -236,6 +236,7 @@ export const HostDashboardScreen = () => {
         personalNote: c.personal_note || '',
         createdAt: c.created_at || new Date().toISOString(),
         respondedAt: c.responded_at,
+        groupId: c.group_id || null,
       }));
       setInquiries(mapped);
     } catch {
@@ -755,7 +756,7 @@ export const HostDashboardScreen = () => {
           {statCards.map((stat, idx) => {
             const arrow = getStatArrowText(stat.label, stat.value);
             return (
-              <Pressable key={idx} style={styles.statCard} onPress={stat.onPress}>
+              <Pressable key={stat.label} style={styles.statCard} onPress={stat.onPress}>
                 <View style={[styles.statIcon, { backgroundColor: stat.iconBg, borderColor: stat.iconBorder, borderWidth: 1 }]}>
                   <Feather name={stat.icon} size={17} color={stat.color} />
                 </View>
@@ -909,7 +910,7 @@ export const HostDashboardScreen = () => {
               { label: '5+ active listings', met: listings.filter(l => l.available).length >= 5 },
               { label: '10+ reviews', met: reviewCount >= 10 },
               { label: '4.6+ average rating', met: avgRating >= 4.6 },
-              { label: 'Under 45 day avg vacancy', met: listings.length >= 3 && listings.filter(l => !l.available || !!l.rentedDate).length >= Math.ceil(listings.length * 0.6) },
+              { label: 'Under 45 day avg vacancy', met: listings.length >= 3 && listings.filter(l => !!l.rentedDate).length >= Math.ceil(listings.length * 0.6) },
               { label: '60%+ fill rate', met: listings.length >= 3 && listings.filter(l => !!l.rentedDate).length / Math.max(1, listings.length) >= 0.6 },
               { label: '2+ team members', met: teamMemberCount >= 2 },
             ]}
@@ -1030,7 +1031,7 @@ export const HostDashboardScreen = () => {
                 {piTopPicks.map((pick, idx) => {
                   const strengthColor = pick.strength === 'strong' ? GREEN : pick.strength === 'good' ? GOLD : '#3b82f6';
                   return (
-                    <View key={`pick-${pick.name}-${idx}`} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                    <View key={pick.id || `${pick.name}-${pick.reason}`} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                       <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: strengthColor }} />
                       <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600', flex: 0 }} numberOfLines={1}>{pick.name}</Text>
                       <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, flex: 1 }} numberOfLines={1}>{pick.reason}</Text>
@@ -1072,7 +1073,7 @@ export const HostDashboardScreen = () => {
               const statusLabel = isCritical ? 'Critical' : isDelayed ? 'Delayed' : 'Unresponsive';
               return (
                 <Pressable
-                  key={`alert-${alertItem.agentId}-${alertItem.conversationId || idx}`}
+                  key={alertItem.conversationId || `alert-${alertItem.agentId}`}
                   style={{
                     backgroundColor: isCritical ? 'rgba(239,68,68,0.08)' : 'rgba(245,158,11,0.08)',
                     borderWidth: 1,
@@ -1172,13 +1173,21 @@ export const HostDashboardScreen = () => {
                     next.set(agent.agentId, { conversations: [], bookings: [], loading: true });
                     return next;
                   });
-                  const data = await getAgentDetailData(agent.agentId, user?.id);
-                  setAgentDetailMap(prev => {
-                    if (prev.get(agent.agentId)?.loading === false) return prev;
-                    const next = new Map(prev);
-                    next.set(agent.agentId, { ...data, loading: false });
-                    return next;
-                  });
+                  try {
+                    const data = await getAgentDetailData(agent.agentId, user?.id);
+                    setAgentDetailMap(prev => {
+                      const next = new Map(prev);
+                      next.set(agent.agentId, { ...data, loading: false });
+                      return next;
+                    });
+                  } catch (e) {
+                    console.warn('[Dashboard] Failed to load agent detail:', e);
+                    setAgentDetailMap(prev => {
+                      const next = new Map(prev);
+                      next.set(agent.agentId, { conversations: [], bookings: [], loading: false });
+                      return next;
+                    });
+                  }
                 }
               };
               const statusColor = (s: string) => {

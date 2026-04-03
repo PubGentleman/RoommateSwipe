@@ -158,26 +158,77 @@ export async function calculateResponseRate(agentId: string): Promise<number> {
 }
 
 export async function getAgentResponseAlerts(companyId: string): Promise<ResponseAlert[]> {
-  const allAlerts = await runResponseStatusCheck();
-
   try {
     const { data: teamMembers } = await supabase
       .from('company_team_members')
       .select('user_id')
       .eq('company_id', companyId);
 
+    if (!teamMembers || teamMembers.length === 0) return [];
+    const companyAgentIds = teamMembers.map(m => m.user_id);
+
+    const { data: matches } = await supabase
+      .from('matches')
+      .select('id, host_id, renter_id, last_renter_message_at, last_agent_response_at, listing_id')
+      .in('host_id', companyAgentIds)
+      .not('last_renter_message_at', 'is', null)
+      .order('last_renter_message_at', { ascending: false })
+      .limit(50);
+
+    if (!matches || matches.length === 0) return [];
+
+    const alerts: ResponseAlert[] = [];
+    const agentIds = [...new Set(matches.map(m => m.host_id))];
+    const renterIds = [...new Set(matches.map(m => m.renter_id).filter(Boolean))];
+
+    const { data: agentUsers } = await supabase
+      .from('users')
+      .select('id, full_name')
+      .in('id', agentIds);
+
+    const { data: renterUsers } = await supabase
+      .from('users')
+      .select('id, full_name')
+      .in('id', renterIds);
+
+    const agentMap = new Map((agentUsers || []).map(u => [u.id, u.full_name || 'Agent']));
+    const renterMap = new Map((renterUsers || []).map(u => [u.id, u.full_name || 'Renter']));
+
+    for (const match of matches) {
+      if (!match.last_renter_message_at) continue;
+      const renterTime = new Date(match.last_renter_message_at).getTime();
+      const agentTime = match.last_agent_response_at ? new Date(match.last_agent_response_at).getTime() : 0;
+      if (agentTime >= renterTime) continue;
+
+      const status = getResponseStatus(match.last_renter_message_at);
+      if (status === 'active') continue;
+
+      alerts.push({
+        agentId: match.host_id,
+        agentName: agentMap.get(match.host_id) || 'Agent',
+        conversationId: match.id,
+        renterName: renterMap.get(match.renter_id) || 'Renter',
+        renterId: match.renter_id,
+        status,
+        hoursSinceMessage: getHoursSinceMessage(match.last_renter_message_at),
+        listingId: match.listing_id,
+      });
+    }
+
+    return alerts;
+  } catch (e) {
+    console.warn('[ResponseTracking] getAgentResponseAlerts DB query failed, falling back:', e);
+    const allAlerts = await runResponseStatusCheck();
+    const { data: teamMembers } = await supabase
+      .from('company_team_members')
+      .select('user_id')
+      .eq('company_id', companyId);
     if (teamMembers && teamMembers.length > 0) {
       const companyAgentIds = teamMembers.map(m => m.user_id);
       return allAlerts.filter(alert => companyAgentIds.includes(alert.agentId));
     }
-  } catch (e) { console.warn('[ResponseTracking] Failed to fetch company team members:', e); }
-
-  const users = await StorageService.getUsers();
-  const companyAgentIds = users
-    .filter(u => u.hostType === 'agent' && (u as any).company_id === companyId)
-    .map(u => u.id);
-
-  return allAlerts.filter(alert => companyAgentIds.includes(alert.agentId));
+    return [];
+  }
 }
 
 export async function getAgentsWithCriticalStatus(): Promise<string[]> {
