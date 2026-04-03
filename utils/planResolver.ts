@@ -17,9 +17,15 @@ export function isPaidHostPlan(plan: string | undefined | null): boolean {
 export function resolveEffectiveAgentPlan(user: User | null): string {
   if (!user) return 'pay_per_use';
   const agentPlan = user.agentPlan || (user as any).agent_plan;
-  if (agentPlan && !isFreeTier(agentPlan)) return resolveBasePlan(agentPlan);
+  if (agentPlan && !isFreeTier(agentPlan)) {
+    const base = resolveBasePlan(agentPlan);
+    return base === 'pay_per_use' ? base : `agent_${base}`;
+  }
   const subPlan = user.hostSubscription?.plan;
-  if (subPlan && !isFreeTier(subPlan)) return resolveBasePlan(subPlan);
+  if (subPlan && !isFreeTier(subPlan)) {
+    const base = resolveBasePlan(subPlan);
+    return base === 'pay_per_use' ? base : `agent_${base}`;
+  }
   return agentPlan || 'pay_per_use';
 }
 
@@ -49,8 +55,11 @@ export function getHostPlanDisplayInfo(user: User | null): { label: string; pric
 
   if (hostType === 'agent') {
     switch (basePlan) {
+      case 'agent_starter':
       case 'starter': return { label: 'Agent Starter', price: '$49/mo', description: 'You have full access', isFree: false };
+      case 'agent_pro':
       case 'pro': return { label: 'Agent Pro', price: '$99/mo', description: 'You have full access', isFree: false };
+      case 'agent_business':
       case 'business': return { label: 'Agent Business', price: '$149/mo', description: 'You have full access', isFree: false };
       default: return { label: 'Pay Per Use', price: '$0', description: 'Upgrade to reach more renters', isFree: true };
     }

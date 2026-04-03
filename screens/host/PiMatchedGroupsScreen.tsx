@@ -19,6 +19,7 @@ import {
 } from '../../services/piAutoMatchService';
 import { supabase } from '../../lib/supabase';
 import { getAutoClaimLimits, type AgentPlan } from '../../constants/planLimits';
+import { resolveEffectiveAgentPlan } from '../../utils/planResolver';
 import { StorageService } from '../../utils/storage';
 import { Property } from '../../types/models';
 import { Image } from 'expo-image';
@@ -43,6 +44,7 @@ export const PiMatchedGroupsScreen = () => {
   const [groups, setGroups] = useState<PiAutoGroup[]>([]);
   const [filteredGroups, setFilteredGroups] = useState<PiAutoGroup[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [claimsUsed, setClaimsUsed] = useState(0);
   const [freeClaimsTotal, setFreeClaimsTotal] = useState(0);
@@ -67,11 +69,10 @@ export const PiMatchedGroupsScreen = () => {
 
   const hostPlan = user?.hostSubscription?.plan || 'free';
   const hostType = user?.hostType || 'individual';
-  const agentPlanResolved = (user?.agentPlan || (hostPlan || '').replace(/^(agent_|company_)/, '')) as AgentPlan | undefined;
-  const agentPlan = agentPlanResolved;
+  const agentPlan = (hostType === 'agent' ? resolveEffectiveAgentPlan(user) : undefined) as AgentPlan | undefined;
   const isFreePlan = hostType === 'agent'
     ? (!agentPlan || agentPlan === 'pay_per_use' || agentPlan === 'free')
-    : (hostPlan === 'free' || hostPlan === 'none' || (hostPlan || '').replace(/^(agent_|company_)/, '') === 'free');
+    : (hostPlan === 'free' || hostPlan === 'none');
 
   const loadData = useCallback(async () => {
     if (!user) return;
@@ -181,6 +182,7 @@ export const PiMatchedGroupsScreen = () => {
     } catch {
       setGroups([]);
       setFilteredGroups([]);
+      setLoadError(true);
     }
     setLoading(false);
     setRefreshing(false);
@@ -236,7 +238,7 @@ export const PiMatchedGroupsScreen = () => {
 
   const handleContactPreformedGroup = (group: PiAutoGroup) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    navigation.navigate('Chat' as never, { conversationId: `group-${group.id}` } as never);
+    navigation.navigate('Chat', { conversationId: `group-${group.id}` });
   };
 
   const handleClaimGroup = async (group: PiAutoGroup) => {
@@ -675,6 +677,14 @@ export const PiMatchedGroupsScreen = () => {
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={PURPLE} />
           <Text style={styles.loadingText}>Loading matched groups...</Text>
+        </View>
+      ) : loadError && groups.length === 0 ? (
+        <View style={styles.loadingContainer}>
+          <Feather name="alert-circle" size={48} color="#999" />
+          <Text style={[styles.loadingText, { marginTop: 12 }]}>Failed to load groups</Text>
+          <Pressable onPress={() => { setLoadError(false); setLoading(true); loadData(); }}>
+            <Text style={{ color: ACCENT, marginTop: 12, fontWeight: '600' }}>Tap to retry</Text>
+          </Pressable>
         </View>
       ) : (
         <FlatList

@@ -139,9 +139,14 @@ async function getAgentGroupsFromLocal(agentId: string): Promise<AgentGroup[]> {
   return groups.filter((g: AgentGroup) => g.agentId === agentId);
 }
 
-export async function getAgentGroups(agentId: string): Promise<AgentGroup[]> {
+export interface AgentGroupsResult {
+  groups: AgentGroup[];
+  isStale: boolean;
+}
+
+export async function getAgentGroups(agentId: string): Promise<AgentGroupsResult> {
   if (useLocalData()) {
-    return getAgentGroupsFromLocal(agentId);
+    return { groups: await getAgentGroupsFromLocal(agentId), isStale: false };
   }
 
   try {
@@ -176,20 +181,20 @@ export async function getAgentGroups(agentId: string): Promise<AgentGroup[]> {
     const result = await Promise.race([wrappedQuery, timeout]);
     if (!result) {
       console.warn('[AgentService] getAgentGroups timed out, falling back to local');
-      return getAgentGroupsFromLocal(agentId);
+      return { groups: await getAgentGroupsFromLocal(agentId), isStale: true };
     }
     const { data: groups, error } = result;
 
     if (error || !groups) {
       console.warn('[AgentService] getAgentGroups error, falling back to local:', error?.message);
-      return getAgentGroupsFromLocal(agentId);
+      return { groups: await getAgentGroupsFromLocal(agentId), isStale: true };
     }
 
     if (groups.length === 0) {
-      return getAgentGroupsFromLocal(agentId);
+      return { groups: await getAgentGroupsFromLocal(agentId), isStale: false };
     }
 
-    return groups.map(g => {
+    const mapped = groups.map(g => {
       const rawMembers = g.group_members || [];
       const memberProfiles = rawMembers.map((m: any) => ({
         id: m.user?.id ?? m.user_id,
@@ -239,9 +244,10 @@ export async function getAgentGroups(agentId: string): Promise<AgentGroup[]> {
         createdAt: g.created_at,
       };
     });
+    return { groups: mapped, isStale: false };
   } catch (e) {
     console.warn('[AgentService] getAgentGroups exception, falling back to local:', e);
-    return getAgentGroupsFromLocal(agentId);
+    return { groups: await getAgentGroupsFromLocal(agentId), isStale: true };
   }
 }
 

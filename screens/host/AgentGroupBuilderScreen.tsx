@@ -83,7 +83,8 @@ export const AgentGroupBuilderScreen = () => {
             .eq('role', 'renter')
             .limit(100);
           pool = (data || []).map((u: any) => {
-            const p = Array.isArray(u.profile) ? u.profile[0] : u.profile;
+            const p = Array.isArray(u.profile) ? (u.profile[0] ?? null) : (u.profile ?? null);
+            if (!p) return null;
             return {
               id: u.id, name: u.full_name || 'Unknown', age: u.age || 0,
               occupation: u.occupation || '',
@@ -96,7 +97,7 @@ export const AgentGroupBuilderScreen = () => {
               interests: p?.interests || [], roomType: p?.room_type,
               gender: u.gender, bio: p?.bio || u.bio,
             };
-          });
+          }).filter(Boolean) as AgentRenter[];
         } catch {}
       }
 
@@ -176,8 +177,11 @@ export const AgentGroupBuilderScreen = () => {
           `)
           .in('id', allIds);
 
-        const mapped: AgentRenter[] = (supaRenters || []).map((u: any) => {
-          const p = Array.isArray(u.profile) ? u.profile[0] : u.profile;
+        const mapped: AgentRenter[] = (supaRenters || []).filter((u: any) => {
+          const p = Array.isArray(u.profile) ? (u.profile[0] ?? null) : (u.profile ?? null);
+          return p !== null;
+        }).map((u: any) => {
+          const p = Array.isArray(u.profile) ? (u.profile[0] ?? null) : (u.profile ?? null);
           return {
             id: u.id,
             name: u.full_name || 'Unknown',
@@ -343,7 +347,7 @@ export const AgentGroupBuilderScreen = () => {
       return;
     }
 
-    const existingGroups = await getAgentGroups(user.id);
+    const { groups: existingGroups } = await getAgentGroups(user.id);
     const activeGroupCount = existingGroups.filter(
       g => g.groupStatus !== 'dissolved' && g.groupStatus !== 'placed'
     ).length;

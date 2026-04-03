@@ -48,7 +48,7 @@ export const PiClaimedGroupDetailScreen = () => {
   const { user } = useAuth();
   const { confirm, alert: showAlert } = useConfirm();
 
-  const groupId = route.params?.groupId as string;
+  const groupId = route.params?.groupId as string | undefined;
 
   const [group, setGroup] = useState<PiAutoGroup | null>(null);
   const [members, setMembers] = useState<MemberProfile[]>([]);
@@ -131,10 +131,20 @@ export const PiClaimedGroupDetailScreen = () => {
 
   useFocusEffect(
     useCallback(() => {
-      setLoading(true);
-      loadData();
-    }, [loadData])
+      if (groupId) {
+        setLoading(true);
+        loadData();
+      }
+    }, [loadData, groupId])
   );
+
+  if (!groupId) {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#111', alignItems: 'center', justifyContent: 'center' }}>
+        <Text style={{ color: '#fff', textAlign: 'center', marginTop: 40 }}>Group not found</Text>
+      </View>
+    );
+  }
 
   const handleRelease = async () => {
     if (!user || !groupId) return;

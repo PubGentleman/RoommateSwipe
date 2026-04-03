@@ -58,6 +58,14 @@ export const InviteExistingRoommatesScreen = () => {
     loadRoommates();
   }, []);
 
+  if (!listingId) {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#111', alignItems: 'center', justifyContent: 'center' }}>
+        <Text style={{ color: '#fff', textAlign: 'center', marginTop: 40 }}>Listing not found</Text>
+      </View>
+    );
+  }
+
   const handleShare = async (roommate: ExistingRoommateRecord, index: number) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {

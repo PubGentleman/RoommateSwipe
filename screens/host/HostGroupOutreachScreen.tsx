@@ -26,6 +26,7 @@ interface Props {
 
 export function HostGroupOutreachScreen({ route, navigation }: Props) {
   const { listingId, listingTitle } = route.params || {};
+
   const { theme } = useTheme();
 
   const { user } = useAuth();
@@ -72,6 +73,14 @@ export function HostGroupOutreachScreen({ route, navigation }: Props) {
     );
     setSelectedPackage(available[0] || OUTREACH_PACKAGES[OUTREACH_PACKAGES.length - 1]);
   }, [selectedGroupIds]);
+
+  if (!listingId) {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#111', alignItems: 'center', justifyContent: 'center' }}>
+        <ThemedText style={{ textAlign: 'center', marginTop: 40 }}>Listing not found</ThemedText>
+      </View>
+    );
+  }
 
   function toggleGroup(groupId: string) {
     setSelectedGroupIds(prev => {

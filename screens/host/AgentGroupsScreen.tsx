@@ -15,6 +15,7 @@ import {
   recordPlacement,
   chargeAgentPlacementFee,
   getMonthlyPlacementCount,
+  type AgentGroupsResult,
 } from '../../services/agentMatchmakerService';
 import { getAgentPlanLimits, canAgentPlace, type AgentPlan } from '../../constants/planLimits';
 import { resolveEffectiveAgentPlan } from '../../utils/planResolver';
@@ -47,6 +48,8 @@ export const AgentGroupsScreen = () => {
 
   const [groups, setGroups] = useState<AgentGroup[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [isStale, setIsStale] = useState(false);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
 
   const agentPlan = resolveEffectiveAgentPlan(user) as AgentPlan;
@@ -74,11 +77,14 @@ export const AgentGroupsScreen = () => {
   const loadGroups = async () => {
     if (!user) return;
     setLoading(true);
+    setLoadError(false);
     try {
-      const data = await getAgentGroups(user.id);
-      setGroups(data);
+      const result = await getAgentGroups(user.id);
+      setGroups(result.groups);
+      setIsStale(result.isStale);
     } catch (e) {
       console.warn('[AgentGroups] Load error:', e);
+      setLoadError(true);
     }
     setLoading(false);
   };
@@ -276,8 +282,23 @@ export const AgentGroupsScreen = () => {
         ))}
       </View>
 
+      {isStale ? (
+        <View style={{ backgroundColor: '#2a2200', padding: 8, marginHorizontal: 16, borderRadius: 8, marginBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Feather name="clock" size={14} color={YELLOW} />
+          <Text style={{ color: YELLOW, fontSize: 12 }}>Using cached data</Text>
+        </View>
+      ) : null}
+
       {loading ? (
         <ActivityIndicator size="large" color={ACCENT} style={{ marginTop: 40 }} />
+      ) : loadError && groups.length === 0 ? (
+        <View style={styles.emptyState}>
+          <Feather name="alert-circle" size={48} color="#999" />
+          <Text style={styles.emptyTitle}>Failed to load groups</Text>
+          <Pressable onPress={() => loadGroups()}>
+            <Text style={{ color: ACCENT, marginTop: 12, fontWeight: '600' }}>Tap to retry</Text>
+          </Pressable>
+        </View>
       ) : filteredGroups.length === 0 ? (
         <View style={styles.emptyState}>
           <Feather name="users" size={48} color="#444" />

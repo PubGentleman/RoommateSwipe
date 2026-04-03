@@ -398,15 +398,21 @@ export const BrowseRentersScreen = () => {
 
     try {
       if (shortlistedIds.has(renter.id)) {
-        await removeFromShortlist(user.id, renter.id);
-        if (isCompanyHost) {
-          try { await companyRemoveFromShortlist(user.id, renter.id, selectedListing?.id); } catch {}
-        }
+        const prevIds = new Set(shortlistedIds);
         setShortlistedIds(prev => {
           const next = new Set(prev);
           next.delete(renter.id);
           return next;
         });
+        try {
+          await removeFromShortlist(user.id, renter.id);
+          if (isCompanyHost) {
+            try { await companyRemoveFromShortlist(user.id, renter.id, selectedListing?.id); } catch {}
+          }
+        } catch (e) {
+          setShortlistedIds(prevIds);
+          Alert.alert('Error', 'Failed to update shortlist. Please try again.');
+        }
         return;
       }
 
@@ -418,17 +424,29 @@ export const BrowseRentersScreen = () => {
         return;
       }
 
-      const result = await addToShortlist(user.id, renter.id, selectedListing?.id);
-      if (!result.success) {
-        if (result.error) {
-          Alert.alert('Cannot Shortlist', result.error);
-        }
-        return;
-      }
-      if (isCompanyHost) {
-        try { await companyShortlistRenter(user.id, renter.id, selectedListing?.id); } catch {}
-      }
+      const prevIds = new Set(shortlistedIds);
       setShortlistedIds(prev => new Set(prev).add(renter.id));
+      try {
+        const result = await addToShortlist(user.id, renter.id, selectedListing?.id);
+        if (!result.success) {
+          setShortlistedIds(prevIds);
+          if (result.error) {
+            Alert.alert('Cannot Shortlist', result.error);
+          }
+          return;
+        }
+        if (isCompanyHost) {
+          try {
+            await companyShortlistRenter(user.id, renter.id, selectedListing?.id);
+          } catch (e) {
+            console.warn('Company shortlist failed:', e);
+            Alert.alert('Error', 'Failed to shortlist renter. Please try again.');
+          }
+        }
+      } catch (e) {
+        setShortlistedIds(prevIds);
+        Alert.alert('Error', 'Failed to update shortlist. Please try again.');
+      }
     } catch (e) {
       console.error('[BrowseRenters] Shortlist error:', e);
     } finally {
@@ -566,11 +584,17 @@ export const BrowseRentersScreen = () => {
                     const result = await addToShortlist(user.id, item.id, selectedListing?.id);
                     if (result.success) {
                       if (isCompanyHost) {
-                        await companyShortlistRenter(user.id, item.id, selectedListing?.id);
+                        try {
+                          await companyShortlistRenter(user.id, item.id, selectedListing?.id);
+                        } catch (ce) {
+                          console.warn('Company shortlist failed:', ce);
+                        }
                       }
                       setShortlistedIds(prev => new Set(prev).add(item.id));
                     }
-                  } catch (_e) {}
+                  } catch (_e) {
+                    console.warn('[BrowseRenters] Inline shortlist error:', _e);
+                  }
                 }
                 navigation.navigate('AgentGroupBuilder', {
                   preselectedIds: [item.id],
@@ -773,7 +797,7 @@ export const BrowseRentersScreen = () => {
             <Pressable onPress={() => {
               const parent = navigation.getParent();
               if (parent) parent.navigate('Dashboard', { screen: 'HostSubscription' });
-              else navigation.navigate('HostSubscription' as never);
+              else navigation.navigate('Dashboard', { screen: 'HostSubscription' });
             }}>
               <Text style={{ color: '#a855f7', fontSize: 11, fontWeight: '700' }}>Upgrade</Text>
             </Pressable>
