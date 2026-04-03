@@ -909,7 +909,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = async () => {
-    await supabase.auth.signOut();
+    try {
+      await Promise.race([
+        supabase.auth.signOut(),
+        new Promise((resolve) => setTimeout(resolve, 3000)),
+      ]);
+    } catch (e) {
+      console.log('[Auth] Supabase signOut error (non-blocking):', e);
+    }
     await StorageService.logoutAndReset();
     rcLogout().catch((e) => console.warn('[Auth] RevenueCat logout failed:', e));
     setUser(null);
