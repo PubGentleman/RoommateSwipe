@@ -524,6 +524,29 @@ export const AgentGroupBuilderScreen = () => {
             </View>
           ) : null}
 
+          <View style={styles.summaryCard}>
+            <Text style={[styles.sectionTitle, { marginBottom: 8 }]}>Invite Preview</Text>
+            {selectedRenters.map(r => {
+              const eligible = r.acceptAgentOffers !== false;
+              return (
+                <View key={r.id} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                  <Feather name={eligible ? 'check-circle' : 'alert-circle'} size={14} color={eligible ? GREEN : YELLOW} />
+                  <Text style={[styles.summaryLabel, { marginLeft: 8, flex: 1 }]}>
+                    {r.name} {eligible ? '— Will receive invite' : '— Opted out of agent offers'}
+                  </Text>
+                </View>
+              );
+            })}
+            {(() => {
+              const eligibleCount = selectedRenters.filter(r => r.acceptAgentOffers !== false).length;
+              return eligibleCount < selectedRenters.length ? (
+                <Text style={{ color: YELLOW, fontSize: 12, marginTop: 4 }}>
+                  {eligibleCount} of {selectedRenters.length} renters will receive invites
+                </Text>
+              ) : null;
+            })()}
+          </View>
+
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
             <Text style={styles.sectionTitle}>Your Message</Text>
             <Pressable
@@ -555,7 +578,14 @@ export const AgentGroupBuilderScreen = () => {
             ) : (
               <>
                 <Feather name="send" size={18} color="#fff" />
-                <Text style={styles.sendBtnText}>Send Invites to All</Text>
+                <Text style={styles.sendBtnText}>
+                  {(() => {
+                    const eligibleCount = selectedRenters.filter(r => r.acceptAgentOffers !== false).length;
+                    return eligibleCount < selectedRenters.length
+                      ? `Send Invites to ${eligibleCount} Renters`
+                      : 'Send Invites to All';
+                  })()}
+                </Text>
               </>
             )}
           </Pressable>

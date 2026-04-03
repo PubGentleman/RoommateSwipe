@@ -59,6 +59,7 @@ serve(async (req) => {
         age,
         occupation,
         city,
+        gender,
         profile:profiles(
           budget_max,
           budget_per_person_min,
@@ -68,14 +69,19 @@ serve(async (req) => {
           sleep_schedule,
           smoking,
           pets,
+          no_pets_allergy,
           drinking,
           guests,
+          guest_policy,
           noise_tolerance,
           interests,
+          interest_tags,
           preferred_trains,
+          preferred_neighborhoods,
           desired_bedrooms,
           location_flexible,
           wfh,
+          work_location,
           bio
         )
       `)
@@ -87,51 +93,55 @@ serve(async (req) => {
 
     const sharePerPerson = listing.price / Math.max(1, bedroomsNeeded);
 
-    const systemPrompt = `You are an expert real estate agent assistant specializing in NYC roommate matching.
-Your job is to analyze a group of shortlisted renters and recommend the best combination to fill a specific apartment.
-You understand NYC neighborhoods, subway lines, and what makes roommates compatible long-term.
+    const systemPrompt = `You are an expert real estate agent's AI assistant specializing in roommate group assembly.
 
-When recommending a group:
-1. Budget must work — combined max budgets must cover the rent
-2. Lifestyle must be compatible — sleep schedules, cleanliness, smoking, pets
-3. Move-in timing must align — within 30 days of each other and the listing availability
-4. Transit must work for everyone — preferred train lines vs listing neighborhood
-5. Group size must match rooms available — exactly the right number of people to fill open rooms
+Your job is to analyze a pool of potential renters and recommend the BEST group for a specific listing.
 
-Always respond in this exact JSON format:
+SCORING PRIORITIES (in order):
+1. DEAL-BREAKERS (must pass): No smoker+non-smoker conflicts, no pet allergy+pet conflicts
+2. SLEEP SCHEDULE ALIGNMENT: Most common source of roommate conflict
+3. CLEANLINESS ALIGNMENT: Second most common conflict source
+4. BUDGET COVERAGE: Combined budget must cover rent (ideally 10-20% above for comfort)
+5. MOVE-IN TIMELINE: All members should be able to move in within 2 weeks of each other
+6. NEIGHBORHOOD/TRANSIT FIT: Members should want to live in or near the listing's area
+7. LIFESTYLE COMPATIBILITY: Guest policy, noise tolerance, work-from-home alignment
+8. SHARED INTERESTS: Bonus for common activities (not required)
+
+GROUP DYNAMICS TO CONSIDER:
+- A group where everyone is compatible with everyone else (no weak pairs)
+- Budget balance — avoid pairing $800/mo and $2500/mo renters (resentment risk)
+- Age proximity — within 5-8 years is ideal for shared living
+- Don't just pick the top individuals — pick the best COMBINATION
+
+RESPONSE FORMAT:
 {
   "recommendedGroup": ["renter_id_1", "renter_id_2"],
   "groupNames": ["Name 1", "Name 2"],
-  "confidence": 85,
-  "headline": "Strong budget and lifestyle match for this 2BR",
-  "reasons": [
-    "Both have similar cleanliness standards (8/10 and 9/10)",
-    "Same sleep schedule — both early risers",
-    "Combined budget of $4,800 covers the $4,500 rent with room to spare",
-    "Both on the N/W train — perfect for this Astoria listing"
-  ],
-  "concerns": [
-    "Jordan has a dog — confirm building is pet-friendly"
-  ],
-  "alternativeGroup": ["renter_id_3", "renter_id_4"],
-  "alternativeReason": "Slightly lower compatibility but better move-in timing",
-  "excludedRenters": [
-    { "id": "renter_id_5", "name": "Alex", "reason": "Budget ($1,200/mo max) too low for $1,500/person share" }
-  ]
+  "confidence": 0-100,
+  "headline": "One sentence summary of why this group works",
+  "reasons": ["reason1", "reason2", "reason3"],
+  "concerns": ["any yellow flags to discuss with renters"],
+  "alternativeGroup": ["alt_renter_id_1", ...] or null,
+  "alternativeReason": "Why this is a backup option",
+  "excludedRenters": [{"id": "...", "name": "...", "reason": "Why they don't fit this group"}]
 }`;
 
     const renterSummaries = renters.map((r: any) => {
       const p = Array.isArray(r.profile) ? r.profile[0] : (r.profile ?? {});
+      const interests = p.interests?.length ? p.interests : (p.interest_tags ?? []);
       return `RENTER: ${r.full_name} (ID: ${r.id})
-  Age: ${r.age} | Occupation: ${r.occupation}
+  Age: ${r.age} | Gender: ${r.gender ?? 'not specified'} | Occupation: ${r.occupation}
   Budget: $${p.budget_per_person_min ?? 0}–$${p.budget_per_person_max ?? p.budget_max ?? 0}/mo per person
   Move-in: ${p.move_in_date ?? 'flexible'}
   Sleep schedule: ${p.sleep_schedule ?? 'not specified'}
   Cleanliness: ${p.cleanliness ?? 'not specified'}/10
-  Smoking: ${p.smoking ? 'yes' : 'no'} | Pets: ${p.pets ?? 'no'}
-  Drinking: ${p.drinking ?? 'not specified'} | Guests: ${p.guests ?? 'not specified'}
+  Smoking: ${p.smoking ? 'yes' : 'no'} | Pets: ${p.pets ?? 'no'} | Pet allergy: ${p.no_pets_allergy ? 'yes' : 'no'}
+  Drinking: ${p.drinking ?? 'not specified'} | Guest policy: ${p.guest_policy ?? p.guests ?? 'not specified'}
+  Noise tolerance: ${p.noise_tolerance ?? 'not specified'}/10
+  Work: ${p.work_location ?? (p.wfh ? 'WFH' : 'office')} | Location flexible: ${p.location_flexible ? 'yes' : 'no'}
+  Preferred neighborhoods: ${(p.preferred_neighborhoods ?? []).join(', ') || 'flexible'}
   Preferred trains: ${(p.preferred_trains ?? []).join(', ') || 'flexible'}
-  WFH: ${p.wfh ? 'yes' : 'no'} | Location flexible: ${p.location_flexible ? 'yes' : 'no'}
+  Interests: ${interests.join(', ') || 'not specified'}
   Desires: ${p.desired_bedrooms ?? listing.bedrooms}BR apartment
   Bio: ${p.bio ?? 'no bio'}`;
     }).join('\n\n');

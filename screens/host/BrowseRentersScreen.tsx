@@ -16,12 +16,17 @@ import { shouldLoadMockData } from '../../utils/dataUtils';
 import { Property, RoommateProfile } from '../../types/models';
 import {
   AgentRenter,
+  AgentGroup,
   getShortlistedRenterIds,
   addToShortlist,
   removeFromShortlist,
   generateAISuggestions,
   generateBestGroupSuggestion,
   calculateRenterRelevance,
+  createAgentGroup,
+  sendAgentInvites,
+  getAgentGroups,
+  calculatePairMatrix,
 } from '../../services/agentMatchmakerService';
 import { calculateListingLocationScore } from '../../utils/listingMatchUtils';
 import { getHostRecommendations, getMonthlyUsageCount, getHostPiMonthlyLimit } from '../../services/piMatchingService';
@@ -29,6 +34,7 @@ import { PiHostRecommendation } from '../../types/models';
 import {
   getAgentPlanLimits,
   canAgentShortlist,
+  canAgentCreateGroup,
   type AgentPlan,
 } from '../../constants/planLimits';
 import {
@@ -78,6 +84,7 @@ export const BrowseRentersScreen = () => {
   const [piLoading, setPiLoading] = useState(false);
   const [piQuotaUsed, setPiQuotaUsed] = useState(0);
   const [piQuotaLimit, setPiQuotaLimit] = useState(0);
+  const [sendingNow, setSendingNow] = useState(false);
   const piRequestId = useRef(0);
 
   const agentPlan = resolveEffectiveAgentPlan(user) as AgentPlan;
@@ -625,6 +632,60 @@ export const BrowseRentersScreen = () => {
     );
   };
 
+  const handleSendNow = async () => {
+    if (!user || !bestGroupSuggestion || !selectedListing) return;
+    const groupMembers: AgentRenter[] = bestGroupSuggestion.group;
+    const eligible = groupMembers.filter(r => r.acceptAgentOffers !== false);
+    if (eligible.length < 2) {
+      showAlert({ title: 'Not Enough', message: 'Not enough eligible renters to form a group. Some have opted out of agent offers.' });
+      return;
+    }
+    const ok = await confirm({
+      title: 'Send Invites Now',
+      message: `Create a group and send invites to ${eligible.length} renters for "${selectedListing.title}"?\n\n${eligible.map(r => r.name).join(', ')}\n\n${bestGroupSuggestion.avgCompatibility}% avg compatibility\nCombined budget: $${bestGroupSuggestion.combinedBudgetMin.toLocaleString()}-$${bestGroupSuggestion.combinedBudgetMax.toLocaleString()}/mo`,
+    });
+    if (!ok) return;
+    setSendingNow(true);
+    try {
+      const { groups: existingGroups } = await getAgentGroups(user.id);
+      const activeCount = existingGroups.filter(g => g.groupStatus !== 'dissolved' && g.groupStatus !== 'placed').length;
+      if (!canAgentCreateGroup(agentPlan, activeCount)) {
+        showAlert({ title: 'Group Limit', message: 'Upgrade your plan to create more groups.' });
+        setSendingNow(false);
+        return;
+      }
+      const matrix = calculatePairMatrix(eligible);
+      const avgCompat = matrix.length > 0 ? Math.round(matrix.reduce((s, p) => s + p.score, 0) / matrix.length) : 0;
+      const group: AgentGroup = {
+        id: `ag_${Date.now()}`,
+        name: `${selectedListing.title} - Agent Group`,
+        agentId: user.id,
+        targetListingId: selectedListing.id,
+        targetListing: selectedListing,
+        members: eligible,
+        memberIds: eligible.map(r => r.id),
+        groupStatus: 'invited',
+        avgCompatibility: avgCompat,
+        combinedBudgetMin: eligible.reduce((s, r) => s + (r.budgetMin ?? 0), 0),
+        combinedBudgetMax: eligible.reduce((s, r) => s + (r.budgetMax ?? 0), 0),
+        coversRent: eligible.reduce((s, r) => s + (r.budgetMax ?? 0), 0) >= selectedListing.price,
+        invites: [],
+        createdAt: new Date().toISOString(),
+      };
+      const created = await createAgentGroup(group);
+      await sendAgentInvites(
+        user.id, user.name ?? '', created.id,
+        eligible.map(r => r.id), selectedListing, '',
+        eligible.map(r => ({ id: r.id, name: r.name, photo: r.photos?.[0] }))
+      );
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      showAlert({ title: 'Invites Sent', message: `Group created and invites sent to ${eligible.length} renters.` });
+    } catch (e) {
+      showAlert({ title: 'Error', message: 'Failed to create group. Please try again.' });
+    }
+    setSendingNow(false);
+  };
+
   const renderAIPanel = () => {
     if (!planLimits.hasAISuggestions || !selectedListing || aiSuggestions.length === 0) return null;
 
@@ -683,15 +744,28 @@ export const BrowseRentersScreen = () => {
             <Text style={[styles.bestGroupMeta, { color: bestGroupSuggestion.coversRent ? GREEN : ACCENT }]}>
               {bestGroupSuggestion.coversRent ? 'Covers rent' : 'May not cover rent'}
             </Text>
-            <Pressable
-              style={styles.buildGroupBtn}
-              onPress={() => navigation.navigate('AgentGroupBuilder', {
-                preselectedIds: bestGroupSuggestion.group.map((r: AgentRenter) => r.id),
-                listingId: selectedListing?.id,
-              })}
-            >
-              <Text style={styles.buildGroupText}>Build This Group</Text>
-            </Pressable>
+            <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+              <Pressable
+                style={[styles.buildGroupBtn, { flex: 1, marginTop: 0 }]}
+                onPress={() => navigation.navigate('AgentGroupBuilder', {
+                  preselectedIds: bestGroupSuggestion.group.map((r: AgentRenter) => r.id),
+                  listingId: selectedListing?.id,
+                })}
+              >
+                <Text style={styles.buildGroupText}>Build & Review</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.buildGroupBtn, { flex: 1, marginTop: 0, backgroundColor: GREEN }]}
+                onPress={handleSendNow}
+                disabled={sendingNow}
+              >
+                {sendingNow ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={[styles.buildGroupText, { color: '#fff' }]}>Send Now</Text>
+                )}
+              </Pressable>
+            </View>
           </View>
         ) : null}
 

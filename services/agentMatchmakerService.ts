@@ -1154,6 +1154,50 @@ export async function recordPlacementFeedback(
   }, { onConflict: 'placement_id' });
 }
 
+export async function findSimilarRenters(
+  targetRenter: AgentRenter,
+  existingIds: string[],
+  limit: number = 10
+): Promise<{ renter: AgentRenter; similarityScore: number; reasons: string[] }[]> {
+  if (useLocalData()) return [];
+
+  const excludeIds = [targetRenter.id, ...existingIds];
+  const { data: candidates } = await supabase
+    .from('users')
+    .select('id, full_name, age, occupation, avatar_url, last_active_at, gender, city, accept_agent_offers, profile:profiles(*)')
+    .eq('role', 'renter')
+    .eq('onboarding_step', 'complete')
+    .not('id', 'in', `(${excludeIds.join(',')})`)
+    .gte('last_active_at', new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString())
+    .limit(200);
+
+  if (!candidates) return [];
+
+  const scored = candidates.map((c: any) => {
+    const profile = Array.isArray(c.profile) ? c.profile[0] : c.profile;
+    const candidate = mapToAgentRenter(c, profile);
+    const similarityScore = calculatePairCompatibility(targetRenter, candidate);
+    const reasons: string[] = [];
+
+    if (candidate.sleepSchedule && candidate.sleepSchedule === targetRenter.sleepSchedule) reasons.push('Same sleep schedule');
+    const smokingC = typeof candidate.smoking === 'string' ? candidate.smoking : (candidate.smoking ? 'yes' : 'no');
+    const smokingT = typeof targetRenter.smoking === 'string' ? targetRenter.smoking : (targetRenter.smoking ? 'yes' : 'no');
+    if (smokingC === smokingT) reasons.push('Same smoking preference');
+    if (Math.abs((candidate.cleanliness ?? 5) - (targetRenter.cleanliness ?? 5)) <= 1) reasons.push('Similar cleanliness');
+    if (Math.abs((candidate.budgetMax ?? 0) - (targetRenter.budgetMax ?? 0)) <= 300) reasons.push('Similar budget');
+    if (candidate.guestPolicy && candidate.guestPolicy === targetRenter.guestPolicy) reasons.push('Same guest policy');
+    const sharedInterests = (candidate.interests ?? []).filter((i: string) => (targetRenter.interests ?? []).includes(i));
+    if (sharedInterests.length >= 2) reasons.push(`${sharedInterests.length} shared interests`);
+
+    return { renter: candidate, similarityScore, reasons };
+  });
+
+  return scored
+    .filter(s => s.similarityScore >= 60)
+    .sort((a, b) => b.similarityScore - a.similarityScore)
+    .slice(0, limit);
+}
+
 export function mapToAgentRenter(user: any, profile: any): AgentRenter {
   const p = Array.isArray(profile) ? (profile[0] ?? null) : (profile ?? null);
   return {
