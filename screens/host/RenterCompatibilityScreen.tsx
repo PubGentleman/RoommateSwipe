@@ -1,9 +1,11 @@
 import React, { useMemo, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, Image, Alert } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { AgentRenter, calculatePairMatrix, analyzeGroupDynamics } from '../../services/agentMatchmakerService';
+import { AgentRenter, AgentGroup, calculatePairMatrix, analyzeGroupDynamics, createAgentGroup, sendAgentInvites } from '../../services/agentMatchmakerService';
+import { useAuth } from '../../contexts/AuthContext';
+import * as Haptics from 'expo-haptics';
 
 const BG = '#0d0d0d';
 const CARD_BG = '#151515';
@@ -188,6 +190,7 @@ export const RenterCompatibilityScreen = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
   const allRenters: AgentRenter[] = route.params?.renters ?? [];
   const renters = useMemo(() => allRenters.filter(r => !isEntireSeeker(r)), [allRenters]);
   const listingId: string | undefined = route.params?.listingId;
@@ -198,6 +201,7 @@ export const RenterCompatibilityScreen = () => {
   const [expandedPairKey, setExpandedPairKey] = useState<string | null>(null);
   const [selectedForGroup, setSelectedForGroup] = useState<Set<string>>(new Set());
   const [invitedPairs, setInvitedPairs] = useState<Set<string>>(new Set());
+  const [sendingInvite, setSendingInvite] = useState(false);
 
   const matrix = useMemo(() => calculatePairMatrix(renters), [renters]);
 
@@ -252,12 +256,49 @@ export const RenterCompatibilityScreen = () => {
     });
   }, [allRenters, navigation, listingId, listing]);
 
-  const handleSendInvite = useCallback((aId: string, bId: string) => {
+  const handleSendInvite = useCallback(async (aId: string, bId: string) => {
     const key = `${aId}-${bId}`;
-    if (!invitedPairs.has(key)) {
+    if (invitedPairs.has(key) || sendingInvite) return;
+    const renterA = renters.find(r => r.id === aId);
+    const renterB = renters.find(r => r.id === bId);
+    if (!renterA || !renterB || !user?.id) return;
+
+    setSendingInvite(true);
+    try {
+      const groupName = listing
+        ? `${listing.title} - ${renterA.name?.split(' ')[0]} & ${renterB.name?.split(' ')[0]}`
+        : `${renterA.name?.split(' ')[0]} & ${renterB.name?.split(' ')[0]} Group`;
+      const group: AgentGroup = {
+        id: `ag_${Date.now()}`,
+        name: groupName,
+        agentId: user.id,
+        targetListingId: listingId || undefined,
+        targetListing: listing || undefined,
+        members: [renterA, renterB],
+        memberIds: [aId, bId],
+        groupStatus: 'invited',
+        avgCompatibility: pairDataList.find(p =>
+          (p.a.id === aId && p.b.id === bId) || (p.a.id === bId && p.b.id === aId)
+        )?.score ?? 0,
+        combinedBudgetMin: (renterA.budgetMin ?? 0) + (renterB.budgetMin ?? 0),
+        combinedBudgetMax: (renterA.budgetMax ?? 0) + (renterB.budgetMax ?? 0),
+        coversRent: listing ? ((renterA.budgetMax ?? 0) + (renterB.budgetMax ?? 0)) >= (listing.price ?? listing.rent ?? 0) : false,
+        invites: [],
+        createdAt: new Date().toISOString(),
+      };
+      const created = await createAgentGroup(group);
+      await sendAgentInvites(
+        user.id, user.name ?? '', created.id,
+        [aId, bId], listing || null, '',
+        [renterA, renterB].map(r => ({ id: r.id, name: r.name, photo: r.photos?.[0] }))
+      );
       setInvitedPairs(prev => new Set([...prev, key]));
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (e) {
+      Alert.alert('Error', 'Failed to send invite. Please try again.');
     }
-  }, [invitedPairs]);
+    setSendingInvite(false);
+  }, [invitedPairs, sendingInvite, renters, user, listing, listingId, pairDataList]);
 
   const firstName = (r: AgentRenter) => r.name?.split(' ')[0] ?? '?';
 

@@ -741,85 +741,83 @@ export function generateBestGroupSuggestion(
 }
 
 export function calculatePairCompatibility(a: AgentRenter, b: AgentRenter): number {
-  let score = 0;
-  let maxScore = 0;
+  let totalWeighted = 0;
+  let totalWeight = 0;
 
-  maxScore += 15;
-  if (a.sleepSchedule && b.sleepSchedule) {
-    if (a.sleepSchedule === b.sleepSchedule) score += 15;
-    else if (a.sleepSchedule === 'flexible' || b.sleepSchedule === 'flexible') score += 10;
-  } else { score += 7; }
+  const w_sleep = 15;
+  totalWeight += w_sleep;
+  const sa = a.sleepSchedule ?? 'flexible';
+  const sb = b.sleepSchedule ?? 'flexible';
+  if (sa === sb) totalWeighted += w_sleep;
+  else if (sa === 'flexible' || sb === 'flexible') totalWeighted += w_sleep * 0.7;
+  else totalWeighted += w_sleep * 0.15;
 
-  maxScore += 15;
-  if (a.cleanliness != null && b.cleanliness != null) {
-    const diff = Math.abs(a.cleanliness - b.cleanliness);
-    if (diff <= 1) score += 15;
-    else if (diff <= 2) score += 12;
-    else if (diff <= 3) score += 8;
-    else if (diff <= 4) score += 4;
-  } else { score += 7; }
+  const w_clean = 15;
+  totalWeight += w_clean;
+  const ca = a.cleanliness ?? 5;
+  const cb = b.cleanliness ?? 5;
+  const cleanDiff = Math.abs(ca - cb);
+  if (cleanDiff <= 1) totalWeighted += w_clean;
+  else if (cleanDiff <= 2) totalWeighted += w_clean * 0.8;
+  else if (cleanDiff <= 3) totalWeighted += w_clean * 0.55;
+  else totalWeighted += w_clean * 0.2;
 
+  const w_smoke = 12;
+  totalWeight += w_smoke;
   const smokingA = typeof a.smoking === 'string' ? a.smoking : (a.smoking ? 'yes' : 'no');
   const smokingB = typeof b.smoking === 'string' ? b.smoking : (b.smoking ? 'yes' : 'no');
-  maxScore += 12;
-  if (smokingA && smokingB) {
-    if (smokingA === smokingB) score += 12;
-    else if (smokingA === 'outside_only' || smokingB === 'outside_only') score += 6;
-  } else { score += 6; }
+  if (smokingA === smokingB) totalWeighted += w_smoke;
+  else if (smokingA === 'outside_only' || smokingB === 'outside_only' || smokingA === 'outside' || smokingB === 'outside')
+    totalWeighted += w_smoke * 0.5;
 
-  maxScore += 8;
-  const hasPetsA = a.hasPets ?? a.pets;
-  const hasPetsB = b.hasPets ?? b.pets;
-  if (hasPetsA != null && hasPetsB != null) {
-    if (hasPetsA === hasPetsB) score += 8;
-    else if (!a.noPetsAllergy && !b.noPetsAllergy) score += 4;
-  } else { score += 4; }
+  const w_pets = 8;
+  totalWeight += w_pets;
+  const hasPetsA = a.hasPets ?? a.pets ?? false;
+  const hasPetsB = b.hasPets ?? b.pets ?? false;
+  if (hasPetsA === hasPetsB) totalWeighted += w_pets;
+  else if ((hasPetsA && b.noPetsAllergy === true) || (hasPetsB && a.noPetsAllergy === true))
+    totalWeighted += 0;
+  else totalWeighted += w_pets * 0.6;
 
-  maxScore += 10;
+  const w_guests = 10;
+  totalWeight += w_guests;
   if (a.guestPolicy && b.guestPolicy) {
-    if (a.guestPolicy === b.guestPolicy) score += 10;
-    else if (Math.abs(guestPolicyRank(a.guestPolicy) - guestPolicyRank(b.guestPolicy)) <= 1) score += 6;
-    else score += 2;
-  } else { score += 5; }
+    const gDiff = Math.abs(guestPolicyRank(a.guestPolicy) - guestPolicyRank(b.guestPolicy));
+    if (gDiff === 0) totalWeighted += w_guests;
+    else if (gDiff <= 1) totalWeighted += w_guests * 0.7;
+    else totalWeighted += w_guests * 0.3;
+  } else { totalWeighted += w_guests * 0.5; }
 
-  maxScore += 8;
-  if (a.noiseTolerance != null && b.noiseTolerance != null) {
-    const diff = Math.abs(a.noiseTolerance - b.noiseTolerance);
-    if (diff <= 1) score += 8;
-    else if (diff <= 2) score += 5;
-    else score += 1;
-  } else { score += 4; }
+  const w_noise = 8;
+  totalWeight += w_noise;
+  const na = a.noiseTolerance ?? 5;
+  const nb = b.noiseTolerance ?? 5;
+  const noiseDiff = Math.abs(na - nb);
+  if (noiseDiff <= 1) totalWeighted += w_noise;
+  else if (noiseDiff <= 2) totalWeighted += w_noise * 0.65;
+  else totalWeighted += w_noise * 0.25;
 
-  maxScore += 10;
-  if (a.budgetMax && b.budgetMax) {
-    const ratio = Math.min(a.budgetMax, b.budgetMax) / Math.max(a.budgetMax, b.budgetMax);
-    if (ratio >= 0.85) score += 10;
-    else if (ratio >= 0.65) score += 6;
-    else score += 2;
-  } else { score += 5; }
+  const w_budget = 10;
+  totalWeight += w_budget;
+  const aMax = a.budgetMax ?? a.budgetMin ?? 0;
+  const bMax = b.budgetMax ?? b.budgetMin ?? 0;
+  if (aMax > 0 && bMax > 0) {
+    const ratio = Math.min(aMax, bMax) / Math.max(aMax, bMax);
+    if (ratio >= 0.85) totalWeighted += w_budget;
+    else if (ratio >= 0.65) totalWeighted += w_budget * 0.6;
+    else totalWeighted += w_budget * 0.25;
+  } else { totalWeighted += w_budget * 0.5; }
 
-  maxScore += 8;
+  const w_moveIn = 8;
+  totalWeight += w_moveIn;
   if (a.moveInDate && b.moveInDate) {
     const daysDiff = Math.abs((new Date(a.moveInDate).getTime() - new Date(b.moveInDate).getTime()) / (1000 * 60 * 60 * 24));
-    if (daysDiff <= 14) score += 8;
-    else if (daysDiff <= 30) score += 5;
-    else if (daysDiff <= 60) score += 2;
-  } else { score += 4; }
+    if (daysDiff <= 14) totalWeighted += w_moveIn;
+    else if (daysDiff <= 30) totalWeighted += w_moveIn * 0.6;
+    else totalWeighted += w_moveIn * 0.2;
+  } else { totalWeighted += w_moveIn * 0.5; }
 
-  maxScore += 6;
-  if (a.workLocation && b.workLocation) {
-    if (a.workLocation === b.workLocation) score += 6;
-    else score += 3;
-  } else { score += 3; }
-
-  maxScore += 8;
-  if (a.interests?.length && b.interests?.length) {
-    const shared = a.interests.filter(i => b.interests!.includes(i)).length;
-    const total = new Set([...a.interests, ...b.interests]).size;
-    score += total > 0 ? Math.round((shared / total) * 8) : 2;
-  } else { score += 2; }
-
-  return maxScore > 0 ? Math.round((score / maxScore) * 100) : 50;
+  return totalWeight > 0 ? Math.round((totalWeighted / totalWeight) * 100) : 50;
 }
 
 function guestPolicyRank(policy: string): number {
@@ -918,9 +916,15 @@ export function analyzeGroupDynamics(renters: AgentRenter[]): {
   const cleanScores = renters.map(r => r.cleanliness).filter(c => c != null) as number[];
   if (cleanScores.length >= 2) {
     const spread = Math.max(...cleanScores) - Math.min(...cleanScores);
-    if (spread >= 5) {
+    if (spread >= 4) {
       conflicts.push(`Cleanliness standards vary widely (${Math.min(...cleanScores)}-${Math.max(...cleanScores)}/10)`);
     }
+  }
+
+  const petOwners = renters.filter(r => r.hasPets === true || r.pets === true);
+  const allergyMembers = renters.filter(r => r.noPetsAllergy === true);
+  if (petOwners.length > 0 && allergyMembers.length > 0) {
+    conflicts.push('Pet owner + pet allergy conflict');
   }
 
   if (avgScore >= 80) strengths.push('Excellent overall group compatibility');
