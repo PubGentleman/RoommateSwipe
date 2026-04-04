@@ -921,21 +921,7 @@ export const ProfileQuestionnaireScreen = () => {
                 />
               </>
             ) : null}
-            {isHostProfessional ? (
-              <View style={styles.inputGroup}>
-                <ThemedText style={styles.inputLabel}>Brokerage License Number</ThemedText>
-                <ThemedText style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 8 }}>
-                  Your real estate brokerage license number (optional — helps verify your business)
-                </ThemedText>
-                <TextInput
-                  style={[styles.textInput, { borderColor: '#2a2a2a', color: '#fff' }]}
-                  value={brokerageLicense}
-                  onChangeText={setBrokerageLicense}
-                  placeholder="Enter your license number"
-                  placeholderTextColor="rgba(255,255,255,0.3)"
-                />
-              </View>
-            ) : null}
+            {null}
             <View style={{ marginTop: 20 }}>
               <ThemedText style={styles.inputLabel}>About You *</ThemedText>
               <ThemedText style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 8 }}>
@@ -965,9 +951,9 @@ export const ProfileQuestionnaireScreen = () => {
             </View>
             {isHostProfessional ? (
               <>
-                {renderSubSectionHeader('Agent License Info')}
+                {renderSubSectionHeader(user?.hostType === 'company' ? 'Brokerage License Info' : 'Agent License Info')}
                 <View style={styles.inputGroup}>
-                  <ThemedText style={styles.inputLabel}>Agency / Brokerage Name</ThemedText>
+                  <ThemedText style={styles.inputLabel}>{user?.hostType === 'company' ? 'Brokerage Name' : 'Agency / Brokerage Name'}</ThemedText>
                   <TextInput
                     style={styles.textInput}
                     value={agencyName}
