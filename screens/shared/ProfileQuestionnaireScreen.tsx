@@ -46,6 +46,7 @@ import { getCoordinatesFromNeighborhood } from '../../utils/locationData';
 import { BOROUGH_NEIGHBORHOODS } from '../../constants/transitData';
 import { updateProfile } from '../../services/profileService';
 import { AppHeader } from '../../components/AppHeader';
+import { RhomeLogo } from '../../components/RhomeLogo';
 
 const TOTAL_STEPS = 12;
 
@@ -1703,7 +1704,9 @@ export const ProfileQuestionnaireScreen = () => {
           <Pressable onPress={() => navigation.goBack()} style={styles.navButton}>
             <Feather name="x" size={24} color="rgba(255,255,255,0.5)" />
           </Pressable>
-        ) : undefined}
+        ) : (
+          <RhomeLogo variant="icon-only" size="sm" />
+        )}
         bottomContent={
           <View style={styles.progressWrap}>
             <ProgressBar currentStep={currentFilteredIndex} totalSteps={stepsToShow.length} />
