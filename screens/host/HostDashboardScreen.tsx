@@ -33,6 +33,8 @@ import { useTourSetup } from '../../hooks/useTourSetup';
 import { TOUR_CONTENT } from '../../constants/tourSteps';
 import { getAgentResponseAlerts } from '../../services/responseTrackingService';
 import { getHostCompletionPercentage } from '../../utils/profileReminderUtils';
+import HostOnboardingChecklist from '../../components/HostOnboardingChecklist';
+import { getHostChecklist, HostChecklistStatus } from '../../utils/hostOnboardingChecklist';
 import { HostReviewsScreen } from '../shared/HostReviewsScreen';
 import { getMonthlyUsageCount, getHostPiMonthlyLimit } from '../../services/piMatchingService';
 import { getAvailableGroups } from '../../services/piAutoMatchService';
@@ -139,6 +141,7 @@ export const HostDashboardScreen = () => {
   const [hostAvgRating, setHostAvgRating] = useState(0);
   const [teamMemberCount, setTeamMemberCount] = useState(0);
   const [showHostReviews, setShowHostReviews] = useState(false);
+  const [checklistStatus, setChecklistStatus] = useState<HostChecklistStatus | null>(null);
 
   const DASH_COLLAPSE_H = 50;
   const dashScrollY = useSharedValue(0);
@@ -384,6 +387,12 @@ export const HostDashboardScreen = () => {
       dashboardTour.startTour();
     }
   }, [listings.length, dashboardTour.shouldShowTour]);
+
+  useEffect(() => {
+    if (user) {
+      getHostChecklist(user, listings).then(setChecklistStatus);
+    }
+  }, [user, listings]);
 
   const activeCount = listings.filter(p => p.available && !p.rentedDate).length;
   const rentedCount = listings.filter(p => !!p.rentedDate).length;
@@ -724,6 +733,23 @@ export const HostDashboardScreen = () => {
               <Feather name="x" size={14} color="rgba(255,255,255,0.35)" />
             </Pressable>
           </Pressable>
+        ) : null}
+
+        {checklistStatus && !checklistStatus.dismissed && user ? (
+          <HostOnboardingChecklist
+            status={checklistStatus}
+            userId={user.id}
+            onAction={(screen, params, navigateVia) => {
+              if (navigateVia === 'profile') {
+                const parent = navigation.getParent();
+                if (parent) parent.navigate('Profile', { screen, params });
+                else navigation.navigate(screen, params);
+              } else {
+                navigation.navigate(screen, params);
+              }
+            }}
+            onDismiss={() => setChecklistStatus(prev => prev ? { ...prev, dismissed: true } : null)}
+          />
         ) : null}
 
         <View style={styles.roleRow}>
