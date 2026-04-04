@@ -35,6 +35,7 @@ import {
   getAgentPlanLimits,
   canAgentShortlist,
   canAgentCreateGroup,
+  getCompatibilityMatrixAccess,
   type AgentPlan,
 } from '../../constants/planLimits';
 import {
@@ -47,7 +48,7 @@ import {
   removeFromShortlist as companyRemoveFromShortlist,
 } from '../../services/companyMatchmakerService';
 import { NEIGHBORHOOD_TRAINS } from '../../constants/transitData';
-import { resolveEffectiveAgentPlan } from '../../utils/planResolver';
+import { resolveEffectiveAgentPlan, resolveEffectiveCompanyPlan } from '../../utils/planResolver';
 import { InvitePreviewSheet } from '../../components/InvitePreviewSheet';
 
 const BG = '#0d0d0d';
@@ -198,9 +199,30 @@ export const BrowseRentersScreen = () => {
   const [inviteSheetVisible, setInviteSheetVisible] = useState(false);
   const [inviteSheetMembers, setInviteSheetMembers] = useState<AgentRenter[]>([]);
   const [inviteSheetGroupName, setInviteSheetGroupName] = useState('');
+  const [matrixViewsRemaining, setMatrixViewsRemaining] = useState<number | null>(null);
 
+  const hostType = user?.hostType || (user as any)?.host_type;
   const agentPlan = resolveEffectiveAgentPlan(user) as AgentPlan;
   const planLimits = getAgentPlanLimits(agentPlan);
+  const effectivePlan = hostType === 'company' ? resolveEffectiveCompanyPlan(user) : agentPlan;
+  const matrixAccess = getCompatibilityMatrixAccess(effectivePlan, hostType);
+
+  useEffect(() => {
+    if (matrixAccess.hasAccess && matrixAccess.limit !== -1 && user?.id) {
+      const monthStart = new Date();
+      monthStart.setDate(1);
+      monthStart.setHours(0, 0, 0, 0);
+      supabase
+        .from('pi_usage_log')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('feature', 'compatibility_matrix')
+        .gte('created_at', monthStart.toISOString())
+        .then(({ count }) => {
+          setMatrixViewsRemaining(Math.max(0, matrixAccess.limit - (count ?? 0)));
+        });
+    }
+  }, [matrixAccess.hasAccess, matrixAccess.limit, user?.id]);
 
   useFocusEffect(
     useCallback(() => {
@@ -1296,10 +1318,28 @@ export const BrowseRentersScreen = () => {
         <Text style={{ fontSize: 13, color: '#888' }}>{filteredRenters.length} renters</Text>
         {roomTypeFilter !== 'entire_apartment' ? (
           <Pressable
-            onPress={() => {
-              if (!planLimits.hasCompatibilityMatrix) {
-                showAlert({ title: 'Pro Feature', message: 'Compatibility Matrix is available on Pro and Business plans.' });
+            onPress={async () => {
+              if (!matrixAccess.hasAccess) {
+                const isCompany = hostType === 'company';
+                const upgradeTo = isCompany ? 'Company Pro' : 'Agent Pro';
+                showAlert({ title: 'Pro Feature', message: `Compatibility Matrix is available on ${upgradeTo} and above plans.` });
                 return;
+              }
+              if (matrixAccess.limit !== -1) {
+                const monthStart = new Date();
+                monthStart.setDate(1);
+                monthStart.setHours(0, 0, 0, 0);
+                const { count } = await supabase
+                  .from('pi_usage_log')
+                  .select('*', { count: 'exact', head: true })
+                  .eq('user_id', user!.id)
+                  .eq('feature', 'compatibility_matrix')
+                  .gte('created_at', monthStart.toISOString());
+                const used = count ?? 0;
+                if (used >= matrixAccess.limit) {
+                  showAlert({ title: 'Monthly Limit Reached', message: `You've used all ${matrixAccess.limit} Compatibility Matrix views this month. Upgrade to Pro for unlimited access.` });
+                  return;
+                }
               }
               let matrixList = renters.filter(r => matrixRenters.has(r.id));
               if (selectedListing) {
@@ -1319,12 +1359,25 @@ export const BrowseRentersScreen = () => {
                 });
                 return;
               }
+              if (matrixAccess.limit !== -1 && user?.id) {
+                await supabase.from('pi_usage_log').insert({
+                  user_id: user.id,
+                  feature: 'compatibility_matrix',
+                  created_at: new Date().toISOString(),
+                });
+                setMatrixViewsRemaining(prev => prev !== null ? Math.max(0, prev - 1) : null);
+              }
               navigation.navigate('RenterCompatibility', { renters: matrixList, listingId: selectedListing?.id, listing: selectedListing });
             }}
             style={st.matrixNavBtn}
           >
             <Feather name="grid" size={14} color={GREEN} />
             <Text style={{ color: GREEN, fontSize: 13, fontWeight: '600' }}>Matrix ({matrixRenters.size})</Text>
+            {matrixAccess.hasAccess && matrixAccess.limit !== -1 && matrixViewsRemaining !== null ? (
+              <View style={{ backgroundColor: matrixViewsRemaining > 0 ? '#22c55e22' : '#ef444422', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, marginLeft: 4 }}>
+                <Text style={{ color: matrixViewsRemaining > 0 ? GREEN : '#ef4444', fontSize: 10, fontWeight: '700' }}>{matrixViewsRemaining} left</Text>
+              </View>
+            ) : null}
           </Pressable>
         ) : null}
       </View>

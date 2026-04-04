@@ -13,6 +13,8 @@ interface AgentPlanLimits {
   hasVerifiedBadge: boolean;
   hasBoosts: boolean;
   hasDedicatedSupport: boolean;
+  hasCompatibilityMatrix: boolean;
+  compatibilityMatrixLimit: number;
   label: string;
 }
 
@@ -22,6 +24,7 @@ const AGENT_PLAN_LIMITS: Record<string, AgentPlanLimits> = {
     hasAIMatching: false, hasAdvancedAI: false, hasPIMatching: false,
     hasBackgroundChecks: false, hasAdvancedAnalytics: false, hasCRM: false,
     hasVerifiedBadge: false, hasBoosts: false, hasDedicatedSupport: false,
+    hasCompatibilityMatrix: false, compatibilityMatrixLimit: 0,
     label: 'Pay Per Use',
   },
   free: {
@@ -29,6 +32,7 @@ const AGENT_PLAN_LIMITS: Record<string, AgentPlanLimits> = {
     hasAIMatching: false, hasAdvancedAI: false, hasPIMatching: false,
     hasBackgroundChecks: false, hasAdvancedAnalytics: false, hasCRM: false,
     hasVerifiedBadge: false, hasBoosts: false, hasDedicatedSupport: false,
+    hasCompatibilityMatrix: false, compatibilityMatrixLimit: 0,
     label: 'Pay Per Use',
   },
   agent_starter: {
@@ -36,6 +40,7 @@ const AGENT_PLAN_LIMITS: Record<string, AgentPlanLimits> = {
     hasAIMatching: true, hasAdvancedAI: false, hasPIMatching: false,
     hasBackgroundChecks: false, hasAdvancedAnalytics: false, hasCRM: false,
     hasVerifiedBadge: true, hasBoosts: true, hasDedicatedSupport: false,
+    hasCompatibilityMatrix: true, compatibilityMatrixLimit: 5,
     label: 'Agent Starter',
   },
   agent_pro: {
@@ -43,6 +48,7 @@ const AGENT_PLAN_LIMITS: Record<string, AgentPlanLimits> = {
     hasAIMatching: true, hasAdvancedAI: true, hasPIMatching: true,
     hasBackgroundChecks: true, hasAdvancedAnalytics: true, hasCRM: false,
     hasVerifiedBadge: true, hasBoosts: true, hasDedicatedSupport: true,
+    hasCompatibilityMatrix: true, compatibilityMatrixLimit: -1,
     label: 'Agent Pro',
   },
   agent_business: {
@@ -50,6 +56,7 @@ const AGENT_PLAN_LIMITS: Record<string, AgentPlanLimits> = {
     hasAIMatching: true, hasAdvancedAI: true, hasPIMatching: true,
     hasBackgroundChecks: true, hasAdvancedAnalytics: true, hasCRM: true,
     hasVerifiedBadge: true, hasBoosts: true, hasDedicatedSupport: true,
+    hasCompatibilityMatrix: true, compatibilityMatrixLimit: -1,
     label: 'Agent Business',
   },
 };

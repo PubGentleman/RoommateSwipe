@@ -312,6 +312,7 @@ export interface AgentPlanLimits {
   hasAISuggestions: boolean;
   hasAIGroupSuggestions: boolean;
   hasCompatibilityMatrix: boolean;
+  compatibilityMatrixLimit: number;
   hasAIChat: boolean;
   hasPriorityVisibility: boolean;
   hasAdvancedAnalytics: boolean;
@@ -335,6 +336,7 @@ const _agentBase = {
     hasAISuggestions: false,
     hasAIGroupSuggestions: false,
     hasCompatibilityMatrix: false,
+    compatibilityMatrixLimit: 0,
     hasAIChat: false,
     hasPriorityVisibility: false,
     hasAdvancedAnalytics: false,
@@ -355,7 +357,8 @@ const _agentBase = {
     listingLimit: 10,
     hasAISuggestions: false,
     hasAIGroupSuggestions: false,
-    hasCompatibilityMatrix: false,
+    hasCompatibilityMatrix: true,
+    compatibilityMatrixLimit: 5,
     hasAIChat: false,
     hasPriorityVisibility: false,
     hasAdvancedAnalytics: false,
@@ -377,6 +380,7 @@ const _agentBase = {
     hasAISuggestions: true,
     hasAIGroupSuggestions: true,
     hasCompatibilityMatrix: true,
+    compatibilityMatrixLimit: -1,
     hasAIChat: true,
     hasPriorityVisibility: false,
     hasAdvancedAnalytics: false,
@@ -398,6 +402,7 @@ const _agentBase = {
     hasAISuggestions: true,
     hasAIGroupSuggestions: true,
     hasCompatibilityMatrix: true,
+    compatibilityMatrixLimit: -1,
     hasAIChat: true,
     hasPriorityVisibility: true,
     hasAdvancedAnalytics: true,
@@ -462,12 +467,14 @@ export interface CompanyPlanLimits {
   extraClaimPriceCents: number;
   maxTeamMembers: number;
   shortlistLimit: number;
+  hasCompatibilityMatrix: boolean;
+  compatibilityMatrixLimit: number;
 }
 
 export const COMPANY_PI_LIMITS: Record<CompanyPlan, CompanyPlanLimits> = {
-  starter: { plan: 'starter', label: 'Company Starter', maxListings: 25, piCallsPerMonth: 200, freeAutoClaimsPerMonth: 10, extraClaimPriceCents: 2000, maxTeamMembers: 3, shortlistLimit: 100 },
-  pro: { plan: 'pro', label: 'Company Pro', maxListings: 100, piCallsPerMonth: 500, freeAutoClaimsPerMonth: 30, extraClaimPriceCents: 1000, maxTeamMembers: 10, shortlistLimit: -1 },
-  enterprise: { plan: 'enterprise', label: 'Company Enterprise', maxListings: -1, piCallsPerMonth: -1, freeAutoClaimsPerMonth: -1, extraClaimPriceCents: 0, maxTeamMembers: -1, shortlistLimit: -1 },
+  starter: { plan: 'starter', label: 'Company Starter', maxListings: 25, piCallsPerMonth: 200, freeAutoClaimsPerMonth: 10, extraClaimPriceCents: 2000, maxTeamMembers: 3, shortlistLimit: 100, hasCompatibilityMatrix: false, compatibilityMatrixLimit: 0 },
+  pro: { plan: 'pro', label: 'Company Pro', maxListings: 100, piCallsPerMonth: 500, freeAutoClaimsPerMonth: 30, extraClaimPriceCents: 1000, maxTeamMembers: 10, shortlistLimit: -1, hasCompatibilityMatrix: true, compatibilityMatrixLimit: -1 },
+  enterprise: { plan: 'enterprise', label: 'Company Enterprise', maxListings: -1, piCallsPerMonth: -1, freeAutoClaimsPerMonth: -1, extraClaimPriceCents: 0, maxTeamMembers: -1, shortlistLimit: -1, hasCompatibilityMatrix: true, compatibilityMatrixLimit: -1 },
 };
 
 export function getCompanyPiMonthlyLimit(plan: string): number {
@@ -488,6 +495,17 @@ export function getAutoClaimLimits(plan: string, hostType?: string): { freePerMo
   const hostPlan = plan as HostPlan;
   const limits = PLAN_LIMITS[hostPlan] ?? PLAN_LIMITS.free;
   return { freePerMonth: limits.freeAutoClaimsPerMonth, extraPriceCents: limits.extraClaimPriceCents };
+}
+
+export function getCompatibilityMatrixAccess(plan: string, hostType?: string): { hasAccess: boolean; limit: number } {
+  if (hostType === 'company') {
+    const normalized = plan.replace('company_', '') as CompanyPlan;
+    const limits = COMPANY_PI_LIMITS[normalized];
+    if (limits) return { hasAccess: limits.hasCompatibilityMatrix, limit: limits.compatibilityMatrixLimit };
+    return { hasAccess: false, limit: 0 };
+  }
+  const agentLimits = getAgentPlanLimits(plan);
+  return { hasAccess: agentLimits.hasCompatibilityMatrix, limit: agentLimits.compatibilityMatrixLimit };
 }
 
 export const UNLOCK_PACKAGES = [
