@@ -30,16 +30,109 @@ import {
   normalizeLegacyAmenity,
 } from '../../constants/amenities';
 
+class GooglePlacesErrorBoundary extends React.Component<
+  { children: React.ReactNode; fallback: React.ReactNode },
+  { hasError: boolean }
+> {
+  state = { hasError: false };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: any) {
+    console.warn('GooglePlacesAutocomplete crashed:', error?.message);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return this.props.fallback;
+    }
+    return this.props.children;
+  }
+}
+
 const LazyGooglePlacesAutocomplete = React.forwardRef((props: any, ref: any) => {
   const [Comp, setComp] = React.useState<any>(null);
+  const [ready, setReady] = React.useState(false);
+  const [loadError, setLoadError] = React.useState(false);
+
   React.useEffect(() => {
-    try {
-      const mod = require('react-native-google-places-autocomplete');
-      setComp(() => mod.GooglePlacesAutocomplete);
-    } catch {}
+    const timer = setTimeout(() => {
+      try {
+        const mod = require('react-native-google-places-autocomplete');
+        setComp(() => mod.GooglePlacesAutocomplete);
+        setReady(true);
+      } catch (e) {
+        console.warn('GooglePlacesAutocomplete failed to load:', e);
+        setLoadError(true);
+        setReady(true);
+      }
+    }, 100);
+    return () => clearTimeout(timer);
   }, []);
-  if (!Comp) return null;
-  return <Comp ref={ref} {...props} />;
+
+  if (!ready) {
+    return (
+      <View style={{
+        height: 50,
+        backgroundColor: '#141414',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
+        borderRadius: 12,
+        justifyContent: 'center',
+        paddingHorizontal: 16,
+      }}>
+        <Text style={{ color: '#666', fontSize: 15 }}>Loading address search...</Text>
+      </View>
+    );
+  }
+
+  if (loadError || !Comp) {
+    return (
+      <TextInput
+        style={{
+          height: 50,
+          backgroundColor: '#141414',
+          borderWidth: 1,
+          borderColor: 'rgba(255,255,255,0.1)',
+          borderRadius: 12,
+          paddingHorizontal: 16,
+          fontSize: 15,
+          color: '#fff',
+        }}
+        value={props.textInputProps?.value || ''}
+        onChangeText={props.textInputProps?.onChangeText}
+        placeholder={props.placeholder || 'Enter your address'}
+        placeholderTextColor="#666"
+      />
+    );
+  }
+
+  return (
+    <GooglePlacesErrorBoundary
+      fallback={
+        <TextInput
+          style={{
+            height: 50,
+            backgroundColor: '#141414',
+            borderWidth: 1,
+            borderColor: 'rgba(255,255,255,0.1)',
+            borderRadius: 12,
+            paddingHorizontal: 16,
+            fontSize: 15,
+            color: '#fff',
+          }}
+          value={props.textInputProps?.value || ''}
+          onChangeText={props.textInputProps?.onChangeText}
+          placeholder={props.placeholder || 'Enter your address'}
+          placeholderTextColor="#666"
+        />
+      }
+    >
+      <Comp ref={ref} {...props} />
+    </GooglePlacesErrorBoundary>
+  );
 });
 
 const BEDROOM_OPTIONS = [1, 2, 3, 4, 5, 6];

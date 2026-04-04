@@ -10,11 +10,20 @@ const GOOGLE_PLACES_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || '';
 
 const POPULAR_CITIES = ['New York', 'Los Angeles', 'Chicago', 'Miami', 'Austin', 'Atlanta', 'Seattle', 'Boston'];
 
-let GooglePlacesAutocomplete: any = null;
-try {
-  const mod = require('react-native-google-places-autocomplete');
-  GooglePlacesAutocomplete = mod.GooglePlacesAutocomplete;
-} catch (e) {
+let _cachedGPA: any = null;
+let _gpaAttempted = false;
+
+function getGooglePlacesComponent() {
+  if (!_gpaAttempted) {
+    _gpaAttempted = true;
+    try {
+      const mod = require('react-native-google-places-autocomplete');
+      _cachedGPA = mod.GooglePlacesAutocomplete;
+    } catch (e) {
+      console.warn('GooglePlacesAutocomplete not available:', e);
+    }
+  }
+  return _cachedGPA;
 }
 
 type SearchErrorBoundaryState = { hasError: boolean };
@@ -222,6 +231,7 @@ export const CityPickerModal: React.FC<CityPickerModalProps> = ({
   };
 
   const renderSearchSection = () => {
+    const GooglePlacesAutocomplete = getGooglePlacesComponent();
     if (!GooglePlacesAutocomplete || !GOOGLE_PLACES_KEY) {
       return (
         <FallbackSearchInput onCitySelect={handleFallbackSelect} />
