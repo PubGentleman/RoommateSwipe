@@ -363,7 +363,9 @@ export const HostAnalyticsScreen = () => {
         </View>
       ) : (
         perListingInquiries.map(({ property, inquiryCount, viewCount }) => (
-          <View key={property.id} style={[styles.card, { backgroundColor: CARD_BG, marginBottom: Spacing.md }]}>
+          <Pressable key={property.id} style={[styles.card, { backgroundColor: CARD_BG, marginBottom: Spacing.md }]}
+            onPress={() => navigation.navigate('ListingPerformance', { listingId: property.id })}
+          >
             <View style={styles.listingHeader}>
               <ThemedText type="h3" style={{ flex: 1 }} numberOfLines={1}>{property.title}</ThemedText>
               <View style={[styles.statusBadge, { backgroundColor: getStatusColor(property) + '22' }]}>
@@ -371,6 +373,7 @@ export const HostAnalyticsScreen = () => {
                   {getStatusLabel(property)}
                 </ThemedText>
               </View>
+              <Feather name="chevron-right" size={14} color="rgba(255,255,255,0.3)" style={{ marginLeft: 4 }} />
             </View>
             <ThemedText style={{ color: '#888', marginBottom: Spacing.sm }}>${property.price}/mo</ThemedText>
 
@@ -401,7 +404,7 @@ export const HostAnalyticsScreen = () => {
                 {Math.round((inquiryCount / viewCount) * 100)}% viewer-to-inquiry rate
               </ThemedText>
             ) : null}
-          </View>
+          </Pressable>
         ))
       )}
 

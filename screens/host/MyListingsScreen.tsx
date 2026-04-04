@@ -519,6 +519,15 @@ export const MyListingsScreen = () => {
             </Pressable>
           )}
 
+          <Pressable
+            style={styles.statsButton}
+            onPress={() => navigation.navigate('ListingPerformance', { listingId: listing.id })}
+          >
+            <Feather name="bar-chart-2" size={13} color={ACCENT} />
+            <Text style={styles.statsButtonText}>View Stats</Text>
+            <Feather name="chevron-right" size={12} color="rgba(255,107,91,0.5)" />
+          </Pressable>
+
           <View style={styles.statChips}>
             <View style={styles.chipMuted}>
               <Feather name="eye" size={12} color="rgba(255,255,255,0.45)" />
@@ -1261,6 +1270,24 @@ const styles = StyleSheet.create({
   },
   chipEntireText: { fontSize: 11, fontWeight: '600' as const, color: '#a78bfa' },
 
+  statsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(255,107,91,0.08)',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,91,0.12)',
+  },
+  statsButtonText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#ff8070',
+  },
   cardDivider: {
     height: 1,
     backgroundColor: 'rgba(255,255,255,0.06)',

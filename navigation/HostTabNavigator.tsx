@@ -36,6 +36,7 @@ import { NotificationsScreen } from '../screens/shared/NotificationsScreen';
 import { ProfileStackNavigator } from './ProfileStackNavigator';
 import { TeamManagementScreen } from '../screens/host/TeamManagementScreen';
 import { HostListingDetailScreen } from '../screens/host/HostListingDetailScreen';
+import { ListingPerformanceScreen } from '../screens/host/ListingPerformanceScreen';
 import { useTheme } from '../hooks/useTheme';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotificationContext } from '../contexts/NotificationContext';
@@ -47,6 +48,7 @@ export type HostListingsStackParamList = {
   ListingBoost: { listingId: string };
   HostGroupOutreach: { listingId: string; listingTitle: string };
   InviteExistingRoommates: { listingId: string; count: number; listingAddress?: string };
+  ListingPerformance: { listingId: string };
 };
 
 export type HostDashboardStackParamList = {
@@ -70,6 +72,7 @@ export type HostDashboardStackParamList = {
   MyListings: undefined;
   Chat: { conversationId: string; otherUser: any };
   AgentGroupBuilder: { preselectedIds?: string[]; preselectedRenters?: any[]; listingId?: string };
+  ListingPerformance: { listingId: string };
 };
 
 export type HostGroupsStackParamList = {
@@ -136,6 +139,7 @@ function DashboardStackNavigator() {
       <DashboardStack.Screen name="MyListings" component={MyListingsScreen} />
       <DashboardStack.Screen name="Chat" component={ChatScreen} />
       <DashboardStack.Screen name="AgentGroupBuilder" component={AgentGroupBuilderScreen} />
+      <DashboardStack.Screen name="ListingPerformance" component={ListingPerformanceScreen} />
     </DashboardStack.Navigator>
   );
 }
@@ -149,6 +153,7 @@ function ListingsStackNavigator() {
       <ListingsStack.Screen name="ListingBoost" component={ListingBoostScreen} />
       <ListingsStack.Screen name="HostGroupOutreach" component={HostGroupOutreachScreen} />
       <ListingsStack.Screen name="InviteExistingRoommates" component={InviteExistingRoommatesScreen} />
+      <ListingsStack.Screen name="ListingPerformance" component={ListingPerformanceScreen} />
     </ListingsStack.Navigator>
   );
 }
