@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, Image, Pressable, FlatList, Modal, TextInput, ScrollView, Switch, ActivityIndicator, KeyboardAvoidingView, Platform, Dimensions } from 'react-native';
 import { PricePickerPair, STANDARD_MAX_VALUE } from '../../components/PricePicker';
 import Animated, { useSharedValue, useAnimatedScrollHandler, useAnimatedStyle, interpolate, Extrapolation } from 'react-native-reanimated';
@@ -66,6 +66,8 @@ import {
 import { HostBadge } from '../../components/HostBadge';
 import { useHostBadge, BADGE_CONFIG, HostBadgeType } from '../../hooks/useHostBadge';
 import CoachMarkOverlay from '../../components/CoachMark';
+import { getProfileGateStatus, getItemsForTier, ProfileTier } from '../../utils/profileGate';
+import FeatureGateModal from '../../components/FeatureGateModal';
 import { useTourSetup } from '../../hooks/useTourSetup';
 import { TOUR_CONTENT } from '../../constants/tourSteps';
 
@@ -147,6 +149,8 @@ export const ExploreScreen = () => {
   const [viewMode, setViewMode] = useState<'all' | 'saved'>('all');
   const exploreTour = useTourSetup('explore', TOUR_CONTENT.explore);
   const [recommendations, setRecommendations] = useState<RecommendationSection[]>([]);
+  const [gateModal, setGateModal] = useState<{ visible: boolean; feature: string; requiredTier: ProfileTier } | null>(null);
+  const gateStatus = useMemo(() => getProfileGateStatus(user), [user]);
   const [displayMode, setDisplayMode] = useState<'list' | 'map'>('list');
   const [showLocationSheet, setShowLocationSheet] = useState(false);
   const [selectedNeighborhood, setSelectedNeighborhood] = useState<string | null>(null);
@@ -1148,6 +1152,11 @@ export const ExploreScreen = () => {
 
   const toggleSave = async (id: string) => {
     if (!user?.id) return;
+
+    if (!gateStatus.canSave) {
+      setGateModal({ visible: true, feature: 'Saving Listings', requiredTier: 'silver' });
+      return;
+    }
     
     const wasSaved = saved.has(id);
     
@@ -3742,6 +3751,17 @@ export const ExploreScreen = () => {
         visible={exploreTour.showTour}
         onComplete={exploreTour.completeTour}
       />
+      {gateModal ? (
+        <FeatureGateModal
+          visible={gateModal.visible}
+          onClose={() => setGateModal(null)}
+          onCompleteProfile={() => { setGateModal(null); (navigation as any).navigate('Profile', { screen: 'ProfileQuestionnaire' }); }}
+          featureName={gateModal.feature}
+          requiredTier={gateModal.requiredTier}
+          currentTier={gateStatus.tier}
+          nextItems={getItemsForTier(user, gateModal.requiredTier)}
+        />
+      ) : null}
     </View>
   );
 };

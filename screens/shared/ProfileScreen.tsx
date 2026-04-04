@@ -26,6 +26,8 @@ import { ModeSwitchToggle } from '../../components/ModeSwitchToggle';
 import { getAffiliateForUser } from '../../services/affiliateService';
 import { normalizeRenterPlan, getRenterPlanLimits } from '../../constants/renterPlanLimits';
 import { getHostPlanDisplayInfo, resolveEffectiveHostPlan, isFreeTier } from '../../utils/planResolver';
+import { getProfileGateStatus, TIER_INFO, ProfileTier } from '../../utils/profileGate';
+import LevelUpToast from '../../components/LevelUpToast';
 
 type ProfileScreenNavigationProp = NativeStackNavigationProp<ProfileStackParamList, 'ProfileMain'>;
 
@@ -352,6 +354,20 @@ export const ProfileScreen = () => {
     return cards.slice(0, 6);
   };
 
+  const gateStatus = useMemo(() => getProfileGateStatus(user), [user]);
+  const prevTierRef = useRef<ProfileTier>(gateStatus.tier);
+  const [levelUpTier, setLevelUpTier] = useState<ProfileTier | null>(null);
+
+  useEffect(() => {
+    const TIER_ORDER: ProfileTier[] = ['bronze', 'silver', 'gold', 'platinum'];
+    const prev = TIER_ORDER.indexOf(prevTierRef.current);
+    const curr = TIER_ORDER.indexOf(gateStatus.tier);
+    if (curr > prev) {
+      setLevelUpTier(gateStatus.tier);
+    }
+    prevTierRef.current = gateStatus.tier;
+  }, [gateStatus.tier]);
+
   const profileCompletion = useMemo(() => {
     let filled = 0;
     const total = 10;
@@ -379,6 +395,13 @@ export const ProfileScreen = () => {
 
   return (
     <View style={[styles.root, { paddingTop: 0 }]}>
+      {levelUpTier ? (
+        <LevelUpToast
+          tier={levelUpTier}
+          visible={true}
+          onDismiss={() => setLevelUpTier(null)}
+        />
+      ) : null}
       <AppHeader
         title="Profile"
         role={isHost ? 'host' : 'renter'}
@@ -441,6 +464,21 @@ export const ProfileScreen = () => {
               </View>
             ) : null}
           </View>
+          {!isHost ? (
+            <View style={styles.rpTierDisplay}>
+              <Feather name={TIER_INFO[gateStatus.tier].icon as any} size={18} color={TIER_INFO[gateStatus.tier].color} />
+              <View>
+                <Text style={[styles.rpTierLabel, { color: TIER_INFO[gateStatus.tier].color }]}>
+                  {TIER_INFO[gateStatus.tier].label} Level
+                </Text>
+                {gateStatus.nextTier ? (
+                  <Text style={styles.rpTierNextHint}>
+                    {gateStatus.nextItems.length} step{gateStatus.nextItems.length !== 1 ? 's' : ''} to {TIER_INFO[gateStatus.nextTier].label}
+                  </Text>
+                ) : null}
+              </View>
+            </View>
+          ) : null}
           <View style={styles.statsRow}>
             {isHost && (user?.hostType === 'agent' || user?.hostType === 'company') ? (
               <>
@@ -1548,6 +1586,25 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#ff6b5b',
+  },
+  rpTierDisplay: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 12,
+    marginTop: 8,
+  },
+  rpTierLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  rpTierNextHint: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.35)',
+    marginTop: 1,
   },
   topNav: {
     flexDirection: 'row',

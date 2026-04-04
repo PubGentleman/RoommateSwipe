@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { View, StyleSheet, Pressable, FlatList, TextInput, KeyboardAvoidingView, Platform, Modal, Linking, Text, NativeSyntheticEvent, NativeScrollEvent, ActivityIndicator } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
 import { ThemedText } from '../../components/ThemedText';
@@ -22,6 +22,8 @@ import { acceptInquiry, declineInquiry, linkListingToGroup, leaveGroup, removeMe
 import { supabase } from '../../lib/supabase';
 import { SafeMessageText } from '../../components/SafeMessageText';
 import { normalizeRenterPlan, getRenterPlanLimits } from '../../constants/renterPlanLimits';
+import { getProfileGateStatus, getItemsForTier, ProfileTier } from '../../utils/profileGate';
+import FeatureGateModal from '../../components/FeatureGateModal';
 import { GroupPropertySearchModal } from '../../components/GroupPropertySearchModal';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSequence } from 'react-native-reanimated';
 import { AdBanner } from '../../components/AdBanner';
@@ -104,6 +106,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   const insets = useSafeAreaInsets();
   const { confirm, alert } = useConfirm();
   const { refreshUnreadCount } = useNotificationContext();
+  const gateStatus = useMemo(() => getProfileGateStatus(user), [user]);
+  const [gateModal, setGateModal] = useState<{ visible: boolean; feature: string; requiredTier: ProfileTier } | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [otherUserTyping, setOtherUserTyping] = useState(false);
@@ -883,6 +887,12 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
 
   const sendMessage = async () => {
     if (!inputText.trim() || !user) return;
+
+    const isRenterChat = user.role !== 'host' && !isInquiryChat;
+    if (isRenterChat && !gateStatus.canMessage) {
+      setGateModal({ visible: true, feature: 'Messaging', requiredTier: 'gold' });
+      return;
+    }
 
     if (messagingLocked) {
       if (canUnlock) {
@@ -2486,6 +2496,17 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
         onTakePhoto={handleTakePhoto}
         onPickDocument={handlePickDocument}
       />
+      {gateModal ? (
+        <FeatureGateModal
+          visible={gateModal.visible}
+          onClose={() => setGateModal(null)}
+          onCompleteProfile={() => { setGateModal(null); (navigation as any).navigate('Profile', { screen: 'ProfileQuestionnaire' }); }}
+          featureName={gateModal.feature}
+          requiredTier={gateModal.requiredTier}
+          currentTier={gateStatus.tier}
+          nextItems={getItemsForTier(user, gateModal.requiredTier)}
+        />
+      ) : null}
     </KeyboardAvoidingView>
   );
 };

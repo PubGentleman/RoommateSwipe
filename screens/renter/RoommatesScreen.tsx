@@ -31,6 +31,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import CoachMarkOverlay from '../../components/CoachMark';
 import { useTourSetup } from '../../hooks/useTourSetup';
 import { TOUR_CONTENT } from '../../constants/tourSteps';
+import { getProfileGateStatus, getItemsForTier, ProfileTier } from '../../utils/profileGate';
+import FeatureGateModal from '../../components/FeatureGateModal';
 import { RhomeLogo } from '../../components/RhomeLogo';
 import { AppHeader, HeaderIconButton } from '../../components/AppHeader';
 import { RoommateFilterSheet, MatchFilters, DEFAULT_FILTERS, getActiveFilterCount, getActiveFilterChips, removeFilterChip, loadSavedFilters, saveFilters, applyFiltersToProfiles } from '../../components/RoommateFilterSheet';
@@ -196,6 +198,8 @@ export const RoommatesScreen = () => {
   const superInterestScale = useSharedValue(1);
   const [showReportBlockModal, setShowReportBlockModal] = useState(false);
   const [matchedProfileData, setMatchedProfileData] = useState<{ profile: RoommateProfile; compatibility: number } | null>(null);
+  const [gateModal, setGateModal] = useState<{ visible: boolean; feature: string; requiredTier: ProfileTier } | null>(null);
+  const gateStatus = useMemo(() => getProfileGateStatus(user), [user]);
   const { activeCity, activeSubArea, recentCities, setActiveCity, setActiveSubArea, initialized: cityInitialized } = useCityContext();
   const [showCityPicker, setShowCityPicker] = useState(false);
   const [showCityPrompt, setShowCityPrompt] = useState(false);
@@ -695,6 +699,16 @@ export const RoommatesScreen = () => {
 
   const handleSwipeAction = async (action: 'like' | 'nope' | 'superlike') => {
     if (!currentProfile || !user || isAnimatingSwipe.value) return;
+
+    if (!gateStatus.canSwipe) {
+      setGateModal({ visible: true, feature: 'Swiping', requiredTier: 'silver' });
+      return;
+    }
+
+    if (action === 'superlike' && !gateStatus.canSuperLike) {
+      setGateModal({ visible: true, feature: 'Super Likes', requiredTier: 'gold' });
+      return;
+    }
 
     const effectiveSwipes = dailySwipesUsed === -1 ? 0 : dailySwipesUsed;
     if (!canSwipe(renterPlan, effectiveSwipes)) {
@@ -3274,6 +3288,17 @@ export const RoommatesScreen = () => {
         visible={roommatesTour.showTour}
         onComplete={roommatesTour.completeTour}
       />
+      {gateModal ? (
+        <FeatureGateModal
+          visible={gateModal.visible}
+          onClose={() => setGateModal(null)}
+          onCompleteProfile={() => { setGateModal(null); (navigation as any).navigate('Profile', { screen: 'ProfileQuestionnaire' }); }}
+          featureName={gateModal.feature}
+          requiredTier={gateModal.requiredTier}
+          currentTier={gateStatus.tier}
+          nextItems={getItemsForTier(user, gateModal.requiredTier)}
+        />
+      ) : null}
     </View>
   );
 };
