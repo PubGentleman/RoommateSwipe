@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { View, Text, TextInput, StyleSheet, Pressable, Image, ScrollView, ActivityIndicator, Animated, Dimensions, Platform, KeyboardAvoidingView } from 'react-native';
+import { View, Text, TextInput, StyleSheet, Pressable, Image, ScrollView, FlatList, ActivityIndicator, Animated, Dimensions, Platform, KeyboardAvoidingView } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
 import { SinglePricePicker, RENT_OPTIONS, DEPOSIT_OPTIONS, formatPriceDisplay, normalizeToOption } from '../../components/PricePicker';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
@@ -30,99 +30,7 @@ import {
   normalizeLegacyAmenity,
 } from '../../constants/amenities';
 
-class GooglePlacesErrorBoundary extends React.Component<
-  { children: React.ReactNode; fallback: React.ReactNode },
-  { hasError: boolean }
-> {
-  state = { hasError: false };
-
-  static getDerivedStateFromError() {
-    return { hasError: true };
-  }
-
-  componentDidCatch(error: any) {
-    console.warn('GooglePlacesAutocomplete crashed:', error?.message);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return this.props.fallback;
-    }
-    return this.props.children;
-  }
-}
-
-let _GooglePlacesComp: any = null;
-let _GooglePlacesLoadAttempted = false;
-
-function loadGooglePlacesSync() {
-  if (_GooglePlacesLoadAttempted) return _GooglePlacesComp;
-  _GooglePlacesLoadAttempted = true;
-  try {
-    const mod = require('react-native-google-places-autocomplete');
-    _GooglePlacesComp = mod?.GooglePlacesAutocomplete || null;
-    if (!_GooglePlacesComp) console.warn('GooglePlacesAutocomplete not found in module');
-  } catch (e) {
-    console.warn('Failed to load GooglePlacesAutocomplete:', e);
-  }
-  return _GooglePlacesComp;
-}
-
-loadGooglePlacesSync();
-
-const PlacesAutocompleteFallback = (props: { value: string; onChangeText: (t: string) => void; placeholder: string }) => (
-  <TextInput
-    style={{
-      height: 50, backgroundColor: '#141414', borderWidth: 1,
-      borderColor: 'rgba(255,255,255,0.1)', borderRadius: 12,
-      paddingHorizontal: 16, fontSize: 15, color: '#fff',
-    }}
-    value={props.value}
-    onChangeText={props.onChangeText}
-    placeholder={props.placeholder}
-    placeholderTextColor="#666"
-  />
-);
-
-const LazyGooglePlacesAutocomplete = React.forwardRef((props: any, ref: any) => {
-  const Comp = _GooglePlacesComp;
-
-  if (!Comp) {
-    return (
-      <PlacesAutocompleteFallback
-        value={props.textInputProps?.value || ''}
-        onChangeText={props.textInputProps?.onChangeText || (() => {})}
-        placeholder={props.placeholder || 'Enter location'}
-      />
-    );
-  }
-
-  const safeProps = {
-    predefinedPlaces: [],
-    filterReverseGeocodingByTypes: [],
-    ...(Platform.OS === 'web' ? {
-      requestUrl: {
-        useOnPlatform: 'web' as const,
-        url: 'https://maps.googleapis.com/maps/api',
-      },
-    } : {}),
-    ...props,
-  };
-
-  return (
-    <GooglePlacesErrorBoundary
-      fallback={
-        <PlacesAutocompleteFallback
-          value={props.textInputProps?.value || ''}
-          onChangeText={props.textInputProps?.onChangeText || (() => {})}
-          placeholder={props.placeholder || 'Enter location'}
-        />
-      }
-    >
-      <Comp ref={ref} {...safeProps} />
-    </GooglePlacesErrorBoundary>
-  );
-});
+const NOMINATIM_BASE = 'https://nominatim.openstreetmap.org';
 
 const BEDROOM_OPTIONS = [1, 2, 3, 4, 5, 6];
 const BATHROOM_OPTIONS = [1, 2, 3, 4];
@@ -171,16 +79,83 @@ export const CreateEditListingScreen = () => {
   const [photos, setPhotos] = useState<string[]>([]);
   const [transitOverride, setTransitOverride] = useState('');
   const [coordinates, setCoordinates] = useState<{ lat: number; lng: number } | null>(null);
-  const [addressFromAutocomplete, setAddressFromAutocomplete] = useState(false);
-  const [googleApiKey] = useState(() => process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || '');
+  const [addressResults, setAddressResults] = useState<any[]>([]);
+  const [addressLoading, setAddressLoading] = useState(false);
+  const addressDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  const [cityResults, setCityResults] = useState<any[]>([]);
+  const [cityLoading, setCityLoading] = useState(false);
+  const cityDebounceRef = useRef<NodeJS.Timeout | null>(null);
 
-  const handleManualAddressChange = useCallback((text: string) => {
+  const searchAddress = useCallback(async (text: string) => {
+    if (text.length < 3) { setAddressResults([]); return; }
+    setAddressLoading(true);
+    try {
+      const res = await fetch(
+        `${NOMINATIM_BASE}/search?q=${encodeURIComponent(text)}&countrycodes=us&format=json&addressdetails=1&limit=5`,
+        { headers: { 'User-Agent': 'RhomeApp/1.0' } }
+      );
+      if (res.ok) setAddressResults(await res.json());
+    } catch { setAddressResults([]); }
+    finally { setAddressLoading(false); }
+  }, []);
+
+  const handleAddressTextChange = useCallback((text: string) => {
     setAddress(text);
-    if (addressFromAutocomplete) {
-      setCoordinates(null);
-      setAddressFromAutocomplete(false);
-    }
-  }, [addressFromAutocomplete]);
+    setCoordinates(null);
+    if (addressDebounceRef.current) clearTimeout(addressDebounceRef.current);
+    addressDebounceRef.current = setTimeout(() => searchAddress(text), 350);
+  }, [searchAddress]);
+
+  const handleAddressSelect = useCallback((result: any) => {
+    const addr = result.address || {};
+    const houseNumber = addr.house_number || '';
+    const road = addr.road || '';
+    const streetAddress = `${houseNumber} ${road}`.trim();
+    const cityName = addr.city || addr.town || addr.village || addr.hamlet || addr.borough || addr.county || '';
+    const stateName = addr.state || '';
+    const neighborhoodName = addr.neighbourhood || addr.suburb || '';
+    const zip = addr.postcode || '';
+    if (streetAddress) setAddress(streetAddress);
+    if (cityName) setCity(cityName);
+    if (stateName) setState(stateName);
+    if (neighborhoodName) setNeighborhood(neighborhoodName);
+    if (zip) setZipCode(zip);
+    if (result.lat && result.lon) setCoordinates({ lat: parseFloat(result.lat), lng: parseFloat(result.lon) });
+    setAddressResults([]);
+  }, []);
+
+  const searchCity = useCallback(async (text: string) => {
+    if (text.length < 2) { setCityResults([]); return; }
+    setCityLoading(true);
+    try {
+      const res = await fetch(
+        `${NOMINATIM_BASE}/search?city=${encodeURIComponent(text)}&countrycodes=us&format=json&addressdetails=1&limit=5`,
+        { headers: { 'User-Agent': 'RhomeApp/1.0' } }
+      );
+      if (res.ok) setCityResults(await res.json());
+    } catch { setCityResults([]); }
+    finally { setCityLoading(false); }
+  }, []);
+
+  const handleCityTextChange = useCallback((text: string) => {
+    setCity(text);
+    if (cityDebounceRef.current) clearTimeout(cityDebounceRef.current);
+    cityDebounceRef.current = setTimeout(() => searchCity(text), 350);
+  }, [searchCity]);
+
+  const handleCitySelect = useCallback((result: any) => {
+    const addr = result.address || {};
+    const cityName = addr.city || addr.town || addr.village || addr.borough || result.display_name.split(',')[0];
+    const stateName = addr.state || '';
+    const zip = addr.postcode || '';
+    const neighborhoodName = addr.neighbourhood || addr.suburb || '';
+    if (cityName) setCity(cityName);
+    if (stateName) setState(stateName);
+    if (zip) setZipCode(zip);
+    if (neighborhoodName) setNeighborhood(neighborhoodName);
+    if (result.lat && result.lon) setCoordinates({ lat: parseFloat(result.lat), lng: parseFloat(result.lon) });
+    setCityResults([]);
+  }, []);
 
   const [hostLivesIn, setHostLivesIn] = useState(false);
   const [existingRoommatesCount, setExistingRoommatesCount] = useState(0);
@@ -864,155 +839,68 @@ export const CreateEditListingScreen = () => {
     <View>
       <View style={[styles.fieldContainer, { zIndex: 1000, elevation: 1000 }]}>
         <Text style={styles.label}>Address</Text>
-        {googleApiKey ? (
-          <LazyGooglePlacesAutocomplete
-            placeholder="Start typing your address..."
-            fetchDetails={true}
-            onPress={(data: any, details: any = null) => {
-              if (!details) return;
-              const components = details.address_components;
-              const getComponent = (type: string) =>
-                components.find((c: any) => c.types.includes(type));
-              const streetNumber = getComponent('street_number')?.long_name || '';
-              const streetName = getComponent('route')?.long_name || '';
-              const cityName =
-                getComponent('locality')?.long_name ||
-                getComponent('sublocality')?.long_name ||
-                getComponent('administrative_area_level_2')?.long_name || '';
-              const stateName =
-                getComponent('administrative_area_level_1')?.short_name || '';
-              const neighborhoodName =
-                getComponent('neighborhood')?.long_name ||
-                getComponent('sublocality_level_1')?.long_name || '';
-              const zip = getComponent('postal_code')?.long_name || '';
-              setAddress(`${streetNumber} ${streetName}`.trim());
-              setCity(cityName);
-              setState(stateName);
-              if (neighborhoodName) setNeighborhood(neighborhoodName);
-              if (zip) setZipCode(zip);
-              const loc = details.geometry.location;
-              setCoordinates({ lat: loc.lat, lng: loc.lng });
-              setAddressFromAutocomplete(true);
-            }}
-            query={{
-              key: googleApiKey,
-              language: 'en',
-              types: 'address',
-            }}
-            textInputProps={{
-              value: address,
-              onChangeText: handleManualAddressChange,
-              placeholderTextColor: '#666',
-            }}
-            styles={{
-              container: { flex: 0 },
-              textInput: {
-                height: 50, backgroundColor: '#141414', borderWidth: 1,
-                borderColor: 'rgba(255,255,255,0.1)', borderRadius: 12,
-                paddingHorizontal: 16, fontSize: 15, color: '#fff',
-              },
-              listView: {
-                backgroundColor: '#1a1a1a', borderWidth: 1,
-                borderColor: 'rgba(255,255,255,0.1)', borderRadius: 12,
-                marginTop: 4, position: 'absolute', top: 55, left: 0, right: 0,
-                zIndex: 9999, elevation: 9999,
-              },
-              row: { paddingHorizontal: 12, paddingVertical: 10, backgroundColor: '#1a1a1a' },
-              description: { fontSize: 14, color: '#ccc' },
-              separator: { height: 1, backgroundColor: '#333' },
-            }}
-            enablePoweredByContainer={false}
-            minLength={2}
-            debounce={300}
-            nearbyPlacesAPI="GooglePlacesSearch"
-            keyboardShouldPersistTaps="handled"
-            onFail={(error: any) => console.warn('Places autocomplete error:', error)}
-            onNotFound={() => {}}
-          />
-        ) : (
+        <View>
           <TextInput
             style={styles.input}
             value={address}
-            onChangeText={handleManualAddressChange}
-            placeholder="Enter your address"
+            onChangeText={handleAddressTextChange}
+            placeholder="Start typing your address..."
             placeholderTextColor="#666"
           />
-        )}
+          {addressLoading ? (
+            <ActivityIndicator size="small" color="#ff6b5b" style={{ position: 'absolute', right: 16, top: 15 }} />
+          ) : null}
+          {addressResults.length > 0 ? (
+            <View style={autocompleteStyles.dropdown}>
+              <FlatList
+                data={addressResults}
+                keyExtractor={(item) => String(item.place_id)}
+                keyboardShouldPersistTaps="handled"
+                nestedScrollEnabled
+                renderItem={({ item }) => (
+                  <Pressable style={autocompleteStyles.row} onPress={() => handleAddressSelect(item)}>
+                    <Text style={autocompleteStyles.rowText} numberOfLines={2}>{item.display_name}</Text>
+                  </Pressable>
+                )}
+              />
+            </View>
+          ) : null}
+        </View>
       </View>
 
       <View style={[styles.fieldContainer, { zIndex: 999, elevation: 999 }]}>
         <Text style={styles.label}>City</Text>
-        {googleApiKey ? (
-          <LazyGooglePlacesAutocomplete
-            placeholder="Type a city..."
-            fetchDetails={true}
-            onPress={(data: any, details: any = null) => {
-              if (!details) return;
-              const components = details.address_components;
-              const getComponent = (type: string) =>
-                components.find((c: any) => c.types.includes(type));
-              const cityName =
-                getComponent('locality')?.long_name ||
-                getComponent('sublocality')?.long_name ||
-                getComponent('administrative_area_level_2')?.long_name || '';
-              const stateName =
-                getComponent('administrative_area_level_1')?.short_name || '';
-              const zipCodeVal =
-                getComponent('postal_code')?.long_name || '';
-              const neighborhoodName =
-                getComponent('neighborhood')?.long_name ||
-                getComponent('sublocality_level_1')?.long_name || '';
-              if (cityName) setCity(cityName);
-              if (stateName) setState(stateName);
-              if (zipCodeVal) setZipCode(zipCodeVal);
-              if (neighborhoodName) setNeighborhood(neighborhoodName);
-              const loc = details.geometry?.location;
-              if (loc) setCoordinates({ lat: loc.lat, lng: loc.lng });
-            }}
-            query={{
-              key: googleApiKey,
-              language: 'en',
-              types: '(cities)',
-            }}
-            textInputProps={{
-              value: city,
-              onChangeText: setCity,
-              placeholderTextColor: '#666',
-            }}
-            styles={{
-              container: { flex: 0 },
-              textInput: {
-                height: 50, backgroundColor: '#141414', borderWidth: 1,
-                borderColor: 'rgba(255,255,255,0.1)', borderRadius: 12,
-                paddingHorizontal: 16, fontSize: 15, color: '#fff',
-              },
-              listView: {
-                backgroundColor: '#1a1a1a', borderWidth: 1,
-                borderColor: 'rgba(255,255,255,0.1)', borderRadius: 12,
-                marginTop: 4, position: 'absolute', top: 55, left: 0, right: 0,
-                zIndex: 9999, elevation: 9999,
-              },
-              row: { paddingHorizontal: 12, paddingVertical: 10, backgroundColor: '#1a1a1a' },
-              description: { fontSize: 14, color: '#ccc' },
-              separator: { height: 1, backgroundColor: '#333' },
-            }}
-            enablePoweredByContainer={false}
-            minLength={2}
-            debounce={300}
-            nearbyPlacesAPI="GooglePlacesSearch"
-            keyboardShouldPersistTaps="handled"
-            onFail={(error: any) => console.warn('City autocomplete error:', error)}
-            onNotFound={() => {}}
-          />
-        ) : (
+        <View>
           <TextInput
             style={styles.input}
             value={city}
-            onChangeText={setCity}
+            onChangeText={handleCityTextChange}
             placeholder="Type a city..."
             placeholderTextColor="#666"
           />
-        )}
+          {cityLoading ? (
+            <ActivityIndicator size="small" color="#ff6b5b" style={{ position: 'absolute', right: 16, top: 15 }} />
+          ) : null}
+          {cityResults.length > 0 ? (
+            <View style={autocompleteStyles.dropdown}>
+              <FlatList
+                data={cityResults}
+                keyExtractor={(item) => String(item.place_id)}
+                keyboardShouldPersistTaps="handled"
+                nestedScrollEnabled
+                renderItem={({ item }) => {
+                  const addr = item.address || {};
+                  const label = [addr.city || addr.town || addr.village || item.display_name.split(',')[0], addr.state].filter(Boolean).join(', ');
+                  return (
+                    <Pressable style={autocompleteStyles.row} onPress={() => handleCitySelect(item)}>
+                      <Text style={autocompleteStyles.rowText} numberOfLines={1}>{label}</Text>
+                    </Pressable>
+                  );
+                }}
+              />
+            </View>
+          ) : null}
+        </View>
       </View>
 
       <View style={styles.fieldContainer}>
@@ -1974,6 +1862,28 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     height: 50,
     paddingHorizontal: 16,
+  },
+});
+
+const autocompleteStyles = StyleSheet.create({
+  dropdown: {
+    backgroundColor: '#1a1a1a',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 12,
+    marginTop: 4,
+    maxHeight: 200,
+    overflow: 'hidden',
+  },
+  row: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#333',
+  },
+  rowText: {
+    color: '#ccc',
+    fontSize: 14,
   },
 });
 
