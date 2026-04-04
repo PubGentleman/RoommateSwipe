@@ -38,6 +38,7 @@ import ChatAttachmentPicker from '../../components/ChatAttachmentPicker';
 import ChatImageMessage from '../../components/ChatImageMessage';
 import ChatFileMessage from '../../components/ChatFileMessage';
 import { pickImage, takePhoto, pickDocument, uploadChatAttachment } from '../../services/chatAttachmentService';
+import * as Notifications from 'expo-notifications';
 import { createBooking } from '../../services/bookingService';
 import {
   updateRenterMessageTimestamp,
@@ -499,6 +500,16 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
       }
     }
   }, [messages, highlightedId]);
+
+  useEffect(() => {
+    const sub = Notifications.addNotificationReceivedListener((notification) => {
+      const data = notification.request.content.data;
+      if (data?.matchId === conversationId || data?.groupId === inquiryGroup?.id) {
+        Notifications.dismissNotificationAsync(notification.request.identifier);
+      }
+    });
+    return () => sub.remove();
+  }, [conversationId, inquiryGroup?.id]);
 
   const handleTextChange = (text: string) => {
     setInputText(text);

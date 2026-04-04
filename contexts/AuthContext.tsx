@@ -10,6 +10,7 @@ import { activateBoost as boostServiceActivateBoost, deactivateExpiredBoosts } f
 import { getAgentPlanLimits, getAgentListingLimitMessage, type AgentPlan } from '../constants/planLimits';
 import { identifyUser as rcIdentifyUser, logoutRevenueCat as rcLogout } from '../lib/revenueCat';
 import { processReferralCommission } from '../services/affiliateService';
+import { registerForPushNotifications, removePushToken } from '../services/pushNotificationService';
 
 export type UserRole = 'renter' | 'host';
 
@@ -139,6 +140,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       authSubscription.unsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    if (user?.id) {
+      registerForPushNotifications(user.id).catch((e) =>
+        console.warn('[Auth] Push registration failed:', e)
+      );
+    }
+  }, [user?.id]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState: AppStateStatus) => {
@@ -912,6 +921,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = async () => {
+    if (user?.id) {
+      removePushToken(user.id).catch((e) => console.warn('[Auth] Push token removal failed:', e));
+    }
     try {
       await Promise.race([
         supabase.auth.signOut(),

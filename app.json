@@ -32,7 +32,8 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "useNextNotificationsApi": true
     },
     "web": {
       "output": "single",
@@ -59,7 +60,14 @@
           ]
         }
       ],
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-notifications",
+        {
+          "color": "#ff6b5b",
+          "sounds": []
+        }
+      ]
     ],
     "experiments": {
       "reactCompiler": true

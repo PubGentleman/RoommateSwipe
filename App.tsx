@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from "react";
 import { AppState, StyleSheet } from "react-native";
-import { NavigationContainer } from "@react-navigation/native";
+import { NavigationContainer, createNavigationContainerRef } from "@react-navigation/native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -23,8 +23,11 @@ import { isDev } from "./utils/dataUtils";
 import { checkDailyTrigger } from "./utils/insightRefresh";
 import { useResponseTracking } from "./hooks/useResponseTracking";
 import { supabase } from "./lib/supabase";
+import { addNotificationResponseListener } from "./services/pushNotificationService";
 
 SplashScreen.preventAutoHideAsync();
+
+export const navigationRef = createNavigationContainerRef<any>();
 
 function ResponseTracker() {
   useResponseTracking();
@@ -97,6 +100,37 @@ export default function App() {
     checkDailyTrigger();
   }, []);
 
+  useEffect(() => {
+    const cleanup = addNotificationResponseListener((response) => {
+      const data = response.notification.request.content.data;
+
+      if (data?.type === 'new_message' && data?.matchId) {
+        navigationRef.current?.navigate('Main', {
+          screen: 'Messages',
+          params: {
+            screen: 'Chat',
+            params: {
+              conversationId: data.matchId,
+            },
+          },
+        });
+      } else if (data?.type === 'new_group_message' && data?.groupId) {
+        navigationRef.current?.navigate('Main', {
+          screen: 'Messages',
+          params: {
+            screen: 'Chat',
+            params: {
+              conversationId: `inquiry_${data.groupId}`,
+              inquiryGroup: { id: data.groupId },
+            },
+          },
+        });
+      }
+    });
+
+    return cleanup;
+  }, []);
+
   return (
     <ErrorBoundary>
       <StripeWrapper>
@@ -110,6 +144,7 @@ export default function App() {
                       <ConfirmProvider>
                         <RevenueCatProvider>
                           <NavigationContainer
+                            ref={navigationRef}
                             linking={{
                               prefixes: [Linking.createURL('/'), 'rhome://'],
                               config: {

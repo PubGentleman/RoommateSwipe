@@ -59,6 +59,7 @@ Supabase provides the complete backend infrastructure:
 - **Auth:** Email/password authentication with Row Level Security (RLS).
 - **Database:** PostgreSQL with RLS, computed columns, and preference tables.
 - **Realtime:** Subscriptions for messaging and notifications.
+- **Push Notifications:** Expo Notifications for message push alerts. `pushNotificationService.ts` handles token registration/removal. `send-push-notification` Edge Function (triggered by DB webhooks on `messages`/`group_messages` INSERT) sends via Expo Push API. Foreground suppression in ChatScreen dismisses notifications for the active chat. Tapping a notification navigates to the relevant chat via `navigationRef`. Migration 081 creates `push_tokens` table and DB triggers.
 - **Storage:** For media assets.
 - **Edge Functions:** Used for webhooks, verification, background checks, payments, references, AI operations, match score calculations, group-to-listing matching, and public forms.
 - **Neighborhood Knowledge Base:** `neighborhood_data` table with pre-seeded data for 55 NYC/NJ neighborhoods (migrations 070-071). Covers safety scores, transit, amenities, vibe tags, median rents, walkability, and more. Pi AI queries this data in real-time for neighborhood questions. Frontend service (`services/neighborhoodDataService.ts`) provides cached access. NeighborhoodAISheet displays safety/walk/transit/nightlife score pills.
@@ -80,6 +81,8 @@ The architecture includes a Babel module resolver, platform-specific UI, perform
 - `react-native-maps`
 - `react-native-google-places-autocomplete`
 - `react-native-webview`
+- `expo-notifications`
+- `expo-device`
 - Supabase (Auth, Database, Realtime, Storage, Edge Functions)
 - Claude (for AI operations)
 - Walk Score API
