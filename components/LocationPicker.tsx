@@ -81,9 +81,9 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
 
   const handleSelect = (result: NominatimResult) => {
     const addr = result.address || {};
-    const city = addr.borough || addr.city || addr.town || addr.village || addr.hamlet || addr.county || '';
+    const city = addr.borough || addr.suburb || addr.city || addr.town || addr.village || addr.hamlet || addr.county || '';
     const state = addr.state || '';
-    const neighborhood = addr.neighbourhood || (addr.suburb && addr.suburb !== city ? addr.suburb : '') || '';
+    const neighborhood = addr.neighbourhood || addr.quarter || '';
 
     onStateChange(state);
     onCityChange(city || result.display_name.split(',')[0]);

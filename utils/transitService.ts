@@ -1,12 +1,10 @@
-import Constants from 'expo-constants';
-
-const GOOGLE_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || '';
-
 export interface TransitStop {
   name: string;
   type: 'subway' | 'bus' | 'train' | 'tram' | 'ferry' | 'other';
   distanceMiles: number;
 }
+
+const GOOGLE_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || '';
 
 export async function geocodeAddress(
   address: string,
@@ -32,55 +30,73 @@ export async function fetchNearbyTransit(
   lat: number,
   lng: number
 ): Promise<TransitStop[]> {
-  if (!GOOGLE_API_KEY) return [];
-
   const radius = 800;
-  const types = ['subway_station', 'bus_station', 'train_station', 'transit_station'];
   const stops: TransitStop[] = [];
   const seen = new Set<string>();
 
-  for (const type of types) {
-    try {
-      const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=${radius}&type=${type}&key=${GOOGLE_API_KEY}`;
-      const res = await fetch(url);
-      const data = await res.json();
+  try {
+    const query = `
+      [out:json][timeout:10];
+      (
+        node["railway"="station"](around:${radius},${lat},${lng});
+        node["railway"="subway_entrance"](around:${radius},${lat},${lng});
+        node["railway"="halt"](around:${radius},${lat},${lng});
+        node["public_transport"="station"](around:${radius},${lat},${lng});
+        node["public_transport"="stop_position"]["subway"="yes"](around:${radius},${lat},${lng});
+        node["highway"="bus_stop"](around:${radius},${lat},${lng});
+        node["amenity"="bus_station"](around:${radius},${lat},${lng});
+        node["railway"="tram_stop"](around:${radius},${lat},${lng});
+        node["amenity"="ferry_terminal"](around:${radius},${lat},${lng});
+      );
+      out body;
+    `;
 
-      if (data.status === 'OK') {
-        for (const place of data.results.slice(0, 3)) {
-          if (seen.has(place.place_id)) continue;
-          seen.add(place.place_id);
+    const res = await fetch('https://overpass-api.de/api/interpreter', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `data=${encodeURIComponent(query)}`,
+    });
 
-          const placeLat = place.geometry.location.lat;
-          const placeLng = place.geometry.location.lng;
-          const distanceMiles = haversineDistance(lat, lng, placeLat, placeLng);
-
-          stops.push({
-            name: place.name,
-            type: mapPlaceTypeToTransitType(type),
-            distanceMiles: Math.round(distanceMiles * 10) / 10,
-          });
-        }
-      }
-    } catch {
+    if (!res.ok) {
+      console.warn('Overpass API error:', res.status);
+      return [];
     }
+
+    const data = await res.json();
+
+    for (const element of data.elements || []) {
+      const name = element.tags?.name;
+      if (!name || seen.has(name)) continue;
+      seen.add(name);
+
+      const type = mapOsmTagsToTransitType(element.tags);
+      const distanceMiles = haversineDistance(lat, lng, element.lat, element.lon);
+
+      stops.push({
+        name,
+        type,
+        distanceMiles: Math.round(distanceMiles * 10) / 10,
+      });
+    }
+  } catch (err) {
+    console.warn('Transit fetch failed:', err);
   }
 
   return stops.sort((a, b) => a.distanceMiles - b.distanceMiles).slice(0, 5);
 }
 
-function mapPlaceTypeToTransitType(type: string): TransitStop['type'] {
-  switch (type) {
-    case 'subway_station':
-      return 'subway';
-    case 'bus_station':
-      return 'bus';
-    case 'train_station':
-      return 'train';
-    case 'transit_station':
-      return 'other';
-    default:
-      return 'other';
+function mapOsmTagsToTransitType(tags: Record<string, string>): TransitStop['type'] {
+  if (tags.railway === 'station' || tags.railway === 'subway_entrance' || tags.station === 'subway') return 'subway';
+  if (tags.railway === 'tram_stop') return 'tram';
+  if (tags.railway === 'halt' || tags.station === 'light_rail') return 'train';
+  if (tags.amenity === 'ferry_terminal') return 'ferry';
+  if (tags.highway === 'bus_stop' || tags.amenity === 'bus_station') return 'bus';
+  if (tags.public_transport === 'station') {
+    if (tags.subway === 'yes' || tags.station === 'subway') return 'subway';
+    if (tags.train === 'yes') return 'train';
+    return 'other';
   }
+  return 'other';
 }
 
 function haversineDistance(

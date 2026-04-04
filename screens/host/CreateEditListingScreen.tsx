@@ -136,16 +136,9 @@ export const CreateEditListingScreen = () => {
     const houseNumber = addr.house_number || '';
     const road = addr.road || '';
     const streetAddress = `${houseNumber} ${road}`.trim();
-    const cityName = addr.borough || addr.city || addr.town || addr.village || addr.hamlet || addr.county || '';
+    const cityName = addr.borough || addr.suburb || addr.city || addr.town || addr.village || addr.hamlet || addr.county || '';
     const stateName = addr.state || '';
-    let neighborhoodName = '';
-    if (addr.neighbourhood) {
-      neighborhoodName = addr.neighbourhood;
-    } else if (addr.suburb && addr.suburb !== cityName) {
-      neighborhoodName = addr.suburb;
-    } else if (addr.quarter) {
-      neighborhoodName = addr.quarter;
-    }
+    const neighborhoodName = addr.neighbourhood || addr.quarter || '';
     const zip = addr.postcode || '';
     if (streetAddress) setAddress(streetAddress);
     if (cityName) setCity(cityName);
@@ -182,15 +175,10 @@ export const CreateEditListingScreen = () => {
 
   const handleCitySelect = useCallback((result: any) => {
     const addr = result.address || {};
-    const cityName = addr.borough || addr.city || addr.town || addr.village || result.display_name.split(',')[0];
+    const cityName = addr.borough || addr.suburb || addr.city || addr.town || addr.village || result.display_name.split(',')[0];
     const stateName = addr.state || '';
     const zip = addr.postcode || '';
-    let neighborhoodName = '';
-    if (addr.neighbourhood) {
-      neighborhoodName = addr.neighbourhood;
-    } else if (addr.suburb && addr.suburb !== cityName) {
-      neighborhoodName = addr.suburb;
-    }
+    const neighborhoodName = addr.neighbourhood || addr.quarter || '';
     if (cityName) setCity(cityName);
     if (stateName) setState(stateName);
     if (zip) setZipCode(zip);
