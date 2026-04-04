@@ -18,6 +18,7 @@ import { getMyListings, mapListingToProperty, getAgentStats, getCompanyAgents, r
 import { getReceivedInterestCards, acceptInterestCard, rejectInterestCard } from '../../services/discoverService';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { RhomeLogo } from '../../components/RhomeLogo';
+import { AppHeader, HeaderIconButton } from '../../components/AppHeader';
 import { updateGroup } from '../../services/groupService';
 import { RhomeAISheet } from '../../components/RhomeAISheet';
 import { AIFloatingButton } from '../../components/AIFloatingButton';
@@ -603,27 +604,24 @@ export const HostDashboardScreen = () => {
 
   return (
     <View style={[styles.container, { backgroundColor: BG }]}>
-      <View style={[styles.topNav, { paddingTop: insets.top + 14 }]}>
-        <RhomeLogo variant="icon-only" size="sm" onPress={() => {
-          const parent = navigation.getParent?.();
-          if (parent) parent.navigate('Dashboard', { screen: 'DashboardMain' });
-        }} />
-        <View style={{ flex: 1, marginLeft: 10 }}>
-          <Text style={styles.greetingTitle}>{isAgent ? 'Agent Dashboard' : isCompany ? 'Company Dashboard' : 'Host Dashboard'}</Text>
-        </View>
-        <View style={styles.navActions}>
-          {canUseAI ? <AIFloatingButton onPress={() => setShowAISheet(true)} position="inline" /> : null}
-          <Pressable style={styles.iconBtn} onPress={() => {
-            navigation.navigate('Notifications');
-          }}>
-            <Feather name="bell" size={16} color="rgba(255,255,255,0.6)" />
-            {pendingInquiries > 0 ? <View style={styles.notifDot} /> : null}
-          </Pressable>
-          <Pressable style={styles.iconBtn} onPress={() => navigateToTab('Profile')}>
-            <Feather name="settings" size={16} color="rgba(255,255,255,0.6)" />
-          </Pressable>
-        </View>
-      </View>
+      <AppHeader
+        title={isAgent ? 'Agent Dashboard' : isCompany ? 'Company Dashboard' : 'Host Dashboard'}
+        hideSeparator
+        rightActions={
+          <>
+            {canUseAI ? <AIFloatingButton onPress={() => setShowAISheet(true)} position="inline" /> : null}
+            <HeaderIconButton
+              icon="bell"
+              onPress={() => navigation.navigate('Notifications')}
+              badge={pendingInquiries > 0}
+            />
+            <HeaderIconButton
+              icon="settings"
+              onPress={() => navigateToTab('Profile')}
+            />
+          </>
+        }
+      />
       <Animated.View style={dashCollapsibleStyle}>
         <View style={{ paddingHorizontal: 20, paddingBottom: 6 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>

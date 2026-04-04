@@ -16,6 +16,7 @@ import { StorageService } from '../../utils/storage';
 import { RhomeAISheet } from '../../components/RhomeAISheet';
 import { AIFloatingButton } from '../../components/AIFloatingButton';
 import { RhomeLogo } from '../../components/RhomeLogo';
+import { AppHeader, HeaderIconButton } from '../../components/AppHeader';
 import { getBoostTimeRemaining, getBoostDuration, isBoostExpired, RENTER_BOOST_OPTIONS, RenterBoostOptionId } from '../../utils/boostUtils';
 import { isDev } from '../../utils/envUtils';
 import * as Linking from 'expo-linking';
@@ -268,22 +269,21 @@ export const ProfileScreen = () => {
   };
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
-      <View style={styles.topNav}>
-        <RhomeLogo variant="icon-only" size="sm" onPress={() => {
-          const parent = navigation.getParent?.();
-          if (parent) {
-            parent.navigate(isHost ? 'Dashboard' : 'Explore');
-          }
-        }} />
-        <AIFloatingButton onPress={() => setShowAISheet(true)} position="inline" />
-        <Pressable onPress={handleDevTap}>
-          <Text style={styles.topNavTitle}>My Profile</Text>
-        </Pressable>
-        <Pressable style={styles.iconBtn} onPress={() => navigation.navigate('PrivacySecurity')}>
-          <Feather name="settings" size={16} color="rgba(255,255,255,0.7)" />
-        </Pressable>
-      </View>
+    <View style={[styles.root, { paddingTop: 0 }]}>
+      <AppHeader
+        title="Profile"
+        role={isHost ? 'host' : 'renter'}
+        hideSeparator
+        rightActions={
+          <>
+            <AIFloatingButton onPress={() => setShowAISheet(true)} position="inline" />
+            <HeaderIconButton
+              icon="settings"
+              onPress={() => navigation.navigate('PrivacySecurity')}
+            />
+          </>
+        }
+      />
 
       <AnimatedScrollView ref={scrollRef} style={styles.scrollContent} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 100 }} onScroll={profileScrollHandler} scrollEventThrottle={16}>
         <Animated.View style={profileCollapsibleStyle}>

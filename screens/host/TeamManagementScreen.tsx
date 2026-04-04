@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { TeamMember } from '../../types/models';
 import { LinearGradient } from 'expo-linear-gradient';
+import { AppHeader, HeaderActionButton } from '../../components/AppHeader';
 
 type InviteRole = 'admin' | 'member' | 'agent';
 
@@ -312,29 +313,19 @@ export function TeamManagementScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
-      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-        <View style={{ flex: 1 }}>
-          <Text style={[Typography.h2, { color: theme.text }]}>Your Team</Text>
-          <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
-            Manage your team members and agents
-          </Text>
-        </View>
-        <Pressable
-          style={[styles.inviteBtn, atSeatLimit ? { opacity: 0.4 } : null]}
-          onPress={() => { if (!atSeatLimit) setShowInvite(true); }}
-          disabled={atSeatLimit}
-        >
-          <LinearGradient
-            colors={['#ff6b5b', '#e83a2a']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.inviteBtnGrad}
-          >
-            <Feather name="user-plus" size={16} color="#FFFFFF" />
-            <Text style={styles.inviteBtnText}>Invite</Text>
-          </LinearGradient>
-        </Pressable>
-      </View>
+      <AppHeader
+        title="Your Team"
+        subtitle={`${activeCount} of ${seatLimitDisplay} seats used · ${members.filter(m => m.role === 'agent').length} agents`}
+        hideSeparator
+        rightActions={
+          <HeaderActionButton
+            label="Invite"
+            icon="user-plus"
+            onPress={() => setShowInvite(true)}
+            disabled={atSeatLimit}
+          />
+        }
+      />
 
       <View style={styles.statsRow}>
         <View style={[styles.statCard, { backgroundColor: theme.card, borderColor: theme.border }]}>

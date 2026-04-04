@@ -40,6 +40,8 @@ import type { HostType } from '../../utils/hostTypeUtils';
 import { PropertyMapView } from '../../components/PropertyMapView';
 import { RhomeAISheet } from '../../components/RhomeAISheet';
 import { RhomeLogo } from '../../components/RhomeLogo';
+import { AppHeader, HeaderIconButton } from '../../components/AppHeader';
+import { AIFloatingButton } from '../../components/AIFloatingButton';
 import { NeighborhoodAISheet } from '../../components/NeighborhoodAISheet';
 import { PropertyReviewsScreen } from '../shared/PropertyReviewsScreen';
 import { WriteReviewSheet } from '../../components/WriteReviewSheet';
@@ -1607,45 +1609,45 @@ export const ExploreScreen = () => {
 
   return (
     <View style={[styles.container, { backgroundColor: BG }]}>
-      <View style={[styles.exploreHeaderRow, { paddingTop: insets.top + 12 }]}>
-        <RhomeLogo variant="icon-only" size="sm" />
-        <Pressable style={styles.aiBtnWrap} onPress={() => setShowAISheet(true)}>
-          <LinearGradient colors={['#ff6b5b', '#ff8c7a']} style={styles.aiBtn}>
-            <Feather name="cpu" size={15} color="#fff" />
-            <Text style={styles.aiBtnText}>AI</Text>
-          </LinearGradient>
-        </Pressable>
-
-        <Pressable style={styles.locationPickerBtn} onPress={() => setShowLocationSheet(true)}>
-          <Feather name="map-pin" size={14} color={ACCENT} />
-          <View style={styles.locationPickerText}>
-            <Text style={styles.locationCity} numberOfLines={1}>{activeCity || 'Select City'}</Text>
-            {selectedNeighborhood
-              ? <Text style={styles.locationNeighborhood} numberOfLines={1}>{selectedNeighborhood}</Text>
-              : <Text style={styles.locationNeighborhood}>{filteredProperties.length} listing{filteredProperties.length !== 1 ? 's' : ''}</Text>
-            }
+      <AppHeader
+        title=""
+        role="renter"
+        hideSeparator
+        rightActions={
+          <>
+            <AIFloatingButton onPress={() => setShowAISheet(true)} position="inline" />
+            <HeaderIconButton
+              icon={displayMode === 'list' ? 'map' : 'list'}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setDisplayMode(displayMode === 'list' ? 'map' : 'list');
+              }}
+              active={displayMode === 'map'}
+            />
+            <HeaderIconButton
+              icon="sliders"
+              onPress={handleFilterPress}
+              badge={hasActiveFilters()}
+              active={hasActiveFilters()}
+            />
+          </>
+        }
+        bottomContent={
+          <View style={{ paddingHorizontal: 16 }}>
+            <Pressable style={styles.locationPickerBtn} onPress={() => setShowLocationSheet(true)}>
+              <Feather name="map-pin" size={14} color={ACCENT} />
+              <View style={styles.locationPickerText}>
+                <Text style={styles.locationCity} numberOfLines={1}>{activeCity || 'Select City'}</Text>
+                {selectedNeighborhood
+                  ? <Text style={styles.locationNeighborhood} numberOfLines={1}>{selectedNeighborhood}</Text>
+                  : <Text style={styles.locationNeighborhood}>{filteredProperties.length} listing{filteredProperties.length !== 1 ? 's' : ''}</Text>
+                }
+              </View>
+              <Feather name="chevron-down" size={14} color="rgba(255,255,255,0.4)" />
+            </Pressable>
           </View>
-          <Feather name="chevron-down" size={14} color="rgba(255,255,255,0.4)" />
-        </Pressable>
-
-        <Pressable
-          style={[styles.headerIconBtn, displayMode === 'map' && styles.headerIconBtnActive]}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            setDisplayMode(displayMode === 'list' ? 'map' : 'list');
-          }}
-        >
-          <Feather
-            name={displayMode === 'list' ? 'map' : 'list'}
-            size={18}
-            color={displayMode === 'map' ? '#ff6b5b' : 'rgba(255,255,255,0.6)'}
-          />
-        </Pressable>
-        <Pressable style={[styles.headerIconBtn, hasActiveFilters() ? styles.headerIconBtnActive : null]} onPress={handleFilterPress}>
-          <Feather name="sliders" size={18} color={hasActiveFilters() ? ACCENT : 'rgba(255,255,255,0.6)'} />
-          {hasActiveFilters() ? <View style={styles.filterDot} /> : null}
-        </Pressable>
-      </View>
+        }
+      />
       <Animated.View style={collapsibleAnimStyle}>
 
         <View style={styles.tabsRow}>

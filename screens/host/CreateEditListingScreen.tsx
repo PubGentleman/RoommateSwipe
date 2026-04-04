@@ -18,6 +18,7 @@ import { formatDate } from '../../utils/dateUtils';
 import { geocodeAddress } from '../../utils/transitService';
 import { fetchAreaInfo } from '../../services/neighborhoodService';
 import { NEIGHBORHOOD_TRAINS, SUBWAY_LINE_COLORS } from '../../constants/transitData';
+import { AppHeader } from '../../components/AppHeader';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -1902,20 +1903,13 @@ export const CreateEditListingScreen = () => {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#0d0d0d' }}>
-      <View style={[wiz.topBar, { paddingTop: insets.top + 8 }]}>
-        <Pressable onPress={handleBack} style={wiz.topBarBackBtn}>
-          <Feather name="arrow-left" size={22} color="rgba(255,255,255,0.8)" />
-        </Pressable>
-        <View style={{ flex: 1, alignItems: 'center' }}>
-          <Text style={wiz.topBarTitle} numberOfLines={1}>
-            {currentStepData?.title || (isEditing ? 'Edit Listing' : 'New Listing')}
-          </Text>
-          <Text style={wiz.topBarStepIndicator}>
-            Step {currentStep + 1} of {steps.length}
-          </Text>
-        </View>
-        <View style={{ width: 40 }} />
-      </View>
+      <AppHeader
+        mode="back"
+        title={currentStepData?.title || (isEditing ? 'Edit Listing' : 'New Listing')}
+        subtitle={`Step ${currentStep + 1} of ${steps.length}`}
+        onBack={handleBack}
+        hideSeparator
+      />
 
       <View style={wiz.progressBar}>
         {steps.map((step, i) => (

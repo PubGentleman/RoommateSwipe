@@ -14,6 +14,7 @@ import { getMyListings, mapListingToProperty, updateListing, deleteListing as de
 import { getReceivedInterestCards } from '../../services/discoverService';
 import { RhomeAISheet } from '../../components/RhomeAISheet';
 import { AIFloatingButton } from '../../components/AIFloatingButton';
+import { AppHeader, HeaderActionButton } from '../../components/AppHeader';
 import { isListingBoosted } from '../../utils/hostPricing';
 import { canUseBoosts, hasVerifiedBadge as planHasVerifiedBadge } from '../../utils/planGates';
 import { type HostPlan, getAgentPlanLimits, type AgentPlan } from '../../constants/planLimits';
@@ -636,37 +637,30 @@ export const MyListingsScreen = () => {
 
   return (
     <View style={[styles.container, { backgroundColor: BG }]}>
-      <View style={[styles.topNav, { paddingTop: insets.top + 14 }]}>
-        <View>
-          <Text style={styles.topTitle}>My Listings</Text>
-          <Text style={styles.topSub}>
-            {nonArchivedListings.length} listing{nonArchivedListings.length !== 1 ? 's' : ''} · {activeCount} active
-          </Text>
-        </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          {canUseAI ? <AIFloatingButton onPress={() => setShowAISheet(true)} position="inline" /> : null}
-        <Pressable onPress={() => {
-          const result = canAddListing(activeCount);
-          if (!result.allowed) {
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-            setLimitMessage(result.reason || 'You have reached your listing limit.');
-            setShowLimitModal(true);
-            return;
-          }
-          navigation.navigate('CreateEditListing');
-        }}>
-          <LinearGradient
-            colors={[ACCENT, '#e83a2a']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.addBtn}
-          >
-            <Feather name="plus" size={13} color="#fff" />
-            <Text style={styles.addBtnText}>Add Listing</Text>
-          </LinearGradient>
-        </Pressable>
-        </View>
-      </View>
+      <AppHeader
+        title="My Listings"
+        subtitle={`${nonArchivedListings.length} listing${nonArchivedListings.length !== 1 ? 's' : ''} · ${activeCount} active`}
+        hideSeparator
+        rightActions={
+          <>
+            {canUseAI ? <AIFloatingButton onPress={() => setShowAISheet(true)} position="inline" /> : null}
+            <HeaderActionButton
+              label="Add Listing"
+              icon="plus"
+              onPress={() => {
+                const result = canAddListing(activeCount);
+                if (!result.allowed) {
+                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+                  setLimitMessage(result.reason || 'You have reached your listing limit.');
+                  setShowLimitModal(true);
+                  return;
+                }
+                navigation.navigate('CreateEditListing');
+              }}
+            />
+          </>
+        }
+      />
 
       <View style={styles.filterTabs}>
         {filterTabs.map(tab => (

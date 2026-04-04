@@ -17,6 +17,7 @@ import { updateGroup } from '../../services/groupService';
 import { supabase } from '../../lib/supabase';
 import { RhomeAISheet } from '../../components/RhomeAISheet';
 import { getAgentPlanLimits, type AgentPlan } from '../../constants/planLimits';
+import { AppHeader, HeaderActionButton } from '../../components/AppHeader';
 
 type FilterStatus = 'all' | 'pending' | 'accepted' | 'passed';
 
@@ -459,25 +460,20 @@ export const HostInquiriesScreen = () => {
   return (
     <ScreenScrollView>
       <View style={styles.container}>
-        <View style={styles.headerRow}>
-          <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
-            <Feather name="chevron-left" size={26} color="#fff" />
-          </Pressable>
-          <Text style={styles.headerTitle}>Inquiries</Text>
-          {canUseAI ? (
-            <Pressable style={styles.aiBtn} onPress={() => setShowAISheet(true)}>
-              <LinearGradient
-                colors={['#ff6b5b', '#ff8c7a']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.aiBtnInner}
-              >
-                <Feather name="cpu" size={13} color="#fff" />
-                <Text style={styles.aiBtnText}>AI Sort</Text>
-              </LinearGradient>
-            </Pressable>
-          ) : null}
-        </View>
+        <AppHeader
+          mode="back"
+          title="Inquiries"
+          hideSeparator
+          rightActions={
+            canUseAI ? (
+              <HeaderActionButton
+                label="AI Sort"
+                icon="cpu"
+                onPress={() => setShowAISheet(true)}
+              />
+            ) : null
+          }
+        />
 
         <View style={styles.statsRow}>
           <View style={styles.statCard}>

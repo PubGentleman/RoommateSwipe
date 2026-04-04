@@ -25,6 +25,7 @@ import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { shouldLoadMockData } from '../../utils/dataUtils';
 import { InvitePreviewSheet } from '../../components/InvitePreviewSheet';
 import { AgentRenter } from '../../services/agentMatchmakerService';
+import { AppHeader, HeaderActionButton } from '../../components/AppHeader';
 import {
   getAgentGroupJoinRequests,
   approveAgentGroupRequest,
@@ -744,21 +745,23 @@ export const AgentGroupsScreen = () => {
   };
 
   return (
-    <View style={[st.container, { paddingTop: insets.top }]}>
-      <View style={st.header}>
-        <Text style={st.title}>My Groups</Text>
-        <Pressable
-          style={st.newGroupBtn}
-          onPress={() => {
-            const parent = navigation.getParent();
-            if (parent) parent.navigate('BrowseRenters');
-            else navigation.navigate('BrowseRenters' as never);
-          }}
-        >
-          <Feather name="plus" size={16} color="#000" />
-          <Text style={{ color: '#000', fontWeight: '700', fontSize: 14 }}>New</Text>
-        </Pressable>
-      </View>
+    <View style={[st.container, { paddingTop: 0 }]}>
+      <AppHeader
+        title="My Groups"
+        hideSeparator
+        rightActions={
+          <HeaderActionButton
+            label="New"
+            icon="plus"
+            variant="secondary"
+            onPress={() => {
+              const parent = navigation.getParent();
+              if (parent) parent.navigate('BrowseRenters');
+              else navigation.navigate('BrowseRenters' as never);
+            }}
+          />
+        }
+      />
 
       {renderPipelineBar()}
 

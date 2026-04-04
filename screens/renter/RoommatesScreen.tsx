@@ -29,6 +29,7 @@ import { PaywallSheet } from '../../components/PaywallSheet';
 import { VerificationBadgeInline, getVerificationLevel } from '../../components/VerificationBadge';
 import { LinearGradient } from 'expo-linear-gradient';
 import { RhomeLogo } from '../../components/RhomeLogo';
+import { AppHeader, HeaderIconButton } from '../../components/AppHeader';
 import { RoommateFilterSheet, MatchFilters, DEFAULT_FILTERS, getActiveFilterCount, getActiveFilterChips, removeFilterChip, loadSavedFilters, saveFilters, applyFiltersToProfiles } from '../../components/RoommateFilterSheet';
 import { PlanBadge } from '../../components/PlanBadge';
 import { normalizeRenterPlan, getRenterPlanLimits, canSwipe } from '../../constants/renterPlanLimits';
@@ -1235,14 +1236,12 @@ export const RoommatesScreen = () => {
     </Modal>
   );
 
+  const isProfileBoosted = !!(user?.boostData?.isBoosted && user?.boostData?.boostExpiresAt && !isBoostExpired(String(user.boostData.boostExpiresAt)));
+
   if (showCityPrompt && !activeCity) {
     return (
       <View style={[styles.container, { backgroundColor: '#141414' }]}>
-        <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
-          <View style={{ width: 42 }} />
-          <RhomeLogo variant="horizontal" size="sm" onPress={() => (navigation as any).getParent?.()?.navigate?.('Explore')} />
-          <View style={{ width: 42 }} />
-        </View>
+        <AppHeader title="Roommates" role="renter" hideSeparator />
         <View style={styles.emptyState}>
           <Feather name="map-pin" size={64} color="#ff4d4d" />
           <ThemedText style={[Typography.h2, styles.emptyTitle, { color: '#FFFFFF' }]}>
@@ -1277,11 +1276,7 @@ export const RoommatesScreen = () => {
   if (isLoading) {
     return (
       <View style={[styles.container, { backgroundColor: '#141414' }]}>
-        <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
-          <View style={{ width: 42 }} />
-          <RhomeLogo variant="horizontal" size="sm" onPress={() => (navigation as any).getParent?.()?.navigate?.('Explore')} />
-          <View style={{ width: 42 }} />
-        </View>
+        <AppHeader title="Roommates" role="renter" hideSeparator />
         {renderCitySelector()}
         <View style={styles.emptyState}>
           <Feather name="loader" size={64} color="rgba(255,255,255,0.35)" />
@@ -1305,29 +1300,31 @@ export const RoommatesScreen = () => {
   if (!currentProfile) {
     return (
       <View style={[styles.container, { backgroundColor: '#141414' }]}>
-        <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
-          <RhomeLogo variant="horizontal" size="sm" onPress={() => (navigation as any).getParent?.()?.navigate?.('Explore')} />
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <Pressable onPress={() => {
-              if (user?.boostData?.isBoosted && user?.boostData?.boostExpiresAt && !isBoostExpired(String(user.boostData.boostExpiresAt))) {
-                setBoostTimeLabel(getBoostTimeRemaining(user.boostData.boostExpiresAt));
-              }
-              setShowBoostModal(true);
-            }} style={styles.navIconBtn}>
-              <View style={[styles.navIconBtnInner, user?.boostData?.isBoosted && user?.boostData?.boostExpiresAt && !isBoostExpired(String(user.boostData.boostExpiresAt))
-                ? { backgroundColor: '#FFD700' }
-                : { backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }
-              ]}>
-                <Feather name="zap" size={18} color={user?.boostData?.isBoosted && user?.boostData?.boostExpiresAt && !isBoostExpired(String(user.boostData.boostExpiresAt)) ? '#000000' : '#FFD700'} />
-              </View>
-            </Pressable>
-            <Pressable onPress={() => (navigation as any).navigate('Notifications')} style={styles.navIconBtn}>
-              <View style={[styles.navIconBtnInner, { backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }]}>
-                <Feather name="bell" size={18} color="#FFFFFF" />
-              </View>
-            </Pressable>
-          </View>
-        </View>
+        <AppHeader
+          title="Roommates"
+          role="renter"
+          hideSeparator
+          rightActions={
+            <>
+              <HeaderIconButton
+                icon="zap"
+                onPress={() => {
+                  if (user?.boostData?.isBoosted && user?.boostData?.boostExpiresAt && !isBoostExpired(String(user.boostData.boostExpiresAt))) {
+                    setBoostTimeLabel(getBoostTimeRemaining(user.boostData.boostExpiresAt));
+                  }
+                  setShowBoostModal(true);
+                }}
+                color={isProfileBoosted ? '#FFD700' : undefined}
+                active={isProfileBoosted}
+                activeColor="#FFD700"
+              />
+              <HeaderIconButton
+                icon="bell"
+                onPress={() => (navigation as any).navigate('Notifications')}
+              />
+            </>
+          }
+        />
         {renderCitySelector()}
         <AIInsightBanner
           onPress={() => (navigation as any).navigate('AIAssistant')}
@@ -1548,29 +1545,31 @@ export const RoommatesScreen = () => {
 
   return (
     <View style={[styles.container, { backgroundColor: '#141414' }]}>
-      <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
-        <RhomeLogo variant="horizontal" size="sm" onPress={() => (navigation as any).getParent?.()?.navigate?.('Explore')} />
-        <View style={{ flexDirection: 'row', gap: 8 }}>
-          <Pressable onPress={() => {
-            if (user?.boostData?.isBoosted && user?.boostData?.boostExpiresAt && !isBoostExpired(String(user.boostData.boostExpiresAt))) {
-              setBoostTimeLabel(getBoostTimeRemaining(user.boostData.boostExpiresAt));
-            }
-            setShowBoostModal(true);
-          }} style={styles.navIconBtn}>
-            <View style={[styles.navIconBtnInner, user?.boostData?.isBoosted && user?.boostData?.boostExpiresAt && !isBoostExpired(String(user.boostData.boostExpiresAt))
-              ? { backgroundColor: '#FFD700' }
-              : { backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }
-            ]}>
-              <Feather name="zap" size={18} color={user?.boostData?.isBoosted && user?.boostData?.boostExpiresAt && !isBoostExpired(String(user.boostData.boostExpiresAt)) ? '#000000' : '#FFD700'} />
-            </View>
-          </Pressable>
-          <Pressable onPress={() => (navigation as any).navigate('Notifications')} style={styles.navIconBtn}>
-            <View style={[styles.navIconBtnInner, { backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }]}>
-              <Feather name="bell" size={18} color="#FFFFFF" />
-            </View>
-          </Pressable>
-        </View>
-      </View>
+      <AppHeader
+        title="Roommates"
+        role="renter"
+        hideSeparator
+        rightActions={
+          <>
+            <HeaderIconButton
+              icon="zap"
+              onPress={() => {
+                if (user?.boostData?.isBoosted && user?.boostData?.boostExpiresAt && !isBoostExpired(String(user.boostData.boostExpiresAt))) {
+                  setBoostTimeLabel(getBoostTimeRemaining(user.boostData.boostExpiresAt));
+                }
+                setShowBoostModal(true);
+              }}
+              color={isProfileBoosted ? '#FFD700' : undefined}
+              active={isProfileBoosted}
+              activeColor="#FFD700"
+            />
+            <HeaderIconButton
+              icon="bell"
+              onPress={() => (navigation as any).navigate('Notifications')}
+            />
+          </>
+        }
+      />
 
       {renderCitySelector()}
 

@@ -22,6 +22,7 @@ import { getZodiacSymbol } from '../../utils/zodiacUtils';
 import { AdBanner } from '../../components/AdBanner';
 import { LinearGradient } from 'expo-linear-gradient';
 import { AIFloatingButton } from '../../components/AIFloatingButton';
+import { AppHeader } from '../../components/AppHeader';
 import { getGroupsHealth, GroupHealthResult } from '../../utils/groupHealthScore';
 import { getAllGroupQuickStats, GroupQuickStats } from '../../utils/groupQuickStats';
 import { normalizeRenterPlan, getRenterPlanLimits } from '../../constants/renterPlanLimits';
@@ -1608,10 +1609,15 @@ export const GroupsScreen = () => {
 
 
   return (
-    <View style={[styles.container, { backgroundColor: '#111111', paddingTop: insets.top, paddingBottom: insets.bottom + 80 }]}>
-      <View style={styles.groupsTopNav}>
-        <AIFloatingButton onPress={() => setShowAISheet(true)} position="inline" />
-      </View>
+    <View style={[styles.container, { backgroundColor: '#111111', paddingTop: 0, paddingBottom: insets.bottom + 80 }]}>
+      <AppHeader
+        title="Groups"
+        role="renter"
+        hideSeparator
+        rightActions={
+          <AIFloatingButton onPress={() => setShowAISheet(true)} position="inline" />
+        }
+      />
 
       <View style={styles.tabBar}>
         {(['my-groups', 'discover', 'create'] as Tab[]).map((tab) => {

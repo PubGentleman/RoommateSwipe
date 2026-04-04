@@ -50,6 +50,7 @@ import {
 import { NEIGHBORHOOD_TRAINS } from '../../constants/transitData';
 import { resolveEffectiveAgentPlan, resolveEffectiveCompanyPlan } from '../../utils/planResolver';
 import { InvitePreviewSheet } from '../../components/InvitePreviewSheet';
+import { AppHeader, HeaderActionButton } from '../../components/AppHeader';
 
 const BG = '#0d0d0d';
 const CARD_BG = '#151515';
@@ -1486,23 +1487,20 @@ export const BrowseRentersScreen = () => {
   );
 
   return (
-    <View style={[st.container, { paddingTop: insets.top }]}>
-      <View style={st.header}>
-        <Text style={st.title}>Browse Renters</Text>
-        {selectedForGroup.size > 0 ? (
-          <Pressable onPress={() => openGroupNamePrompt('build')}>
-            <LinearGradient
-              colors={[ACCENT, RED]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={st.buildGroupGradient}
-            >
-              <Feather name="users" size={16} color="#fff" />
-              <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>Build Group ({selectedForGroup.size})</Text>
-            </LinearGradient>
-          </Pressable>
-        ) : null}
-      </View>
+    <View style={[st.container, { paddingTop: 0 }]}>
+      <AppHeader
+        title="Browse Renters"
+        hideSeparator
+        rightActions={
+          selectedForGroup.size > 0 ? (
+            <HeaderActionButton
+              label={`Build Group (${selectedForGroup.size})`}
+              icon="users"
+              onPress={() => openGroupNamePrompt('build')}
+            />
+          ) : null
+        }
+      />
 
       {loading ? (
         <ActivityIndicator size="large" color={ACCENT} style={{ marginTop: 40 }} />
