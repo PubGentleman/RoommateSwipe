@@ -278,7 +278,7 @@ export const SinglePricePicker: React.FC<SinglePricePickerProps> = ({
 );
 
 const RENT_OPTIONS: { label: string; value: number }[] = [];
-for (let v = 500; v <= 10000; v += v < 3000 ? 250 : 500) {
+for (let v = 500; v <= 10000; v += 100) {
   RENT_OPTIONS.push({ label: `$${v.toLocaleString()}`, value: v });
 }
 RENT_OPTIONS.push({ label: '$10,000+', value: 10001 });
