@@ -221,6 +221,13 @@ export const HostSubscriptionScreen = () => {
   const handleConfirmSubscription = async () => {
     if (!selectedPlan || !user || !hostSub) return;
     setSubscribing(true);
+
+    const safetyTimeout = setTimeout(() => {
+      setSubscribing(false);
+      setSelectedPlan(null);
+      showAlert({ title: 'Timed Out', message: 'This is taking too long. Please check your connection and try again.', variant: 'warning' });
+    }, 30000);
+
     try {
       const rawPlan = selectedPlan as string;
       const alreadyPrefixed = rawPlan.startsWith('agent_') || rawPlan.startsWith('company_');
@@ -265,13 +272,17 @@ export const HostSubscriptionScreen = () => {
         createdAt: new Date(),
         data: { plan: storedPlan },
       });
+      clearTimeout(safetyTimeout);
       const successMsg = `You're now on the ${planData.label} plan at $${price}/mo!`;
       await showAlert({ title: 'Plan Updated', message: successMsg, variant: 'success' });
       navigation.goBack();
     } catch (e) {
+      clearTimeout(safetyTimeout);
       console.error(e);
+      await showAlert({ title: 'Error', message: 'Failed to update your plan. Please try again.', variant: 'warning' });
     } finally {
       setSubscribing(false);
+      setSelectedPlan(null);
     }
   };
 

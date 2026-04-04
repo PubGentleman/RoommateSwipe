@@ -125,7 +125,7 @@ export const PlanSelectionScreen = () => {
   const [showConfirm, setShowConfirm] = useState(false);
   const [processing, setProcessing] = useState(false);
 
-  const isHost = user?.role === 'host';
+  const isHost = user?.role === 'host' || !!user?.hostType || !!user?.hostTypeLockedAt;
   const hostType = (user?.hostType as HostType) ?? 'individual';
   const plans = useMemo(() => isHost ? buildHostPlans(hostType) : RENTER_PLANS, [isHost, hostType]);
 
@@ -160,14 +160,22 @@ export const PlanSelectionScreen = () => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } catch {}
 
+    const safetyTimeout = setTimeout(() => {
+      setProcessing(false);
+      setShowConfirm(false);
+      alert({ title: 'Timed Out', message: 'Payment is taking too long. Please check your connection and try again.', variant: 'warning' });
+    }, 60000);
+
     try {
       const stripePlan = planId;
       const planType = isHost ? 'host' : 'renter';
       const { success, subscriptionId } = await processPayment(user.id, user.email || '', stripePlan, billingCycle, planType as any);
 
       if (!success) {
+        clearTimeout(safetyTimeout);
         setProcessing(false);
         setShowConfirm(false);
+        await alert({ title: 'Payment Failed', message: 'Unable to process payment. Please try again.', variant: 'warning' });
         return;
       }
 
@@ -178,15 +186,18 @@ export const PlanSelectionScreen = () => {
         else if (planId === 'elite') await upgradeToElite(billingCycle, subscriptionId);
       }
       await completeOnboardingStep('complete');
+      clearTimeout(safetyTimeout);
       try {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } catch {}
       await alert({ title: 'Welcome!', message: `You're now on the ${planId.charAt(0).toUpperCase() + planId.slice(1)} plan.`, variant: 'success' });
-    } catch {
+    } catch (err: any) {
+      clearTimeout(safetyTimeout);
+      await alert({ title: 'Error', message: err?.message || 'Something went wrong. Please try again.', variant: 'warning' });
+    } finally {
+      setShowConfirm(false);
       setProcessing(false);
     }
-    setShowConfirm(false);
-    setProcessing(false);
   };
 
   const selectedPlan = plans.find(p => p.id === selectedPlanId);
