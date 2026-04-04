@@ -85,6 +85,31 @@ export const CreateEditListingScreen = () => {
   const [cityResults, setCityResults] = useState<any[]>([]);
   const [cityLoading, setCityLoading] = useState(false);
   const cityDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  const [transitLoading, setTransitLoading] = useState(false);
+
+  const fetchTransitForLocation = useCallback(async (lat: number, lng: number) => {
+    setTransitLoading(true);
+    try {
+      const stops = await fetchNearbyTransit(lat, lng);
+      if (stops.length > 0) {
+        const summary = stops
+          .slice(0, 5)
+          .map(stop => {
+            const label = (stop.type || 'stop').charAt(0).toUpperCase() + (stop.type || 'stop').slice(1);
+            const walkMin = Math.round((stop.distanceMiles || 0) * 20);
+            return `${label}: ${stop.name} (${walkMin} min walk)`;
+          })
+          .join('\n');
+        setTransitOverride(prev => prev.trim() ? prev : summary);
+      } else {
+        setTransitOverride(prev => prev.trim() ? prev : 'No major transit stations found nearby');
+      }
+    } catch (err) {
+      console.warn('Transit auto-detect failed:', err);
+    } finally {
+      setTransitLoading(false);
+    }
+  }, []);
 
   const searchAddress = useCallback(async (text: string) => {
     if (text.length < 3) { setAddressResults([]); return; }
@@ -120,9 +145,14 @@ export const CreateEditListingScreen = () => {
     if (stateName) setState(stateName);
     if (neighborhoodName) setNeighborhood(neighborhoodName);
     if (zip) setZipCode(zip);
-    if (result.lat && result.lon) setCoordinates({ lat: parseFloat(result.lat), lng: parseFloat(result.lon) });
+    if (result.lat && result.lon) {
+      const lat = parseFloat(result.lat);
+      const lng = parseFloat(result.lon);
+      setCoordinates({ lat, lng });
+      fetchTransitForLocation(lat, lng);
+    }
     setAddressResults([]);
-  }, []);
+  }, [fetchTransitForLocation]);
 
   const searchCity = useCallback(async (text: string) => {
     if (text.length < 2) { setCityResults([]); return; }
@@ -429,10 +459,13 @@ export const CreateEditListingScreen = () => {
         }
         if (coords) {
           savedCoords = coords;
-          const stops = await fetchNearbyTransit(coords.lat, coords.lng);
+          let stops: any[] = [];
+          if (!override) {
+            stops = await fetchNearbyTransit(coords.lat, coords.lng);
+          }
           transitInfo = {
             stops,
-            noTransitNearby: stops.length === 0,
+            noTransitNearby: stops.length === 0 && !override,
             manualOverride: override,
             fetchedAt: new Date().toISOString(),
           };
@@ -939,19 +972,29 @@ export const CreateEditListingScreen = () => {
       </View>
 
       <View style={styles.fieldContainer}>
-        <Text style={styles.label}>Transportation (optional)</Text>
-        <Text style={wiz.hintText}>
-          We auto-detect nearby transit from your address. Override below if needed.
+        <Text style={styles.label}>
+          Transportation {transitLoading ? '' : '(optional)'}
         </Text>
+        {transitLoading ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <ActivityIndicator size="small" color="#ff6b5b" />
+            <Text style={{ color: '#888', fontSize: 13 }}>Detecting nearby transit...</Text>
+          </View>
+        ) : (
+          <Text style={wiz.hintText}>
+            {transitOverride ? 'Auto-detected from your address. Edit if needed.' : 'We auto-detect nearby transit from your address. Override below if needed.'}
+          </Text>
+        )}
         <TextInput
-          style={[styles.input, styles.multilineInput, { minHeight: 60 }]}
+          style={[styles.input, styles.multilineInput, { minHeight: 80 }]}
           placeholder="e.g. Near Metro Line 2, Bus Route 40, 5 min walk to station"
           placeholderTextColor="#666"
           value={transitOverride}
           onChangeText={setTransitOverride}
           multiline
-          numberOfLines={2}
+          numberOfLines={3}
           textAlignVertical="top"
+          editable={!transitLoading}
         />
       </View>
     </View>
