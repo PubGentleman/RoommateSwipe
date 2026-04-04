@@ -383,6 +383,20 @@ export const HostAnalyticsScreen = () => {
         <Feather name="chevron-right" size={16} color="rgba(255,255,255,0.3)" />
       </Pressable>
 
+      <Pressable
+        style={[styles.card, { backgroundColor: CARD_BG, marginBottom: Spacing.md, flexDirection: 'row', alignItems: 'center', gap: 12 }]}
+        onPress={() => navigation.navigate('ComparativeInsights')}
+      >
+        <View style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: 'rgba(108,92,231,0.12)', alignItems: 'center', justifyContent: 'center' }}>
+          <Feather name="bar-chart" size={18} color="#6C5CE7" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <ThemedText type="h3">How You Compare</ThemedText>
+          <ThemedText style={{ color: '#888', fontSize: 12 }}>Price, engagement, response time</ThemedText>
+        </View>
+        <Feather name="chevron-right" size={16} color="rgba(255,255,255,0.3)" />
+      </Pressable>
+
       <ThemedText type="h2" style={styles.sectionTitle}>Per-Listing Breakdown</ThemedText>
       {perListingInquiries.length === 0 ? (
         <View style={[styles.card, { backgroundColor: CARD_BG, alignItems: 'center', paddingVertical: Spacing.xxl }]}>

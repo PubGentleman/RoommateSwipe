@@ -237,6 +237,14 @@ export const ListingPerformanceScreen = () => {
               <Feather name="zap" size={16} color="#fff" />
               <Text style={styles.boostCtaText}>Boost This Listing</Text>
             </Pressable>
+
+            <Pressable
+              style={styles.compareCta}
+              onPress={() => navigation.navigate('ComparativeInsights', { listingId })}
+            >
+              <Feather name="bar-chart" size={16} color="#6C5CE7" />
+              <Text style={styles.compareCtaText}>Compare to Area</Text>
+            </Pressable>
           </>
         ) : null}
       </ScreenScrollView>
@@ -376,6 +384,12 @@ const styles = StyleSheet.create({
     marginHorizontal: 16, marginTop: 20,
   },
   boostCtaText: { fontSize: 15, fontWeight: '700', color: '#fff' },
+  compareCta: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    backgroundColor: 'rgba(108,92,231,0.12)', borderRadius: 14, paddingVertical: 14,
+    marginHorizontal: 16, marginTop: 10,
+  },
+  compareCtaText: { fontSize: 15, fontWeight: '700', color: '#6C5CE7' },
   chartCard: {
     backgroundColor: CARD_BG, borderRadius: 14, padding: 16,
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',

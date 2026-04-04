@@ -39,6 +39,7 @@ import { HostListingDetailScreen } from '../screens/host/HostListingDetailScreen
 import { ListingPerformanceScreen } from '../screens/host/ListingPerformanceScreen';
 import { InquiryTrendsScreen } from '../screens/host/InquiryTrendsScreen';
 import { RevenueOverviewScreen } from '../screens/host/RevenueOverviewScreen';
+import { ComparativeInsightsScreen } from '../screens/host/ComparativeInsightsScreen';
 import { useTheme } from '../hooks/useTheme';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotificationContext } from '../contexts/NotificationContext';
@@ -77,6 +78,7 @@ export type HostDashboardStackParamList = {
   ListingPerformance: { listingId: string };
   InquiryTrends: undefined;
   RevenueOverview: undefined;
+  ComparativeInsights: { listingId?: string } | undefined;
 };
 
 export type HostGroupsStackParamList = {
@@ -146,6 +148,7 @@ function DashboardStackNavigator() {
       <DashboardStack.Screen name="ListingPerformance" component={ListingPerformanceScreen} />
       <DashboardStack.Screen name="InquiryTrends" component={InquiryTrendsScreen} />
       <DashboardStack.Screen name="RevenueOverview" component={RevenueOverviewScreen} />
+      <DashboardStack.Screen name="ComparativeInsights" component={ComparativeInsightsScreen} />
     </DashboardStack.Navigator>
   );
 }
@@ -160,6 +163,7 @@ function ListingsStackNavigator() {
       <ListingsStack.Screen name="HostGroupOutreach" component={HostGroupOutreachScreen} />
       <ListingsStack.Screen name="InviteExistingRoommates" component={InviteExistingRoommatesScreen} />
       <ListingsStack.Screen name="ListingPerformance" component={ListingPerformanceScreen} />
+      <ListingsStack.Screen name="ComparativeInsights" component={ComparativeInsightsScreen} />
     </ListingsStack.Navigator>
   );
 }
