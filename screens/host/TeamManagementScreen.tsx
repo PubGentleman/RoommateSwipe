@@ -111,7 +111,7 @@ export function TeamManagementScreen() {
   };
 
   const renderMember = ({ item }: { item: TeamMember }) => (
-    <View style={[styles.memberRow, { backgroundColor: theme.card, borderColor: theme.border }]}>
+    <View style={[styles.memberRow, { backgroundColor: theme.card, borderColor: theme.border }, menuMemberId === item.id ? { zIndex: 100 } : null]}>
       <View style={[styles.avatar, { backgroundColor: getRoleBadgeColor(item.role) + '25' }]}>
         <Text style={[styles.avatarText, { color: getRoleBadgeColor(item.role) }]}>
           {getInitials(item.fullName, item.email)}
@@ -455,9 +455,9 @@ const styles = StyleSheet.create({
     top: 52,
     borderRadius: 10,
     borderWidth: 1,
-    overflow: 'hidden',
-    zIndex: 10,
+    zIndex: 100,
     minWidth: 160,
+    elevation: 10,
   },
   menuItem: {
     flexDirection: 'row',
