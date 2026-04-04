@@ -1359,6 +1359,22 @@ export const HostDashboardScreen = () => {
           <Feather name="chevron-right" size={16} color="rgba(255,255,255,0.3)" />
         </Pressable>
 
+        {!user?.identity_verified && !user?.verification?.government_id?.verified ? (
+          <Pressable
+            style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(108,92,231,0.08)', borderRadius: 14, padding: 14, marginHorizontal: 16, marginBottom: 8, gap: 12 }}
+            onPress={() => navigation.navigate('Verification' as any)}
+          >
+            <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: 'rgba(108,92,231,0.15)', alignItems: 'center', justifyContent: 'center' }}>
+              <Feather name="shield" size={18} color="#6C5CE7" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: '#fff', fontSize: 14, fontWeight: '600' }}>Verify your identity</Text>
+              <Text style={{ color: '#999', fontSize: 12, marginTop: 2 }}>Verified hosts get 2x more inquiries</Text>
+            </View>
+            <Feather name="chevron-right" size={16} color="rgba(255,255,255,0.3)" />
+          </Pressable>
+        ) : null}
+
         <View style={[styles.sectionHeader, { marginTop: 6 }]}>
           <Text style={styles.sectionTitle}>QUICK ACTIONS</Text>
         </View>

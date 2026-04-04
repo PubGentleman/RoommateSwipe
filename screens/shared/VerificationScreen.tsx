@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, Pressable, TextInput, Modal, ActivityIndicator } from 'react-native';
+import React, { useState, useMemo } from 'react';
+import { View, StyleSheet, Pressable, TextInput, Modal, ActivityIndicator, Alert } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
 import { WebView } from 'react-native-webview';
+import { Image } from 'expo-image';
+import * as ImagePicker from 'expo-image-picker';
 import { ScreenKeyboardAwareScrollView } from '../../components/ScreenKeyboardAwareScrollView';
 import { ThemedText } from '../../components/ThemedText';
 import { useTheme } from '../../hooks/useTheme';
@@ -9,8 +11,11 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { Typography, Spacing } from '../../constants/theme';
 import { getVerificationLevel, getVerificationLabel } from '../../components/VerificationBadge';
+import { TrustBadge } from '../../components/TrustBadge';
+import { calculateTrustScore, getTrustLevelLabel } from '../../utils/trustScore';
 import { isDev } from '../../utils/envUtils';
 import { supabase } from '../../lib/supabase';
+import { submitSelfieVerification } from '../../services/backgroundCheckService';
 import { createVerificationSession } from '../../services/paymentService';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { ProfileStackParamList } from '../../navigation/ProfileStackNavigator';
@@ -37,6 +42,18 @@ export function VerificationScreen({ navigation, route }: Props) {
   const [hostIdUploading, setHostIdUploading] = useState(false);
   const [stripeVerificationUrl, setStripeVerificationUrl] = useState<string | null>(null);
   const [showStripeWebView, setShowStripeWebView] = useState(false);
+  const [selfieUri, setSelfieUri] = useState<string | null>(null);
+  const [selfieSubmitting, setSelfieSubmitting] = useState(false);
+  const [selfieResult, setSelfieResult] = useState<{ match: boolean; confidence: number } | null>(null);
+
+  const trustScore = useMemo(() => calculateTrustScore(
+    verification,
+    user?.background_check_status,
+    null,
+    0,
+    user?.createdAt,
+    user?.selfie_verified ?? verification?.selfie?.verified
+  ), [verification, user?.background_check_status, user?.createdAt, user?.selfie_verified]);
 
   const syncVerificationToSupabase = async (verificationData: any) => {
     await updateUser({ verification: verificationData });
@@ -283,6 +300,58 @@ export function VerificationScreen({ navigation, route }: Props) {
     }
   };
 
+  const handleTakeSelfie = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      await showAlert({ title: 'Camera Permission', message: 'Please allow camera access to take a selfie.', variant: 'warning' });
+      return;
+    }
+    const photo = await ImagePicker.launchCameraAsync({
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+    if (!photo.canceled && photo.assets[0]) {
+      setSelfieUri(photo.assets[0].uri);
+      setSelfieResult(null);
+    }
+  };
+
+  const handleSubmitSelfie = async () => {
+    if (!selfieUri || !user?.id) return;
+    setSelfieSubmitting(true);
+    if (isDev) {
+      setTimeout(async () => {
+        const newVerification = {
+          ...verification,
+          selfie: { verified: true, verifiedAt: new Date(), confidence: 0.95 },
+        };
+        await updateUser({ verification: newVerification, selfie_verified: true, selfie_verified_at: new Date().toISOString() });
+        await syncVerificationToSupabase(newVerification);
+        setSelfieResult({ match: true, confidence: 0.95 });
+        setSelfieSubmitting(false);
+        await showAlert({ title: 'Selfie Verified', message: 'Your selfie has been verified successfully.', variant: 'success' });
+      }, 1500);
+      return;
+    }
+    const res = await submitSelfieVerification(user.id, selfieUri);
+    if (res.success) {
+      setSelfieResult({ match: res.match, confidence: res.confidence });
+      if (res.match) {
+        const newVerification = {
+          ...verification,
+          selfie: { verified: true, verifiedAt: new Date(), confidence: res.confidence },
+        };
+        await updateUser({ verification: newVerification, selfie_verified: true, selfie_verified_at: new Date().toISOString() });
+        await syncVerificationToSupabase(newVerification);
+        await showAlert({ title: 'Selfie Verified', message: 'Your selfie has been verified successfully.', variant: 'success' });
+      }
+    } else {
+      await showAlert({ title: 'Error', message: res.error || 'Failed to verify selfie.', variant: 'warning' });
+    }
+    setSelfieSubmitting(false);
+  };
+
   const handleVerifyIncome = async () => {
     if (!isElite) return;
     const confirmed = await confirm({
@@ -333,7 +402,10 @@ export function VerificationScreen({ navigation, route }: Props) {
               </ThemedText>
             </View>
           </View>
-          <View style={[styles.progressBarBackground, { backgroundColor: theme.border }]}>
+          <View style={{ marginTop: Spacing.sm }}>
+            <TrustBadge trustScore={trustScore} size="medium" showScore />
+          </View>
+          <View style={[styles.progressBarBackground, { backgroundColor: theme.border, marginTop: Spacing.sm }]}>
             <View style={[styles.progressBarFill, { width: `${progressPercent}%`, backgroundColor: progressColor }]} />
           </View>
           <ThemedText style={[Typography.small, { color: theme.textSecondary, marginTop: Spacing.sm }]}>
@@ -476,6 +548,76 @@ export function VerificationScreen({ navigation, route }: Props) {
               <ThemedText style={[Typography.small, { color: theme.textSecondary, marginTop: Spacing.sm, textAlign: 'center' }]}>
                 Accepts driver's license, passport, or national ID card. Includes selfie matching.
               </ThemedText>
+            </View>
+          ) : null}
+        </View>
+
+        <View style={[styles.verificationItem, { backgroundColor: '#1a1a1a', borderColor: '#333333' }]}>
+          <View style={styles.verificationHeader}>
+            <View style={[styles.verificationIcon, { backgroundColor: verification?.selfie?.verified ? '#2563EB20' : '#222222' }]}>
+              <Feather name="camera" size={22} color={verification?.selfie?.verified ? '#2563EB' : theme.textSecondary} />
+            </View>
+            <View style={{ flex: 1, marginLeft: Spacing.md }}>
+              <ThemedText style={[Typography.body, { fontWeight: '600' }]}>Selfie Match</ThemedText>
+              <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>
+                Take a selfie to confirm you match your ID photo
+              </ThemedText>
+            </View>
+            {verification?.selfie?.verified ? (
+              <View style={[styles.verifiedTag, { backgroundColor: '#2563EB20' }]}>
+                <Feather name="check" size={14} color="#2563EB" />
+                <ThemedText style={[Typography.small, { color: '#2563EB', fontWeight: '600', marginLeft: 4 }]}>Verified</ThemedText>
+              </View>
+            ) : null}
+          </View>
+          {!verification?.selfie?.verified ? (
+            <View style={styles.verificationAction}>
+              {!verification?.government_id?.verified ? (
+                <View style={[styles.infoCard, { backgroundColor: '#222222', borderColor: '#333333' }]}>
+                  <Feather name="info" size={14} color={theme.textSecondary} style={{ marginRight: Spacing.sm, marginTop: 2 }} />
+                  <ThemedText style={[Typography.small, { color: theme.textSecondary, flex: 1 }]}>
+                    Complete Government ID verification first to enable selfie matching.
+                  </ThemedText>
+                </View>
+              ) : (
+                <>
+                  {selfieUri ? (
+                    <View style={{ alignItems: 'center', gap: Spacing.sm }}>
+                      <Image source={{ uri: selfieUri }} style={styles.selfieImage} />
+                      <Pressable onPress={handleTakeSelfie} style={styles.retakeButton}>
+                        <Feather name="refresh-cw" size={14} color="#fff" />
+                        <ThemedText style={[Typography.small, { color: '#fff', fontWeight: '600', marginLeft: 4 }]}>Retake</ThemedText>
+                      </Pressable>
+                    </View>
+                  ) : (
+                    <Pressable onPress={handleTakeSelfie} style={styles.takeSelfieButton}>
+                      <Feather name="camera" size={24} color="#fff" />
+                      <ThemedText style={[Typography.body, { color: '#fff', fontWeight: '600', marginTop: Spacing.xs }]}>Take Selfie</ThemedText>
+                    </Pressable>
+                  )}
+                  {selfieUri && !selfieResult ? (
+                    <Pressable
+                      onPress={handleSubmitSelfie}
+                      style={[styles.actionButton, { backgroundColor: '#6C5CE7', marginTop: Spacing.sm, opacity: selfieSubmitting ? 0.6 : 1 }]}
+                      disabled={selfieSubmitting}
+                    >
+                      {selfieSubmitting ? (
+                        <ActivityIndicator size="small" color="#FFFFFF" />
+                      ) : (
+                        <ThemedText style={[Typography.body, { color: '#FFFFFF', fontWeight: '600' }]}>Verify Selfie</ThemedText>
+                      )}
+                    </Pressable>
+                  ) : null}
+                  {selfieResult && !selfieResult.match ? (
+                    <View style={[styles.infoCard, { backgroundColor: '#ef444420', borderColor: '#ef4444' }]}>
+                      <Feather name="alert-triangle" size={14} color="#ef4444" style={{ marginRight: Spacing.sm, marginTop: 2 }} />
+                      <ThemedText style={[Typography.small, { color: '#ef4444', flex: 1 }]}>
+                        Selfie didn't match your ID. Please try again with good lighting.
+                      </ThemedText>
+                    </View>
+                  ) : null}
+                </>
+              )}
             </View>
           ) : null}
         </View>
@@ -899,6 +1041,31 @@ const styles = StyleSheet.create({
     backgroundColor: '#1a1a1a',
     borderBottomWidth: 1,
     borderBottomColor: '#333333',
+  },
+  selfieImage: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    borderWidth: 2,
+    borderColor: '#6C5CE7',
+  },
+  retakeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  takeSelfieButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 24,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#6C5CE7',
+    borderStyle: 'dashed',
+    backgroundColor: 'rgba(108,92,231,0.08)',
   },
   stripeWebViewFooter: {
     flexDirection: 'row',

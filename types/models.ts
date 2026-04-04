@@ -405,6 +405,26 @@ export interface VerificationStatus {
     verified: boolean;
     verifiedAt?: Date;
   };
+  selfie?: {
+    verified: boolean;
+    verifiedAt?: Date;
+    confidence?: number;
+  };
+}
+
+export interface TrustScore {
+  overall: number;
+  breakdown: {
+    phoneVerified: number;
+    idVerified: number;
+    selfieVerified: number;
+    socialVerified: number;
+    backgroundCheck: number;
+    reviewScore: number;
+    accountAge: number;
+  };
+  level: 'unverified' | 'basic' | 'verified' | 'trusted' | 'fully_trusted';
+  badgeColor: string;
 }
 
 export interface User {
@@ -644,6 +664,8 @@ export interface User {
   references?: Reference[];
   identity_verified?: boolean;
   identity_verified_at?: string;
+  selfie_verified?: boolean;
+  selfie_verified_at?: string;
   background_check_status?: 'none' | 'pending' | 'clear' | 'flagged';
   background_check_completed_at?: string;
   notificationPreferences?: {
@@ -683,6 +705,7 @@ export interface User {
       allergiesRestrictions?: string;
     };
   };
+  createdAt?: string;
 }
 
 export interface InterestCard {

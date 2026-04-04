@@ -40,7 +40,7 @@ The application is built with React Native, Expo, and TypeScript. React Navigati
 -   **Pi Demand Intelligence:** Aggregates anonymous renter activity for market insights.
 -   **Contact Info Protection:** Platform-level contact information blurring in chat for free users.
 -   **Agent/Company Messaging Paywall:** Blurred message previews for free-tier agents/companies.
--   **Verification & Safety:** Features Instagram verification, multi-photo enforcement, chat leakage detection, background checks, identity verification, a References System, Agent License Verification, email domain blocking, email verification, password recovery, and a comprehensive block/report system.
+-   **Verification & Safety:** Features Instagram verification, multi-photo enforcement, chat leakage detection, background checks, identity verification (with selfie match step), a References System, Agent License Verification, email domain blocking, email verification, password recovery, a comprehensive block/report system, and a Trust Score system (0-100) combining phone/ID/selfie/social/background/reviews/account age signals with TrustBadge component and verification nudges on profiles/chat/host dashboard.
 -   **Profile Pause:** Renters can pause their search profiles.
 -   **Activity Decay Ranking:** Inactive user profiles are deprioritized in discovery.
 -   **Boost System:** A three-tier system for hosts to improve listing visibility with various benefits and analytics.

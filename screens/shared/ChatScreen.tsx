@@ -28,6 +28,7 @@ import { GroupPropertySearchModal } from '../../components/GroupPropertySearchMo
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSequence } from 'react-native-reanimated';
 import { AdBanner } from '../../components/AdBanner';
 import { getDailyMessageCount, MESSAGING_LIMITS, getTimeUntilMidnight, incrementDailyColdMessageCount } from '../../utils/messagingUtils';
+import { calculateTrustScore } from '../../utils/trustScore';
 import { dispatchInsightTrigger } from '../../utils/insightRefresh';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import MeetupSuggestionCard from '../../components/MeetupSuggestionCard';
@@ -1985,6 +1986,16 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
           }}
         />
       ) : null}
+
+      {otherUser && (() => {
+        const ots = calculateTrustScore(otherUser.verification, undefined, null, 0, undefined, undefined);
+        return ots.level === 'unverified' ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm, backgroundColor: 'rgba(243,156,18,0.08)', gap: 8 }}>
+            <Feather name="alert-circle" size={14} color="#F39C12" />
+            <ThemedText style={[Typography.small, { color: '#F39C12', flex: 1 }]}>This user hasn't verified their identity yet</ThemedText>
+          </View>
+        ) : null;
+      })()}
 
       <View style={{ flex: 1 }}>
         <FlatList

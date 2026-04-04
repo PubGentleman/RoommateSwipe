@@ -44,6 +44,47 @@ export const getMyBackgroundCheck = async (userId: string): Promise<BackgroundCh
   }
 }
 
+export async function submitSelfieVerification(
+  userId: string,
+  selfieUri: string
+): Promise<{ success: boolean; match: boolean; confidence: number; error?: string }> {
+  const filename = `${userId}/selfie-${Date.now()}.jpg`;
+  const { error: uploadError } = await supabase.storage
+    .from('verification-selfies')
+    .upload(filename, {
+      uri: selfieUri,
+      type: 'image/jpeg',
+      name: 'selfie.jpg',
+    } as any);
+
+  if (uploadError) return { success: false, match: false, confidence: 0, error: uploadError.message };
+
+  const { data, error } = await supabase.functions.invoke('verify-selfie', {
+    body: { userId, selfieStoragePath: filename },
+  });
+
+  if (error) return { success: false, match: false, confidence: 0, error: error.message };
+  if (!data || typeof data.match !== 'boolean') {
+    return { success: false, match: false, confidence: 0, error: 'Invalid response from verification service' };
+  }
+
+  if (data.match && data.confidence >= 0.85) {
+    await supabase
+      .from('users')
+      .update({
+        selfie_verified: true,
+        selfie_verified_at: new Date().toISOString(),
+      })
+      .eq('id', userId);
+  }
+
+  return {
+    success: true,
+    match: data.match,
+    confidence: data.confidence,
+  };
+}
+
 export const getUserBackgroundBadge = async (userId: string): Promise<BackgroundCheckBadge | null> => {
   const { data } = await supabase
     .from('public_background_badges')

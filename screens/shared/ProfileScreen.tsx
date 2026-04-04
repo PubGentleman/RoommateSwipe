@@ -13,6 +13,8 @@ import type { ProfileStackParamList } from '../../navigation/ProfileStackNavigat
 import { useNotificationContext } from '../../contexts/NotificationContext';
 import { ProfileCompletionCard } from '../../components/ProfileCompletionCard';
 import { getVerificationLevel } from '../../components/VerificationBadge';
+import { calculateTrustScore } from '../../utils/trustScore';
+import { TrustBadge } from '../../components/TrustBadge';
 import { StorageService } from '../../utils/storage';
 import { RhomeAISheet } from '../../components/RhomeAISheet';
 import { AIFloatingButton } from '../../components/AIFloatingButton';
@@ -846,6 +848,13 @@ export const ProfileScreen = () => {
               title="Verify Identity"
               subtitle="Phone, ID, social verification"
               onPress={() => navigation.navigate('Verification')}
+              rightElement={(() => {
+                const ts = calculateTrustScore(
+                  user?.verification, user?.background_check_status,
+                  null, 0, user?.createdAt, user?.selfie_verified ?? user?.verification?.selfie?.verified
+                );
+                return ts.overall > 0 ? <TrustBadge trustScore={ts} size="small" /> : null;
+              })()}
             />
             {!isHost ? (
               <SettingsItem
