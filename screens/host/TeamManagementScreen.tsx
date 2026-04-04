@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  View, Text, Pressable, StyleSheet, FlatList, Modal, TextInput,
-  ActivityIndicator, Alert,
+  View, Text, Pressable, StyleSheet, ScrollView, Modal, TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
 import { useTheme } from '../../hooks/useTheme';
@@ -37,11 +37,20 @@ export function TeamManagementScreen() {
   const atSeatLimit = activeCount >= seatLimit;
   const seatLimitDisplay = seatLimit === Infinity ? 'Unlimited' : String(seatLimit);
 
+  const agents = members.filter(m => m.role === 'agent');
+  const staff = members.filter(m => m.role !== 'agent');
+
   const loadMembers = useCallback(async () => {
     setLoading(true);
-    const data = await getTeamMembers();
-    setMembers(data);
-    setLoading(false);
+    try {
+      const data = await getTeamMembers();
+      setMembers(data);
+    } catch (e) {
+      console.warn('Failed to load team members:', e);
+      setMembers([]);
+    } finally {
+      setLoading(false);
+    }
   }, [getTeamMembers]);
 
   useEffect(() => { loadMembers(); }, []);
@@ -92,7 +101,7 @@ export function TeamManagementScreen() {
   const getInitials = (name?: string, email?: string) => {
     if (name) {
       const parts = name.split(' ');
-      return (parts[0]?.[0] ?? '' + (parts[1]?.[0] ?? '')).toUpperCase();
+      return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase();
     }
     return (email?.[0] ?? '?').toUpperCase();
   };
@@ -106,132 +115,192 @@ export function TeamManagementScreen() {
     }
   };
 
-  const getStatusColor = (status: string) => {
-    return status === 'active' ? '#22C55E' : '#F59E0B';
+  const renderMember = ({ item }: { item: TeamMember }) => {
+    const isAgent = item.role === 'agent';
+    const isPending = item.status === 'pending';
+    const roleColor = getRoleBadgeColor(item.role);
+    const joinedDate = item.joinedAt
+      ? new Date(item.joinedAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+      : null;
+
+    return (
+      <View
+        style={[
+          styles.memberRow,
+          { backgroundColor: theme.card, borderColor: theme.border },
+          menuMemberId === item.id ? { zIndex: 100 } : null,
+        ]}
+      >
+        <View style={{ position: 'relative' }}>
+          <View style={[styles.avatar, { backgroundColor: roleColor + '20', borderWidth: 2, borderColor: roleColor + '40' }]}>
+            <Text style={[styles.avatarText, { color: roleColor }]}>
+              {getInitials(item.fullName, item.email)}
+            </Text>
+          </View>
+          <View
+            style={[
+              styles.statusIndicator,
+              { backgroundColor: isPending ? '#F59E0B' : '#22C55E', borderColor: theme.card },
+            ]}
+          />
+        </View>
+
+        <View style={styles.memberInfo}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Text style={[styles.memberName, { color: theme.text }]} numberOfLines={1}>
+              {item.fullName || item.email}
+            </Text>
+            <View style={[styles.roleBadge, { backgroundColor: roleColor + '20' }]}>
+              <Text style={[styles.roleBadgeText, { color: roleColor }]}>
+                {item.role.charAt(0).toUpperCase() + item.role.slice(1)}
+              </Text>
+            </View>
+          </View>
+
+          <Text style={[styles.memberEmail, { color: theme.textSecondary }]} numberOfLines={1}>
+            {item.email}
+          </Text>
+
+          {isAgent && item.agentLicenseNumber ? (
+            <Text style={[styles.memberMeta, { color: theme.textSecondary }]}>
+              License: {item.agentLicenseNumber}
+            </Text>
+          ) : null}
+
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}>
+            {isPending ? (
+              <View style={[styles.statusBadge, { backgroundColor: '#F59E0B20' }]}>
+                <View style={[styles.statusDot, { backgroundColor: '#F59E0B' }]} />
+                <Text style={[styles.statusText, { color: '#F59E0B' }]}>Pending Invite</Text>
+              </View>
+            ) : (
+              <Text style={[styles.memberMeta, { color: theme.textSecondary }]}>
+                {joinedDate ? `Joined ${joinedDate}` : 'Active'}
+              </Text>
+            )}
+          </View>
+        </View>
+
+        {item.role !== 'owner' ? (
+          <Pressable
+            style={styles.menuBtn}
+            onPress={() => setMenuMemberId(menuMemberId === item.id ? null : item.id)}
+            hitSlop={8}
+          >
+            <Feather name="more-vertical" size={18} color={theme.textSecondary} />
+          </Pressable>
+        ) : null}
+
+        {menuMemberId === item.id && item.role !== 'owner' ? (
+          <View style={[styles.menuDropdown, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            {item.status === 'active' && item.memberUserId ? (
+              <Pressable
+                style={styles.menuItem}
+                onPress={() => {
+                  setMenuMemberId(null);
+                  navigation.navigate('HostPublicProfile', { hostId: item.memberUserId });
+                }}
+              >
+                <Feather name="user" size={14} color={theme.text} />
+                <Text style={[styles.menuItemText, { color: theme.text }]}>View Profile</Text>
+              </Pressable>
+            ) : null}
+
+            {isPending ? (
+              <Pressable
+                style={styles.menuItem}
+                onPress={() => { setMenuMemberId(null); handleResend(item); }}
+              >
+                <Feather name="mail" size={14} color={theme.text} />
+                <Text style={[styles.menuItemText, { color: theme.text }]}>Resend Invite</Text>
+              </Pressable>
+            ) : null}
+
+            <View style={[styles.menuSeparator, { backgroundColor: theme.border }]} />
+
+            {item.role !== 'admin' ? (
+              <Pressable
+                style={styles.menuItem}
+                onPress={() => { setMenuMemberId(null); handleRoleChange(item, 'admin'); }}
+              >
+                <Feather name="shield" size={14} color={theme.text} />
+                <Text style={[styles.menuItemText, { color: theme.text }]}>Change to Admin</Text>
+              </Pressable>
+            ) : null}
+            {item.role !== 'member' ? (
+              <Pressable
+                style={styles.menuItem}
+                onPress={() => { setMenuMemberId(null); handleRoleChange(item, 'member'); }}
+              >
+                <Feather name="users" size={14} color={theme.text} />
+                <Text style={[styles.menuItemText, { color: theme.text }]}>Change to Member</Text>
+              </Pressable>
+            ) : null}
+            {item.role !== 'agent' ? (
+              <Pressable
+                style={styles.menuItem}
+                onPress={() => { setMenuMemberId(null); handleRoleChange(item, 'agent'); }}
+              >
+                <Feather name="briefcase" size={14} color={theme.text} />
+                <Text style={[styles.menuItemText, { color: theme.text }]}>Change to Agent</Text>
+              </Pressable>
+            ) : null}
+
+            <View style={[styles.menuSeparator, { backgroundColor: theme.border }]} />
+
+            <Pressable
+              style={styles.menuItem}
+              onPress={() => { setMenuMemberId(null); handleRemove(item); }}
+            >
+              <Feather name="user-minus" size={14} color="#EF4444" />
+              <Text style={[styles.menuItemText, { color: '#EF4444' }]}>Remove from Team</Text>
+            </Pressable>
+          </View>
+        ) : null}
+      </View>
+    );
   };
 
-  const renderMember = ({ item }: { item: TeamMember }) => (
-    <View style={[styles.memberRow, { backgroundColor: theme.card, borderColor: theme.border }, menuMemberId === item.id ? { zIndex: 100 } : null]}>
-      <View style={[styles.avatar, { backgroundColor: getRoleBadgeColor(item.role) + '25' }]}>
-        <Text style={[styles.avatarText, { color: getRoleBadgeColor(item.role) }]}>
-          {getInitials(item.fullName, item.email)}
-        </Text>
-      </View>
-      <View style={styles.memberInfo}>
-        <Text style={[styles.memberName, { color: theme.text }]} numberOfLines={1}>
-          {item.fullName || item.email}
-        </Text>
-        <Text style={[styles.memberEmail, { color: theme.textSecondary }]} numberOfLines={1}>
-          {item.email}
-        </Text>
-      </View>
-      <View style={styles.memberBadges}>
-        <View style={[styles.roleBadge, { backgroundColor: getRoleBadgeColor(item.role) + '20' }]}>
-          <Text style={[styles.roleBadgeText, { color: getRoleBadgeColor(item.role) }]}>
-            {item.role.charAt(0).toUpperCase() + item.role.slice(1)}
-          </Text>
-        </View>
-        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) + '20' }]}>
-          <View style={[styles.statusDot, { backgroundColor: getStatusColor(item.status) }]} />
-          <Text style={[styles.statusText, { color: getStatusColor(item.status) }]}>
-            {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
-          </Text>
-        </View>
-      </View>
-      {item.role !== 'owner' ? (
-        <Pressable
-          style={styles.menuBtn}
-          onPress={() => setMenuMemberId(menuMemberId === item.id ? null : item.id)}
-          hitSlop={8}
-        >
-          <Feather name="more-vertical" size={18} color={theme.textSecondary} />
-        </Pressable>
-      ) : null}
-      {menuMemberId === item.id && item.role !== 'owner' ? (
-        <View style={[styles.menuDropdown, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          {item.status === 'pending' ? (
-            <Pressable
-              style={styles.menuItem}
-              onPress={() => { setMenuMemberId(null); handleResend(item); }}
-            >
-              <Feather name="mail" size={14} color={theme.text} />
-              <Text style={[styles.menuItemText, { color: theme.text }]}>Resend Invite</Text>
-            </Pressable>
-          ) : null}
-          {item.role !== 'admin' ? (
-            <Pressable
-              style={styles.menuItem}
-              onPress={() => { setMenuMemberId(null); handleRoleChange(item, 'admin'); }}
-            >
-              <Feather name="shield" size={14} color={theme.text} />
-              <Text style={[styles.menuItemText, { color: theme.text }]}>Change to Admin</Text>
-            </Pressable>
-          ) : null}
-          {item.role !== 'member' ? (
-            <Pressable
-              style={styles.menuItem}
-              onPress={() => { setMenuMemberId(null); handleRoleChange(item, 'member'); }}
-            >
-              <Feather name="users" size={14} color={theme.text} />
-              <Text style={[styles.menuItemText, { color: theme.text }]}>Change to Member</Text>
-            </Pressable>
-          ) : null}
-          {item.role !== 'agent' ? (
-            <Pressable
-              style={styles.menuItem}
-              onPress={() => { setMenuMemberId(null); handleRoleChange(item, 'agent'); }}
-            >
-              <Feather name="briefcase" size={14} color={theme.text} />
-              <Text style={[styles.menuItemText, { color: theme.text }]}>Change to Agent</Text>
-            </Pressable>
-          ) : null}
-          <Pressable
-            style={styles.menuItem}
-            onPress={() => { setMenuMemberId(null); handleRemove(item); }}
-          >
-            <Feather name="user-minus" size={14} color="#EF4444" />
-            <Text style={[styles.menuItemText, { color: '#EF4444' }]}>Remove</Text>
-          </Pressable>
-        </View>
-      ) : null}
-    </View>
-  );
-
   const ownerRow = (
-    <View style={[styles.memberRow, { backgroundColor: theme.card, borderColor: theme.border }]}>
-      <View style={[styles.avatar, { backgroundColor: '#F59E0B25' }]}>
-        <Text style={[styles.avatarText, { color: '#F59E0B' }]}>
-          {getInitials(user?.name)}
-        </Text>
+    <View style={[styles.memberRow, styles.ownerRow, { backgroundColor: theme.card, borderColor: '#F59E0B30' }]}>
+      <View style={{ position: 'relative' }}>
+        <View style={[styles.avatar, { backgroundColor: '#F59E0B20', borderWidth: 2, borderColor: '#F59E0B40' }]}>
+          <Text style={[styles.avatarText, { color: '#F59E0B' }]}>
+            {getInitials(user?.name)}
+          </Text>
+        </View>
+        <View style={[styles.statusIndicator, { backgroundColor: '#22C55E', borderColor: theme.card }]} />
       </View>
       <View style={styles.memberInfo}>
-        <Text style={[styles.memberName, { color: theme.text }]} numberOfLines={1}>
-          {user?.name} (You)
-        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Text style={[styles.memberName, { color: theme.text }]} numberOfLines={1}>
+            {user?.name}
+          </Text>
+          <View style={[styles.roleBadge, { backgroundColor: '#F59E0B20' }]}>
+            <Text style={[styles.roleBadgeText, { color: '#F59E0B' }]}>Owner</Text>
+          </View>
+        </View>
         <Text style={[styles.memberEmail, { color: theme.textSecondary }]} numberOfLines={1}>
           {user?.email}
         </Text>
+        <Text style={[styles.memberMeta, { color: theme.textSecondary, marginTop: 4 }]}>
+          Account holder
+        </Text>
       </View>
-      <View style={styles.memberBadges}>
-        <View style={[styles.roleBadge, { backgroundColor: '#F59E0B20' }]}>
-          <Text style={[styles.roleBadgeText, { color: '#F59E0B' }]}>Owner</Text>
-        </View>
-        <View style={[styles.statusBadge, { backgroundColor: '#22C55E20' }]}>
-          <View style={[styles.statusDot, { backgroundColor: '#22C55E' }]} />
-          <Text style={[styles.statusText, { color: '#22C55E' }]}>Active</Text>
-        </View>
-      </View>
+      <Feather name="award" size={16} color="#F59E0B" style={{ opacity: 0.6 }} />
     </View>
   );
+
+  const seatFillPercent = Math.min(100, (activeCount / (seatLimit === Infinity ? activeCount + 5 : seatLimit)) * 100);
+  const seatBarColor = atSeatLimit ? '#EF4444' : (activeCount / seatLimit > 0.75 ? '#F59E0B' : '#22C55E');
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-        <View>
+        <View style={{ flex: 1 }}>
           <Text style={[Typography.h2, { color: theme.text }]}>Your Team</Text>
           <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
-            {activeCount} of {seatLimitDisplay} seats used
-            {' · '}{members.filter(m => m.role === 'agent').length} agents
+            Manage your team members and agents
           </Text>
         </View>
         <Pressable
@@ -239,43 +308,145 @@ export function TeamManagementScreen() {
           onPress={() => { if (!atSeatLimit) setShowInvite(true); }}
           disabled={atSeatLimit}
         >
-          <Feather name="user-plus" size={16} color="#FFFFFF" />
-          <Text style={styles.inviteBtnText}>Invite</Text>
+          <LinearGradient
+            colors={['#ff6b5b', '#e83a2a']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.inviteBtnGrad}
+          >
+            <Feather name="user-plus" size={16} color="#FFFFFF" />
+            <Text style={styles.inviteBtnText}>Invite</Text>
+          </LinearGradient>
         </Pressable>
       </View>
 
-      {atSeatLimit ? (
-        <View style={[styles.limitBanner, { backgroundColor: '#F59E0B15', borderColor: '#F59E0B30' }]}>
-          <Feather name="users" size={15} color="#F59E0B" />
-          <Text style={[styles.limitText, { color: theme.textSecondary }]}>
-            You've reached your {seatLimitDisplay}-seat limit.{' '}
-            <Text style={styles.upgradeLink} onPress={() => navigation.navigate('HostSubscription')}>
-              Upgrade to add more
-            </Text>
+      <View style={styles.statsRow}>
+        <View style={[styles.statCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+          <View style={[styles.statIcon, { backgroundColor: '#3B82F620' }]}>
+            <Feather name="users" size={16} color="#3B82F6" />
+          </View>
+          <Text style={[styles.statNumber, { color: theme.text }]}>{activeCount}</Text>
+          <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Total</Text>
+        </View>
+        <View style={[styles.statCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+          <View style={[styles.statIcon, { backgroundColor: '#34C75920' }]}>
+            <Feather name="briefcase" size={16} color="#34C759" />
+          </View>
+          <Text style={[styles.statNumber, { color: theme.text }]}>{agents.length}</Text>
+          <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Agents</Text>
+        </View>
+        <View style={[styles.statCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+          <View style={[styles.statIcon, { backgroundColor: '#F59E0B20' }]}>
+            <Feather name="clock" size={16} color="#F59E0B" />
+          </View>
+          <Text style={[styles.statNumber, { color: theme.text }]}>
+            {members.filter(m => m.status === 'pending').length}
+          </Text>
+          <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Pending</Text>
+        </View>
+      </View>
+
+      <View style={[styles.seatSection, { backgroundColor: theme.card, borderColor: theme.border }]}>
+        <View style={styles.seatHeader}>
+          <Text style={[styles.seatTitle, { color: theme.text }]}>Team Seats</Text>
+          <Text style={[styles.seatCount, { color: theme.textSecondary }]}>
+            {activeCount} / {seatLimitDisplay}
           </Text>
         </View>
-      ) : null}
+        <View style={styles.progressBarBg}>
+          <View
+            style={[
+              styles.progressBarFill,
+              { width: `${seatFillPercent}%`, backgroundColor: seatBarColor },
+            ]}
+          />
+        </View>
+        {atSeatLimit ? (
+          <Pressable onPress={() => navigation.navigate('HostSubscription')}>
+            <Text style={styles.upgradeText}>
+              Seat limit reached —{' '}
+              <Text style={{ fontWeight: '700', color: '#ff6b5b' }}>Upgrade Plan</Text>
+            </Text>
+          </Pressable>
+        ) : null}
+      </View>
 
       {loading ? (
         <View style={styles.loadingWrap}>
           <ActivityIndicator size="large" color={theme.primary} />
         </View>
       ) : (
-        <FlatList
-          data={members}
-          keyExtractor={(item) => item.id}
-          renderItem={renderMember}
-          ListHeaderComponent={ownerRow}
-          contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 100 }]}
-          ListEmptyComponent={
-            <View style={styles.emptyWrap}>
-              <Feather name="users" size={40} color={theme.textSecondary} />
-              <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
-                No team members yet. Invite your first colleague.
-              </Text>
-            </View>
-          }
-        />
+        <Pressable onPress={() => setMenuMemberId(null)} style={{ flex: 1 }}>
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 100 }]}
+            showsVerticalScrollIndicator={false}
+          >
+            {ownerRow}
+
+            {staff.length > 0 ? (
+              <>
+                <View style={styles.sectionHeader}>
+                  <Feather name="shield" size={14} color={theme.textSecondary} />
+                  <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>
+                    Staff ({staff.length})
+                  </Text>
+                </View>
+                {staff.map((item) => (
+                  <React.Fragment key={item.id}>
+                    {renderMember({ item })}
+                  </React.Fragment>
+                ))}
+              </>
+            ) : null}
+
+            {agents.length > 0 ? (
+              <>
+                <View style={styles.sectionHeader}>
+                  <Feather name="briefcase" size={14} color="#34C759" />
+                  <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>
+                    Agents ({agents.length})
+                  </Text>
+                </View>
+                {agents.map((item) => (
+                  <React.Fragment key={item.id}>
+                    {renderMember({ item })}
+                  </React.Fragment>
+                ))}
+              </>
+            ) : null}
+
+            {members.length === 0 ? (
+              <View style={styles.emptyWrap}>
+                <View style={[styles.emptyIcon, { backgroundColor: theme.card }]}>
+                  <Feather name="user-plus" size={32} color={theme.textSecondary} />
+                </View>
+                <Text style={[styles.emptyTitle, { color: theme.text }]}>
+                  Build your team
+                </Text>
+                <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
+                  Invite agents and staff to manage listings together.
+                </Text>
+                <Pressable
+                  style={styles.emptyInviteBtn}
+                  onPress={() => { if (!atSeatLimit) setShowInvite(true); }}
+                >
+                  <LinearGradient
+                    colors={['#ff6b5b', '#e83a2a']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.emptyInviteBtnGrad}
+                  >
+                    <Feather name="user-plus" size={16} color="#FFFFFF" />
+                    <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 14 }}>
+                      Invite Your First Member
+                    </Text>
+                  </LinearGradient>
+                </Pressable>
+              </View>
+            ) : null}
+          </ScrollView>
+        </Pressable>
       )}
 
       <Modal visible={showInvite} transparent animationType="slide" onRequestClose={() => setShowInvite(false)}>
@@ -378,6 +549,7 @@ export function TeamManagementScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -385,32 +557,94 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     paddingBottom: Spacing.md,
   },
-  subtitle: { fontSize: 13, marginTop: 2 },
-  inviteBtn: {
+  subtitle: { fontSize: 13, marginTop: 2, lineHeight: 18 },
+  inviteBtn: {},
+  inviteBtnGrad: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#ff6b5b',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 10,
-  },
-  inviteBtnText: { fontSize: 13, fontWeight: '700', color: '#FFFFFF' },
-  limitBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginHorizontal: Spacing.lg,
-    marginBottom: Spacing.sm,
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 12,
+  },
+  inviteBtnText: { fontSize: 13, fontWeight: '700', color: '#FFFFFF' },
+
+  statsRow: {
+    flexDirection: 'row',
+    paddingHorizontal: Spacing.lg,
+    gap: 10,
+    marginBottom: Spacing.md,
+  },
+  statCard: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    gap: 6,
+  },
+  statIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statNumber: { fontSize: 20, fontWeight: '700' },
+  statLabel: { fontSize: 11, fontWeight: '500' },
+
+  seatSection: {
+    marginHorizontal: Spacing.lg,
+    marginBottom: Spacing.md,
+    padding: 14,
+    borderRadius: 14,
     borderWidth: 1,
   },
-  limitText: { fontSize: 12, flex: 1, lineHeight: 17 },
-  upgradeLink: { color: '#F59E0B', fontWeight: '700' },
-  loadingWrap: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  list: { paddingHorizontal: Spacing.lg, gap: 10, paddingTop: Spacing.sm },
+  seatHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  seatTitle: { fontSize: 13, fontWeight: '600' },
+  seatCount: { fontSize: 13, fontWeight: '600' },
+  progressBarBg: {
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%' as any,
+    borderRadius: 3,
+  },
+  upgradeText: {
+    fontSize: 12,
+    color: '#888',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 20,
+    marginBottom: 8,
+    paddingHorizontal: 4,
+  },
+  sectionTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+
+  list: {
+    paddingHorizontal: Spacing.lg,
+    gap: 10,
+    paddingTop: Spacing.sm,
+  },
   memberRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -420,18 +654,30 @@ const styles = StyleSheet.create({
     gap: 12,
     position: 'relative',
   },
+  ownerRow: {
+    borderWidth: 1.5,
+  },
   avatar: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarText: { fontSize: 15, fontWeight: '700' },
+  statusIndicator: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    borderWidth: 2,
+  },
   memberInfo: { flex: 1, gap: 2 },
   memberName: { fontSize: 14, fontWeight: '600' },
   memberEmail: { fontSize: 12 },
-  memberBadges: { gap: 4, alignItems: 'flex-end' },
+  memberMeta: { fontSize: 11 },
   roleBadge: {
     paddingHorizontal: 8,
     paddingVertical: 3,
@@ -448,31 +694,63 @@ const styles = StyleSheet.create({
   },
   statusDot: { width: 5, height: 5, borderRadius: 3 },
   statusText: { fontSize: 10, fontWeight: '600' },
-  menuBtn: { padding: 4 },
+
+  menuBtn: { padding: 6 },
   menuDropdown: {
     position: 'absolute',
     right: 14,
-    top: 52,
-    borderRadius: 10,
+    top: 56,
+    borderRadius: 14,
     borderWidth: 1,
     zIndex: 100,
-    minWidth: 160,
+    minWidth: 180,
     elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    overflow: 'hidden',
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 14,
+    gap: 10,
+    paddingHorizontal: 16,
     paddingVertical: 12,
   },
   menuItemText: { fontSize: 13, fontWeight: '500' },
+  menuSeparator: {
+    height: StyleSheet.hairlineWidth,
+    marginHorizontal: 12,
+  },
+
   emptyWrap: {
     alignItems: 'center',
     gap: 12,
     paddingVertical: 60,
   },
-  emptyText: { fontSize: 14, textAlign: 'center', maxWidth: 220, lineHeight: 21 },
+  emptyIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  emptyTitle: { fontSize: 18, fontWeight: '700' },
+  emptyText: { fontSize: 14, textAlign: 'center', maxWidth: 240, lineHeight: 21 },
+  emptyInviteBtn: { marginTop: 8 },
+  emptyInviteBtnGrad: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+
+  loadingWrap: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.6)',
