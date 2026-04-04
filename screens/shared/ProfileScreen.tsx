@@ -1294,8 +1294,7 @@ const styles = StyleSheet.create({
     borderColor: '#2a2a2a',
     borderRadius: 14,
     paddingVertical: 14,
-    paddingHorizontal: 10,
-    minWidth: 90,
+    paddingHorizontal: 6,
     alignItems: 'center',
   },
   statDivider: {
