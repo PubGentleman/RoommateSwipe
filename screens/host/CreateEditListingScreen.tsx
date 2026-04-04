@@ -123,10 +123,7 @@ const LazyGooglePlacesAutocomplete = React.forwardRef((props: any, ref: any) => 
 
 const BEDROOM_OPTIONS = [1, 2, 3, 4, 5, 6];
 const BATHROOM_OPTIONS = [1, 2, 3, 4];
-const POPULAR_CITIES = [
-  'New York', 'Los Angeles', 'Chicago', 'Miami', 'San Francisco',
-  'Austin', 'Seattle', 'Denver', 'Boston', 'Houston',
-];
+
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const PHOTO_GRID_WIDTH = SCREEN_WIDTH - 40;
 const PHOTO_COL_WIDTH = (PHOTO_GRID_WIDTH - 10) / 2;
@@ -937,30 +934,95 @@ export const CreateEditListingScreen = () => {
         )}
       </View>
 
-      <View style={styles.fieldContainer}>
+      <View style={[styles.fieldContainer, { zIndex: 999 }]}>
         <Text style={styles.label}>City</Text>
-        <TextInput
-          style={styles.input}
-          value={city}
-          onChangeText={setCity}
-          placeholder="Type a city..."
-          placeholderTextColor="#666"
-        />
-        <Text style={[styles.label, { marginTop: 12 }]}>Popular Cities</Text>
-        <View style={styles.chipRow}>
-          {POPULAR_CITIES.map(c => {
-            const selected = c === city;
-            return (
-              <Pressable
-                key={c}
-                style={[styles.cityChip, selected ? styles.cityChipSelected : styles.cityChipUnselected]}
-                onPress={() => setCity(c)}
-              >
-                <Text style={[styles.cityChipText, { color: selected ? '#fff' : '#aaa' }]}>{c}</Text>
-              </Pressable>
-            );
-          })}
-        </View>
+        {process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY ? (
+          <LazyGooglePlacesAutocomplete
+            placeholder="Type a city..."
+            fetchDetails={true}
+            onPress={(data: any, details: any = null) => {
+              if (!details) return;
+              const components = details.address_components;
+              const getComponent = (type: string) =>
+                components.find((c: any) => c.types.includes(type));
+              const cityName =
+                getComponent('locality')?.long_name ||
+                getComponent('sublocality')?.long_name ||
+                getComponent('administrative_area_level_2')?.long_name || '';
+              const stateName =
+                getComponent('administrative_area_level_1')?.short_name || '';
+              const zipCodeVal =
+                getComponent('postal_code')?.long_name || '';
+              const neighborhoodName =
+                getComponent('neighborhood')?.long_name ||
+                getComponent('sublocality_level_1')?.long_name || '';
+              if (cityName) setCity(cityName);
+              if (stateName) setState(stateName);
+              if (zipCodeVal) setZipCode(zipCodeVal);
+              if (neighborhoodName) setNeighborhood(neighborhoodName);
+              const loc = details.geometry?.location;
+              if (loc) setCoordinates({ lat: loc.lat, lng: loc.lng });
+            }}
+            query={{
+              key: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
+              language: 'en',
+              types: '(cities)',
+            }}
+            textInputProps={{
+              value: city,
+              onChangeText: setCity,
+              placeholderTextColor: '#666',
+            }}
+            styles={{
+              container: { flex: 0 },
+              textInput: {
+                height: 50,
+                backgroundColor: '#141414',
+                borderWidth: 1,
+                borderColor: 'rgba(255,255,255,0.1)',
+                borderRadius: 12,
+                paddingHorizontal: 16,
+                fontSize: 15,
+                color: '#fff',
+              },
+              listView: {
+                backgroundColor: '#1a1a1a',
+                borderWidth: 1,
+                borderColor: 'rgba(255,255,255,0.1)',
+                borderRadius: 12,
+                marginTop: 4,
+                zIndex: 999,
+              },
+              row: {
+                paddingHorizontal: 12,
+                paddingVertical: 10,
+                backgroundColor: '#1a1a1a',
+              },
+              description: {
+                fontSize: 14,
+                color: '#ccc',
+              },
+              separator: {
+                height: 1,
+                backgroundColor: '#333',
+              },
+            }}
+            enablePoweredByContainer={false}
+            minLength={2}
+            debounce={300}
+            keyboardShouldPersistTaps="handled"
+            onFail={(error: any) => console.warn('City autocomplete error:', error)}
+            onNotFound={() => {}}
+          />
+        ) : (
+          <TextInput
+            style={styles.input}
+            value={city}
+            onChangeText={setCity}
+            placeholder="Type a city..."
+            placeholderTextColor="#666"
+          />
+        )}
       </View>
 
       <View style={styles.fieldContainer}>
@@ -1870,25 +1932,6 @@ const styles = StyleSheet.create({
   chipText: {
     fontSize: 15,
     fontWeight: '700',
-  },
-  cityChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1.5,
-    marginBottom: 4,
-  },
-  cityChipSelected: {
-    backgroundColor: '#ff6b5b',
-    borderColor: '#ff6b5b',
-  },
-  cityChipUnselected: {
-    backgroundColor: '#141414',
-    borderColor: 'rgba(255,255,255,0.12)',
-  },
-  cityChipText: {
-    fontSize: 13,
-    fontWeight: '500',
   },
   amenityChip: {
     flexDirection: 'row',
