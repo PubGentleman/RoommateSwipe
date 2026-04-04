@@ -331,7 +331,7 @@ export const MyListingsScreen = () => {
       <View key={listing.id} style={styles.card}>
         <Pressable
           style={styles.cardPhoto}
-          onPress={() => navigation.navigate('CreateEditListing', { propertyId: listing.id })}
+          onPress={() => navigation.navigate('HostListingDetail', { listingId: listing.id })}
         >
           {listing.photos && listing.photos.length > 0 ? (
             <Image source={{ uri: listing.photos[0] }} style={styles.photoImage} />
@@ -380,7 +380,7 @@ export const MyListingsScreen = () => {
         </Pressable>
 
         <View style={styles.cardBody}>
-          <Pressable onPress={() => navigation.navigate('CreateEditListing', { propertyId: listing.id })}>
+          <Pressable onPress={() => navigation.navigate('HostListingDetail', { listingId: listing.id })}>
             <View style={styles.cardTitleRow}>
               <Text style={styles.cardTitle} numberOfLines={1}>{listing.title}</Text>
               {(user?.purchases?.hostVerificationBadge === true || planHasVerifiedBadge(getHostPlan() as HostPlan)) ? (

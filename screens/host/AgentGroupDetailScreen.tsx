@@ -199,7 +199,7 @@ export const AgentGroupDetailScreen = () => {
           <Text style={styles.subText}>Created {group.createdAt ? new Date(group.createdAt).toLocaleDateString() : 'N/A'}</Text>
 
           {group.targetListing ? (
-            <Pressable style={styles.listingCard} onPress={() => navigation.navigate('ListingDetail', { listingId: group.targetListingId })}>
+            <Pressable style={styles.listingCard} onPress={() => navigation.navigate('HostListingDetail', { listingId: group.targetListingId })}>
               <Feather name="home" size={16} color={ACCENT} />
               <View style={{ marginLeft: 10, flex: 1 }}>
                 <Text style={styles.listingTitle} numberOfLines={1}>{(group.targetListing as any).title}</Text>

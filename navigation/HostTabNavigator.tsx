@@ -35,6 +35,7 @@ import { HostMessagesStackNavigator } from './HostMessagesStackNavigator';
 import { NotificationsScreen } from '../screens/shared/NotificationsScreen';
 import { ProfileStackNavigator } from './ProfileStackNavigator';
 import { TeamManagementScreen } from '../screens/host/TeamManagementScreen';
+import { HostListingDetailScreen } from '../screens/host/HostListingDetailScreen';
 import { useTheme } from '../hooks/useTheme';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotificationContext } from '../contexts/NotificationContext';
@@ -42,6 +43,7 @@ import { useNotificationContext } from '../contexts/NotificationContext';
 export type HostListingsStackParamList = {
   MyListings: undefined;
   CreateEditListing: { propertyId?: string };
+  HostListingDetail: { listingId: string };
   ListingBoost: { listingId: string };
   HostGroupOutreach: { listingId: string; listingTitle: string };
   InviteExistingRoommates: { listingId: string; count: number; listingAddress?: string };
@@ -50,6 +52,7 @@ export type HostListingsStackParamList = {
 export type HostDashboardStackParamList = {
   DashboardMain: undefined;
   CreateEditListing: { propertyId?: string };
+  HostListingDetail: { listingId: string };
   Analytics: undefined;
   Inquiries: { filter?: 'all' | 'pending' | 'accepted' | 'passed' } | undefined;
   Notifications: undefined;
@@ -115,6 +118,7 @@ function DashboardStackNavigator() {
     <DashboardStack.Navigator screenOptions={{ headerShown: false }}>
       <DashboardStack.Screen name="DashboardMain" component={HostDashboardScreen} />
       <DashboardStack.Screen name="CreateEditListing" component={CreateEditListingScreen} />
+      <DashboardStack.Screen name="HostListingDetail" component={HostListingDetailScreen} />
       <DashboardStack.Screen name="Analytics" component={HostAnalyticsScreen} />
       <DashboardStack.Screen name="Inquiries" component={HostInquiriesScreen} />
       <DashboardStack.Screen name="Notifications" component={NotificationsScreen} />
@@ -141,6 +145,7 @@ function ListingsStackNavigator() {
     <ListingsStack.Navigator screenOptions={{ headerShown: false }}>
       <ListingsStack.Screen name="MyListings" component={MyListingsScreen} />
       <ListingsStack.Screen name="CreateEditListing" component={CreateEditListingScreen} />
+      <ListingsStack.Screen name="HostListingDetail" component={HostListingDetailScreen} />
       <ListingsStack.Screen name="ListingBoost" component={ListingBoostScreen} />
       <ListingsStack.Screen name="HostGroupOutreach" component={HostGroupOutreachScreen} />
       <ListingsStack.Screen name="InviteExistingRoommates" component={InviteExistingRoommatesScreen} />
@@ -193,7 +198,7 @@ const HOST_TAB_CONFIG: Record<string, { icon: string; label: string }> = {
   Profile: { icon: 'user', label: 'Profile' },
 };
 
-const SCREENS_HIDE_TAB_BAR = ['CreateEditListing'];
+const SCREENS_HIDE_TAB_BAR = ['CreateEditListing', 'HostListingDetail'];
 
 function HostCustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const { theme, isDark } = useTheme();
