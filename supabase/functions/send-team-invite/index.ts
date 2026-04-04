@@ -71,7 +71,7 @@ Deno.serve(async (req) => {
     const email = member.email;
     const role = member.role;
 
-    const joinLink = `https://rhomeapp.io/join-team?invite=${teamMemberId}`;
+    const joinLink = `https://rhomeapp.io/join-team/${teamMemberId}`;
 
     const emailHtml = `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px;">
@@ -83,12 +83,14 @@ Deno.serve(async (req) => {
           <h2 style="color: #1a1a2e; font-size: 22px; margin: 0 0 12px;">You're Invited!</h2>
           <p style="color: #4b5563; font-size: 15px; line-height: 1.6; margin: 0 0 8px;">
             <strong>${inviterName}</strong> has invited you to join
-            <strong>${companyName}</strong> on Rhome as ${role === 'admin' ? 'an Admin' : 'a Member'}.
+            <strong>${companyName}</strong> on Rhome as ${role === 'admin' ? 'an Admin' : role === 'agent' ? 'an Agent' : 'a Member'}.
           </p>
           <p style="color: #6b7280; font-size: 13px; margin: 0 0 24px;">
             ${role === 'admin'
-              ? 'As an Admin, you can manage listings, respond to inquiries, and invite new team members.'
-              : 'As a Member, you can manage listings and respond to inquiries.'}
+              ? 'As an <strong>Admin</strong>, you can manage listings, respond to inquiries, and invite new team members.'
+              : role === 'agent'
+                ? 'As an <strong>Agent</strong>, you\'ll get your own profile under ' + companyName + ', can be assigned to listings, and connect directly with renters.'
+                : 'As a <strong>Member</strong>, you can manage listings and respond to inquiries.'}
           </p>
           <a href="${joinLink}" style="display: inline-block; background: linear-gradient(135deg, #ff6b5b, #e83a2a); color: white; text-decoration: none; padding: 14px 40px; border-radius: 12px; font-weight: 700; font-size: 15px;">
             Join Team
@@ -112,7 +114,9 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         from: 'Rhome <noreply@rhomeapp.io>',
         to: email,
-        subject: `${inviterName} invited you to join ${companyName} on Rhome`,
+        subject: role === 'agent'
+          ? `${inviterName} invited you to join ${companyName} as an agent on Rhome`
+          : `${inviterName} invited you to join ${companyName} on Rhome`,
         html: emailHtml,
       }),
     });

@@ -758,10 +758,12 @@ export interface TeamMember {
   memberUserId?: string;
   email: string;
   fullName?: string;
-  role: 'owner' | 'admin' | 'member';
+  role: 'owner' | 'admin' | 'member' | 'agent';
   status: 'pending' | 'active' | 'removed';
   invitedAt: string;
   joinedAt?: string;
+  agentLicenseNumber?: string;
+  agentSpecialties?: string[];
 }
 
 export interface DailyQuestion {

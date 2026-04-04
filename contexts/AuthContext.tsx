@@ -97,12 +97,12 @@ interface AuthContextType {
   switchMode: (mode: 'renter' | 'host') => Promise<void>;
   completeHostOnboarding: () => Promise<void>;
   getTeamMembers: () => Promise<TeamMember[]>;
-  inviteTeamMember: (email: string, name: string, role: 'admin' | 'member') => Promise<void>;
+  inviteTeamMember: (email: string, name: string, role: 'admin' | 'member' | 'agent', agentLicenseNumber?: string) => Promise<void>;
   resendTeamInvite: (member: TeamMember) => Promise<void>;
   removeTeamMember: (memberId: string) => Promise<void>;
-  updateTeamMemberRole: (memberId: string, role: 'admin' | 'member') => Promise<void>;
+  updateTeamMemberRole: (memberId: string, role: 'admin' | 'member' | 'agent') => Promise<void>;
   getTeamSeatLimit: () => number;
-  teamRole: 'owner' | 'admin' | 'member' | null;
+  teamRole: 'owner' | 'admin' | 'member' | 'agent' | null;
   canInviteMembers: boolean;
   canManageBilling: boolean;
   canDeleteListings: boolean;
@@ -2627,6 +2627,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           status: d.status,
           invitedAt: d.invited_at,
           joinedAt: d.joined_at ?? undefined,
+          agentLicenseNumber: d.agent_license_number ?? undefined,
+          agentSpecialties: d.agent_specialties ?? undefined,
         }));
       }
     }
@@ -2664,7 +2666,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const inviteTeamMember = async (email: string, name: string, role: 'admin' | 'member'): Promise<void> => {
+  const inviteTeamMember = async (email: string, name: string, role: 'admin' | 'member' | 'agent', agentLicenseNumber?: string): Promise<void> => {
     if (!user || user.hostType !== 'company') return;
     const members = await getTeamMembers();
     const seatLimit = getTeamSeatLimit();
@@ -2680,6 +2682,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         full_name: name,
         role,
         status: 'pending',
+        ...(role === 'agent' && agentLicenseNumber ? { agent_license_number: agentLicenseNumber } : {}),
       }).select('id').single();
       if (error) throw new Error(error.message);
       if (data?.id) {
@@ -2706,7 +2709,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const updateTeamMemberRole = async (memberId: string, role: 'admin' | 'member'): Promise<void> => {
+  const updateTeamMemberRole = async (memberId: string, role: 'admin' | 'member' | 'agent'): Promise<void> => {
     if (!user) return;
     if (isSupabaseConfigured) {
       await supabase

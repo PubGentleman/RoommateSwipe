@@ -22,6 +22,7 @@ import { NotificationsScreen } from '../screens/shared/NotificationsScreen';
 import { ProfileCompletionScreen } from '../screens/shared/ProfileCompletionScreen';
 import { OccupationPickerScreen } from '../screens/shared/OccupationPickerScreen';
 import { LifestyleQuestionsScreen } from '../screens/shared/LifestyleQuestionsScreen';
+import { JoinTeamScreen } from '../screens/host/JoinTeamScreen';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../hooks/useTheme';
@@ -41,6 +42,7 @@ export type RootStackParamList = {
   ProfileCompletion: undefined;
   OccupationPicker: undefined;
   LifestyleQuestions: undefined;
+  JoinTeam: { inviteId: string };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -244,6 +246,15 @@ export const RootNavigator = () => {
         <Stack.Screen
           name="LifestyleQuestions"
           component={LifestyleQuestionsScreen}
+          options={{
+            presentation: 'modal',
+            headerShown: false,
+            animation: 'slide_from_bottom',
+          }}
+        />
+        <Stack.Screen
+          name="JoinTeam"
+          component={JoinTeamScreen}
           options={{
             presentation: 'modal',
             headerShown: false,

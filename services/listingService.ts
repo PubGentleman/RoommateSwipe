@@ -254,7 +254,8 @@ export async function getCompanyAgents(companyUserId: string): Promise<{ id: str
       .from('team_members')
       .select('member_user_id, full_name, email')
       .eq('company_user_id', companyUserId)
-      .eq('status', 'active');
+      .eq('status', 'active')
+      .eq('role', 'agent');
 
     if (error || !data || data.length === 0) {
       const allUsers = await StorageService.getUsers();

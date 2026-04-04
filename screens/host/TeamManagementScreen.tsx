@@ -13,7 +13,7 @@ import { useNavigation } from '@react-navigation/native';
 import { TeamMember } from '../../types/models';
 import { LinearGradient } from 'expo-linear-gradient';
 
-type InviteRole = 'admin' | 'member';
+type InviteRole = 'admin' | 'member' | 'agent';
 
 export function TeamManagementScreen() {
   const { theme } = useTheme();
@@ -28,6 +28,7 @@ export function TeamManagementScreen() {
   const [inviteName, setInviteName] = useState('');
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<InviteRole>('member');
+  const [agentLicense, setAgentLicense] = useState('');
   const [sending, setSending] = useState(false);
   const [menuMemberId, setMenuMemberId] = useState<string | null>(null);
 
@@ -49,12 +50,13 @@ export function TeamManagementScreen() {
     if (!inviteName.trim() || !inviteEmail.trim()) return;
     setSending(true);
     try {
-      await inviteTeamMember(inviteEmail.trim(), inviteName.trim(), inviteRole);
+      await inviteTeamMember(inviteEmail.trim(), inviteName.trim(), inviteRole, inviteRole === 'agent' ? agentLicense : undefined);
       await showAlert({ title: 'Invite Sent', message: `${inviteName.trim()} has been invited to join your team.` });
       setShowInvite(false);
       setInviteName('');
       setInviteEmail('');
       setInviteRole('member');
+      setAgentLicense('');
       loadMembers();
     } catch (e: any) {
       await showAlert({ title: 'Error', message: e?.message || 'Failed to send invite.', variant: 'warning' });
@@ -73,8 +75,7 @@ export function TeamManagementScreen() {
     loadMembers();
   };
 
-  const handleRoleChange = async (member: TeamMember) => {
-    const newRole: InviteRole = member.role === 'admin' ? 'member' : 'admin';
+  const handleRoleChange = async (member: TeamMember, newRole: InviteRole) => {
     await updateTeamMemberRole(member.id, newRole);
     loadMembers();
   };
@@ -100,6 +101,7 @@ export function TeamManagementScreen() {
     switch (role) {
       case 'owner': return '#F59E0B';
       case 'admin': return '#3B82F6';
+      case 'agent': return '#34C759';
       default: return '#6B7280';
     }
   };
@@ -156,15 +158,33 @@ export function TeamManagementScreen() {
               <Text style={[styles.menuItemText, { color: theme.text }]}>Resend Invite</Text>
             </Pressable>
           ) : null}
-          <Pressable
-            style={styles.menuItem}
-            onPress={() => { setMenuMemberId(null); handleRoleChange(item); }}
-          >
-            <Feather name="shield" size={14} color={theme.text} />
-            <Text style={[styles.menuItemText, { color: theme.text }]}>
-              {item.role === 'admin' ? 'Change to Member' : 'Change to Admin'}
-            </Text>
-          </Pressable>
+          {item.role !== 'admin' ? (
+            <Pressable
+              style={styles.menuItem}
+              onPress={() => { setMenuMemberId(null); handleRoleChange(item, 'admin'); }}
+            >
+              <Feather name="shield" size={14} color={theme.text} />
+              <Text style={[styles.menuItemText, { color: theme.text }]}>Change to Admin</Text>
+            </Pressable>
+          ) : null}
+          {item.role !== 'member' ? (
+            <Pressable
+              style={styles.menuItem}
+              onPress={() => { setMenuMemberId(null); handleRoleChange(item, 'member'); }}
+            >
+              <Feather name="users" size={14} color={theme.text} />
+              <Text style={[styles.menuItemText, { color: theme.text }]}>Change to Member</Text>
+            </Pressable>
+          ) : null}
+          {item.role !== 'agent' ? (
+            <Pressable
+              style={styles.menuItem}
+              onPress={() => { setMenuMemberId(null); handleRoleChange(item, 'agent'); }}
+            >
+              <Feather name="briefcase" size={14} color={theme.text} />
+              <Text style={[styles.menuItemText, { color: theme.text }]}>Change to Agent</Text>
+            </Pressable>
+          ) : null}
           <Pressable
             style={styles.menuItem}
             onPress={() => { setMenuMemberId(null); handleRemove(item); }}
@@ -211,6 +231,7 @@ export function TeamManagementScreen() {
           <Text style={[Typography.h2, { color: theme.text }]}>Your Team</Text>
           <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
             {activeCount} of {seatLimitDisplay} seats used
+            {' · '}{members.filter(m => m.role === 'agent').length} agents
           </Text>
         </View>
         <Pressable
@@ -290,27 +311,42 @@ export function TeamManagementScreen() {
             <View style={styles.fieldWrap}>
               <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Role</Text>
               <View style={styles.roleRow}>
-                {(['admin', 'member'] as InviteRole[]).map((r) => (
-                  <Pressable
-                    key={r}
-                    style={[
-                      styles.roleCard,
-                      { backgroundColor: theme.background, borderColor: inviteRole === r ? theme.primary : theme.border },
-                    ]}
-                    onPress={() => setInviteRole(r)}
-                  >
-                    <Text style={[styles.roleCardTitle, { color: inviteRole === r ? theme.primary : theme.text }]}>
-                      {r === 'admin' ? 'Admin' : 'Member'}
-                    </Text>
-                    <Text style={[styles.roleCardDesc, { color: theme.textSecondary }]}>
-                      {r === 'admin'
-                        ? 'Manage listings, inquiries, and invite members'
-                        : 'Manage listings and respond to inquiries'}
-                    </Text>
-                  </Pressable>
-                ))}
+                <Pressable
+                  style={[styles.roleCard, { backgroundColor: theme.background, borderColor: inviteRole === 'admin' ? theme.primary : theme.border }]}
+                  onPress={() => setInviteRole('admin')}
+                >
+                  <Text style={[styles.roleCardTitle, { color: inviteRole === 'admin' ? theme.primary : theme.text }]}>Admin</Text>
+                  <Text style={[styles.roleCardDesc, { color: theme.textSecondary }]}>Manage listings, inquiries, and invite members</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.roleCard, { backgroundColor: theme.background, borderColor: inviteRole === 'member' ? theme.primary : theme.border }]}
+                  onPress={() => setInviteRole('member')}
+                >
+                  <Text style={[styles.roleCardTitle, { color: inviteRole === 'member' ? theme.primary : theme.text }]}>Member</Text>
+                  <Text style={[styles.roleCardDesc, { color: theme.textSecondary }]}>Manage listings and respond to inquiries</Text>
+                </Pressable>
               </View>
+              <Pressable
+                style={[styles.roleCard, { backgroundColor: theme.background, borderColor: inviteRole === 'agent' ? '#34C759' : theme.border, marginTop: 10 }]}
+                onPress={() => setInviteRole('agent')}
+              >
+                <Text style={[styles.roleCardTitle, { color: inviteRole === 'agent' ? '#34C759' : theme.text }]}>Agent</Text>
+                <Text style={[styles.roleCardDesc, { color: theme.textSecondary }]}>Licensed agent — gets their own profile, can be assigned to listings</Text>
+              </Pressable>
             </View>
+
+            {inviteRole === 'agent' ? (
+              <View style={styles.fieldWrap}>
+                <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Agent License Number</Text>
+                <TextInput
+                  style={[styles.input, { backgroundColor: theme.background, borderColor: theme.border, color: theme.text }]}
+                  value={agentLicense}
+                  onChangeText={setAgentLicense}
+                  placeholder="Enter agent's license number (optional)"
+                  placeholderTextColor={theme.textSecondary + '60'}
+                />
+              </View>
+            ) : null}
 
             <Pressable
               style={[styles.sendBtn, (!inviteName.trim() || !inviteEmail.trim()) ? { opacity: 0.4 } : null]}
