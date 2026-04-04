@@ -10,6 +10,7 @@ import { useConfirm } from '../../contexts/ConfirmContext';
 import { StorageService } from '../../utils/storage';
 import { HostPlanType, HostSubscriptionData } from '../../types/models';
 import { HOST_PLANS, AGENT_VERIFICATION_FEE, subscriptionFromPlan, calculateHostMonthlyCost, isFreePlan } from '../../utils/hostPricing';
+import { PLAN_LIMITS, COMPANY_PI_LIMITS } from '../../constants/planLimits';
 import { PurchaseConfirmModal } from '../../components/modals/PurchaseConfirmModal';
 import { HOST_PLAN_CONFIGS, HOST_DOWNGRADE_CONFIG } from '../../constants/purchaseConfig';
 import {
@@ -311,6 +312,30 @@ export const HostSubscriptionScreen = () => {
 
   const hostTypePlans = getHostPlans(hostType);
 
+  const getCompanyMetrics = (planId: string) => {
+    const isEnterprise = planId.includes('enterprise');
+    const companyKey = isEnterprise ? 'enterprise' : planId.includes('pro') ? 'pro' : planId.includes('starter') ? 'starter' : null;
+    const planKey = isEnterprise ? 'company_enterprise' : planId.includes('pro') ? 'company_pro' : planId.includes('starter') ? 'company_starter' : 'free';
+    const limits = PLAN_LIMITS[planKey] || PLAN_LIMITS.free;
+    const seats = companyKey ? COMPANY_PI_LIMITS[companyKey as keyof typeof COMPANY_PI_LIMITS]?.maxTeamMembers : 1;
+    return {
+      agentSeats: isEnterprise || seats === -1 ? 'Custom' : String(seats ?? 1),
+      freeBoosts: isEnterprise ? 'Custom' : String(limits.freeBoostsPerMonth),
+      piCalls: isEnterprise ? 'Custom' : (limits.piCallsPerMonth === -1 ? 'Custom' : String(limits.piCallsPerMonth)),
+    };
+  };
+
+  const getAgentMetrics = (planId: string) => {
+    const key = planId.includes('business') ? 'agent_business'
+      : planId.includes('pro') ? 'agent_pro'
+      : planId.includes('starter') ? 'agent_starter' : 'free';
+    const limits = PLAN_LIMITS[key] || PLAN_LIMITS.free;
+    return {
+      freeBoosts: String(limits.freeBoostsPerMonth),
+      piCalls: limits.piCallsPerMonth === -1 ? 'Custom' : String(limits.piCallsPerMonth),
+    };
+  };
+
   const renderPlanCard = (display: PlanDisplayInfo) => {
     const planKey = display.id;
     const hostPlanConfig = HOST_PLANS[planKey as HostPlanType];
@@ -408,6 +433,48 @@ export const HostSubscriptionScreen = () => {
             </View>
           </View>
         ) : null}
+
+        {hostType === 'company' ? (() => {
+          const m = getCompanyMetrics(planKey);
+          const isEnt = planKey.includes('enterprise');
+          return (
+            <View style={styles.metricsRow}>
+              <View style={styles.metricPill}>
+                <Feather name="users" size={16} color={display.badgeColor} />
+                <Text style={[styles.metricValue, isEnt ? styles.metricValueSmall : null]}>{m.agentSeats}</Text>
+                <Text style={styles.metricLabel}>Agents</Text>
+              </View>
+              <View style={styles.metricPill}>
+                <Feather name="zap" size={16} color={display.badgeColor} />
+                <Text style={[styles.metricValue, isEnt ? styles.metricValueSmall : null]}>{m.freeBoosts}</Text>
+                <Text style={styles.metricLabel}>Free Boosts</Text>
+              </View>
+              <View style={styles.metricPill}>
+                <Feather name="message-circle" size={16} color={display.badgeColor} />
+                <Text style={[styles.metricValue, isEnt ? styles.metricValueSmall : null]}>{m.piCalls}</Text>
+                <Text style={styles.metricLabel}>PI Calls/mo</Text>
+              </View>
+            </View>
+          );
+        })() : null}
+
+        {hostType === 'agent' ? (() => {
+          const m = getAgentMetrics(planKey);
+          return (
+            <View style={styles.metricsRow}>
+              <View style={styles.metricPill}>
+                <Feather name="zap" size={16} color={display.badgeColor} />
+                <Text style={styles.metricValue}>{m.freeBoosts}</Text>
+                <Text style={styles.metricLabel}>Free Boosts</Text>
+              </View>
+              <View style={styles.metricPill}>
+                <Feather name="message-circle" size={16} color={display.badgeColor} />
+                <Text style={styles.metricValue}>{m.piCalls}</Text>
+                <Text style={styles.metricLabel}>PI Calls/mo</Text>
+              </View>
+            </View>
+          );
+        })() : null}
 
         {isCurrentPlan ? (
           <View style={styles.ctaBtnDisabled}>
@@ -813,6 +880,36 @@ const styles = StyleSheet.create({
   },
   listingCapStrong: { fontSize: 15, fontWeight: '700', color: '#fff', marginBottom: 1 },
   listingCapSub: { fontSize: 13, color: '#888' },
+  metricsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 16,
+  },
+  metricPill: {
+    flex: 1,
+    backgroundColor: '#1E1E1E',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    alignItems: 'center',
+  },
+  metricValue: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '800',
+    marginTop: 4,
+  },
+  metricValueSmall: {
+    fontSize: 14,
+  },
+  metricLabel: {
+    color: '#888',
+    fontSize: 10,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginTop: 2,
+  },
   ctaBtnPrimary: {
     height: 48,
     borderRadius: 12,

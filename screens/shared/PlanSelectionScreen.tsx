@@ -9,6 +9,7 @@ import { useConfirm } from '../../contexts/ConfirmContext';
 import { useStripePayment } from '../../hooks/useStripePayment';
 import { useRevenueCat } from '../../contexts/RevenueCatContext';
 import { getHostPlans, HostType } from '../../constants/hostPlansByType';
+import { PLAN_LIMITS, COMPANY_PI_LIMITS } from '../../constants/planLimits';
 
 const BG = '#111111';
 const CARD_BG = '#1a1a1a';
@@ -113,6 +114,30 @@ const getPerMonth = (plan: PlanOption, cycle: BillingCycle): string => {
   if (cycle === 'monthly') return `$${plan.monthlyPrice.toFixed(2)}/mo`;
   if (cycle === '3month') return `$${(plan.threeMonthPrice / 3).toFixed(2)}/mo`;
   return `$${(plan.annualPrice / 12).toFixed(2)}/mo`;
+};
+
+const getCompanyMetrics = (planId: string) => {
+  const isEnterprise = planId.includes('enterprise');
+  const companyKey = isEnterprise ? 'enterprise' : planId.includes('pro') ? 'pro' : planId.includes('starter') ? 'starter' : null;
+  const planKey = isEnterprise ? 'company_enterprise' : planId.includes('pro') ? 'company_pro' : planId.includes('starter') ? 'company_starter' : 'free';
+  const limits = PLAN_LIMITS[planKey] || PLAN_LIMITS.free;
+  const seats = companyKey ? COMPANY_PI_LIMITS[companyKey as keyof typeof COMPANY_PI_LIMITS]?.maxTeamMembers : 1;
+  return {
+    agentSeats: isEnterprise || seats === -1 ? 'Custom' : String(seats ?? 1),
+    freeBoosts: isEnterprise ? 'Custom' : String(limits.freeBoostsPerMonth),
+    piCalls: isEnterprise ? 'Custom' : (limits.piCallsPerMonth === -1 ? 'Custom' : String(limits.piCallsPerMonth)),
+  };
+};
+
+const getAgentMetrics = (planId: string) => {
+  const key = planId.includes('business') ? 'agent_business'
+    : planId.includes('pro') ? 'agent_pro'
+    : planId.includes('starter') ? 'agent_starter' : 'free';
+  const limits = PLAN_LIMITS[key] || PLAN_LIMITS.free;
+  return {
+    freeBoosts: String(limits.freeBoostsPerMonth),
+    piCalls: limits.piCallsPerMonth === -1 ? 'Custom' : String(limits.piCallsPerMonth),
+  };
 };
 
 export const PlanSelectionScreen = () => {
@@ -290,6 +315,50 @@ export const PlanSelectionScreen = () => {
                 ))}
               </View>
 
+              {hostType === 'company' ? (() => {
+                const m = getCompanyMetrics(plan.id);
+                const isEnt = plan.id.includes('enterprise');
+                const pillColor = plan.badgeColor || '#888';
+                return (
+                  <View style={s.metricsRow}>
+                    <View style={s.metricPill}>
+                      <Feather name="users" size={16} color={pillColor} />
+                      <Text style={[s.metricValue, isEnt ? s.metricValueSmall : null]}>{m.agentSeats}</Text>
+                      <Text style={s.metricLabel}>Agents</Text>
+                    </View>
+                    <View style={s.metricPill}>
+                      <Feather name="zap" size={16} color={pillColor} />
+                      <Text style={[s.metricValue, isEnt ? s.metricValueSmall : null]}>{m.freeBoosts}</Text>
+                      <Text style={s.metricLabel}>Free Boosts</Text>
+                    </View>
+                    <View style={s.metricPill}>
+                      <Feather name="message-circle" size={16} color={pillColor} />
+                      <Text style={[s.metricValue, isEnt ? s.metricValueSmall : null]}>{m.piCalls}</Text>
+                      <Text style={s.metricLabel}>PI Calls/mo</Text>
+                    </View>
+                  </View>
+                );
+              })() : null}
+
+              {hostType === 'agent' ? (() => {
+                const m = getAgentMetrics(plan.id);
+                const pillColor = plan.badgeColor || '#888';
+                return (
+                  <View style={s.metricsRow}>
+                    <View style={s.metricPill}>
+                      <Feather name="zap" size={16} color={pillColor} />
+                      <Text style={s.metricValue}>{m.freeBoosts}</Text>
+                      <Text style={s.metricLabel}>Free Boosts</Text>
+                    </View>
+                    <View style={s.metricPill}>
+                      <Feather name="message-circle" size={16} color={pillColor} />
+                      <Text style={s.metricValue}>{m.piCalls}</Text>
+                      <Text style={s.metricLabel}>PI Calls/mo</Text>
+                    </View>
+                  </View>
+                );
+              })() : null}
+
               {plan.isContactSales ? (
                 <Pressable
                   style={({ pressed }) => [
@@ -446,6 +515,36 @@ const s = StyleSheet.create({
   featureRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   featureText: { fontSize: 13, color: 'rgba(255,255,255,0.8)' },
   featureTextDim: { color: 'rgba(255,255,255,0.3)' },
+  metricsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 16,
+  },
+  metricPill: {
+    flex: 1,
+    backgroundColor: '#1E1E1E',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    alignItems: 'center',
+  },
+  metricValue: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '800',
+    marginTop: 4,
+  },
+  metricValueSmall: {
+    fontSize: 14,
+  },
+  metricLabel: {
+    color: '#888',
+    fontSize: 10,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginTop: 2,
+  },
 
   selectBtn: { borderRadius: 14, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center', paddingVertical: 14 },
   selectBtnFree: { backgroundColor: 'rgba(255,255,255,0.06)' },
