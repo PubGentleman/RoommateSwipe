@@ -11,6 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Property } from '../../types/models';
+import { StorageService } from '../../utils/storage';
 import { getListing, mapListingToProperty, updateListing } from '../../services/listingService';
 import { SUBWAY_LINE_COLORS } from '../../constants/transitData';
 import * as Haptics from 'expo-haptics';
@@ -29,25 +30,38 @@ export function HostListingDetailScreen() {
   const route = useRoute<RouteProp<RouteParams, 'HostListingDetail'>>();
   const insets = useSafeAreaInsets();
 
-  const { listingId } = route.params;
+  const { listingId, propertyId } = route.params as any;
+  const resolvedId = listingId || propertyId;
 
   const [property, setProperty] = useState<Property | null>(null);
   const [loading, setLoading] = useState(true);
   const [photoIndex, setPhotoIndex] = useState(0);
 
   const loadListing = useCallback(async () => {
+    if (!resolvedId) { setLoading(false); return; }
     setLoading(true);
+    let loaded = false;
     try {
-      const raw = await getListing(listingId);
+      const raw = await getListing(resolvedId);
       if (raw) {
         const mapped = mapListingToProperty(raw);
         setProperty(mapped);
+        loaded = true;
       }
     } catch (err) {
-      console.warn('Failed to load listing:', err);
+      console.warn('Supabase listing fetch failed, trying local:', err);
+    }
+    if (!loaded) {
+      try {
+        const properties = await StorageService.getProperties();
+        const found = properties.find(p => p.id === resolvedId);
+        if (found) {
+          setProperty(found);
+        }
+      } catch {}
     }
     setLoading(false);
-  }, [listingId]);
+  }, [resolvedId]);
 
   useFocusEffect(
     useCallback(() => {
