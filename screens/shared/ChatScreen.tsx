@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, StyleSheet, Pressable, FlatList, TextInput, KeyboardAvoidingView, Platform, Modal, Linking, Text, NativeSyntheticEvent, NativeScrollEvent } from 'react-native';
+import { View, StyleSheet, Pressable, FlatList, TextInput, KeyboardAvoidingView, Platform, Modal, Linking, Text, NativeSyntheticEvent, NativeScrollEvent, ActivityIndicator } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
 import { ThemedText } from '../../components/ThemedText';
 import { useTheme } from '../../hooks/useTheme';
@@ -34,6 +34,10 @@ import { ChatActionCard } from '../../components/ChatActionCard';
 import { VisitRequestModal } from '../../components/VisitRequestModal';
 import { BookingOfferModal } from '../../components/BookingOfferModal';
 import { sendStructuredMessage, updateMessageMetadata } from '../../services/messageService';
+import ChatAttachmentPicker from '../../components/ChatAttachmentPicker';
+import ChatImageMessage from '../../components/ChatImageMessage';
+import ChatFileMessage from '../../components/ChatFileMessage';
+import { pickImage, takePhoto, pickDocument, uploadChatAttachment } from '../../services/chatAttachmentService';
 import { createBooking } from '../../services/bookingService';
 import {
   updateRenterMessageTimestamp,
@@ -102,6 +106,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [otherUserTyping, setOtherUserTyping] = useState(false);
+  const [showAttachmentPicker, setShowAttachmentPicker] = useState(false);
+  const [uploadingAttachment, setUploadingAttachment] = useState(false);
   const typingPresenceRef = useRef<{ setTyping: (v: boolean) => Promise<void>; unsubscribe: () => void } | null>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showGroupOption, setShowGroupOption] = useState(true);
@@ -492,6 +498,78 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
     } else if (text.length === 0 && typingPresenceRef.current) {
       typingPresenceRef.current.setTyping(false);
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    }
+  };
+
+  const handlePickImage = async () => {
+    try {
+      const result = await pickImage();
+      if (!result || result.canceled) return;
+      const asset = result.assets[0];
+      setUploadingAttachment(true);
+      const attachment = await uploadChatAttachment(
+        user!.id,
+        asset.uri,
+        asset.fileName || `photo-${Date.now()}.jpg`,
+        asset.mimeType || 'image/jpeg'
+      );
+      const matchIdOrGroupId = matchIdFromConversation || conversationId;
+      if (isInquiryChat) {
+        const groupId = inquiryGroup?.id || conversationId.replace('inquiry_', '');
+        await sendGroupMessage(user!.id, groupId, `[Image: ${attachment.filename}]`);
+      } else {
+        await sendStructuredMessage(user!.id, matchIdOrGroupId, 'image', { url: attachment.url, filename: attachment.filename, mimeType: attachment.mimeType, sizeBytes: attachment.sizeBytes }, 'Sent a photo');
+      }
+    } catch (err: any) {
+      await alert({ title: 'Upload Failed', message: err.message || 'Could not upload the image.', variant: 'warning' });
+    } finally {
+      setUploadingAttachment(false);
+    }
+  };
+
+  const handleTakePhoto = async () => {
+    try {
+      const result = await takePhoto();
+      if (!result || result.canceled) return;
+      const asset = result.assets[0];
+      setUploadingAttachment(true);
+      const attachment = await uploadChatAttachment(
+        user!.id,
+        asset.uri,
+        `photo-${Date.now()}.jpg`,
+        'image/jpeg'
+      );
+      const matchIdOrGroupId = matchIdFromConversation || conversationId;
+      if (!isInquiryChat) {
+        await sendStructuredMessage(user!.id, matchIdOrGroupId, 'image', { url: attachment.url, filename: attachment.filename, mimeType: attachment.mimeType, sizeBytes: attachment.sizeBytes }, 'Sent a photo');
+      }
+    } catch (err: any) {
+      await alert({ title: 'Upload Failed', message: err.message || 'Could not take the photo.', variant: 'warning' });
+    } finally {
+      setUploadingAttachment(false);
+    }
+  };
+
+  const handlePickDocument = async () => {
+    try {
+      const result = await pickDocument();
+      if (!result || result.canceled) return;
+      const doc = result.assets[0];
+      setUploadingAttachment(true);
+      const attachment = await uploadChatAttachment(
+        user!.id,
+        doc.uri,
+        doc.name || `file-${Date.now()}`,
+        doc.mimeType || 'application/octet-stream'
+      );
+      const matchIdOrGroupId = matchIdFromConversation || conversationId;
+      if (!isInquiryChat) {
+        await sendStructuredMessage(user!.id, matchIdOrGroupId, 'file', { url: attachment.url, filename: attachment.filename, mimeType: attachment.mimeType, sizeBytes: attachment.sizeBytes }, `Sent a file: ${attachment.filename}`);
+      }
+    } catch (err: any) {
+      await alert({ title: 'Upload Failed', message: err.message || 'Could not upload the file.', variant: 'warning' });
+    } finally {
+      setUploadingAttachment(false);
     }
   };
 
@@ -1201,6 +1279,35 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
     }
 
     const msgType = (item as any).message_type;
+    const isOwnMsg = item.senderId === user?.id;
+
+    if (msgType === 'image' && (item as any).metadata?.url) {
+      return (
+        <View style={{ paddingHorizontal: 12, marginBottom: 8 }}>
+          <ChatImageMessage
+            url={(item as any).metadata.url}
+            isMine={isOwnMsg}
+            timestamp={item.timestamp?.toString() || new Date().toISOString()}
+          />
+        </View>
+      );
+    }
+
+    if (msgType === 'file' && (item as any).metadata?.url) {
+      return (
+        <View style={{ paddingHorizontal: 12, marginBottom: 8 }}>
+          <ChatFileMessage
+            url={(item as any).metadata.url}
+            filename={(item as any).metadata.filename || 'File'}
+            mimeType={(item as any).metadata.mimeType || ''}
+            sizeBytes={(item as any).metadata.sizeBytes || 0}
+            isMine={isOwnMsg}
+            timestamp={item.timestamp?.toString() || new Date().toISOString()}
+          />
+        </View>
+      );
+    }
+
     if (msgType === 'visit_request' || msgType === 'booking_offer') {
       if (messagingLocked) {
         return (
@@ -1972,6 +2079,17 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
           </View>
         ) : (
           <>
+            <Pressable
+              style={styles.attachBtn}
+              onPress={() => setShowAttachmentPicker(true)}
+              disabled={uploadingAttachment || messagingLocked}
+            >
+              {uploadingAttachment ? (
+                <ActivityIndicator size="small" color="#ff6b5b" />
+              ) : (
+                <Feather name="paperclip" size={20} color="rgba(255,255,255,0.5)" />
+              )}
+            </Pressable>
             {isInquiryChat && inquiryStatus === 'accepted' ? (
               <Pressable
                 onPress={() => setShowChatActions(true)}
@@ -2332,6 +2450,14 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
         role={user?.hostType === 'agent' ? 'host' : isHost ? 'host' : 'renter'}
         onUpgrade={() => { setShowPaywall(false); (navigation as any).navigate(isHost ? 'HostSubscription' : 'Plans'); }}
         onDismiss={() => setShowPaywall(false)}
+      />
+
+      <ChatAttachmentPicker
+        visible={showAttachmentPicker}
+        onClose={() => setShowAttachmentPicker(false)}
+        onPickImage={handlePickImage}
+        onTakePhoto={handleTakePhoto}
+        onPickDocument={handlePickDocument}
       />
     </KeyboardAvoidingView>
   );
@@ -2758,6 +2884,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#888',
     fontWeight: '500' as const,
+  },
+  attachBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
   },
   typingIndicator: {
     flexDirection: 'row' as const,
