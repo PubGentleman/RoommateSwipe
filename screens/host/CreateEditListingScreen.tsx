@@ -52,71 +52,74 @@ class GooglePlacesErrorBoundary extends React.Component<
   }
 }
 
-const LazyGooglePlacesAutocomplete = React.forwardRef((props: any, ref: any) => {
-  const [Comp, setComp] = React.useState<any>(null);
-  const [ready, setReady] = React.useState(false);
-  const [loadError, setLoadError] = React.useState(false);
+let _GooglePlacesComp: any = null;
+let _GooglePlacesLoadAttempted = false;
 
-  React.useEffect(() => {
-    const timer = setTimeout(() => {
-      try {
-        const mod = require('react-native-google-places-autocomplete');
-        setComp(() => mod.GooglePlacesAutocomplete);
-        setReady(true);
-      } catch (e) {
-        console.warn('GooglePlacesAutocomplete failed to load:', e);
-        setLoadError(true);
-        setReady(true);
-      }
-    }, 100);
-    return () => clearTimeout(timer);
-  }, []);
-
-  if (!ready) {
-    return (
-      <View style={{
-        height: 50, backgroundColor: '#141414', borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.1)', borderRadius: 12,
-        justifyContent: 'center', paddingHorizontal: 16,
-      }}>
-        <Text style={{ color: '#666', fontSize: 15 }}>Loading address search...</Text>
-      </View>
-    );
+function loadGooglePlacesSync() {
+  if (_GooglePlacesLoadAttempted) return _GooglePlacesComp;
+  _GooglePlacesLoadAttempted = true;
+  try {
+    const mod = require('react-native-google-places-autocomplete');
+    _GooglePlacesComp = mod?.GooglePlacesAutocomplete || null;
+    if (!_GooglePlacesComp) console.warn('GooglePlacesAutocomplete not found in module');
+  } catch (e) {
+    console.warn('Failed to load GooglePlacesAutocomplete:', e);
   }
+  return _GooglePlacesComp;
+}
 
-  if (loadError || !Comp) {
+loadGooglePlacesSync();
+
+const PlacesAutocompleteFallback = (props: { value: string; onChangeText: (t: string) => void; placeholder: string }) => (
+  <TextInput
+    style={{
+      height: 50, backgroundColor: '#141414', borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.1)', borderRadius: 12,
+      paddingHorizontal: 16, fontSize: 15, color: '#fff',
+    }}
+    value={props.value}
+    onChangeText={props.onChangeText}
+    placeholder={props.placeholder}
+    placeholderTextColor="#666"
+  />
+);
+
+const LazyGooglePlacesAutocomplete = React.forwardRef((props: any, ref: any) => {
+  const Comp = _GooglePlacesComp;
+
+  if (!Comp) {
     return (
-      <TextInput
-        style={{
-          height: 50, backgroundColor: '#141414', borderWidth: 1,
-          borderColor: 'rgba(255,255,255,0.1)', borderRadius: 12,
-          paddingHorizontal: 16, fontSize: 15, color: '#fff',
-        }}
+      <PlacesAutocompleteFallback
         value={props.textInputProps?.value || ''}
-        onChangeText={props.textInputProps?.onChangeText}
-        placeholder={props.placeholder || 'Enter your address'}
-        placeholderTextColor="#666"
+        onChangeText={props.textInputProps?.onChangeText || (() => {})}
+        placeholder={props.placeholder || 'Enter location'}
       />
     );
   }
 
+  const safeProps = {
+    predefinedPlaces: [],
+    filterReverseGeocodingByTypes: [],
+    ...(Platform.OS === 'web' ? {
+      requestUrl: {
+        useOnPlatform: 'web' as const,
+        url: 'https://maps.googleapis.com/maps/api',
+      },
+    } : {}),
+    ...props,
+  };
+
   return (
     <GooglePlacesErrorBoundary
       fallback={
-        <TextInput
-          style={{
-            height: 50, backgroundColor: '#141414', borderWidth: 1,
-            borderColor: 'rgba(255,255,255,0.1)', borderRadius: 12,
-            paddingHorizontal: 16, fontSize: 15, color: '#fff',
-          }}
+        <PlacesAutocompleteFallback
           value={props.textInputProps?.value || ''}
-          onChangeText={props.textInputProps?.onChangeText}
-          placeholder={props.placeholder || 'Enter your address'}
-          placeholderTextColor="#666"
+          onChangeText={props.textInputProps?.onChangeText || (() => {})}
+          placeholder={props.placeholder || 'Enter location'}
         />
       }
     >
-      <Comp ref={ref} {...props} />
+      <Comp ref={ref} {...safeProps} />
     </GooglePlacesErrorBoundary>
   );
 });
@@ -169,6 +172,7 @@ export const CreateEditListingScreen = () => {
   const [transitOverride, setTransitOverride] = useState('');
   const [coordinates, setCoordinates] = useState<{ lat: number; lng: number } | null>(null);
   const [addressFromAutocomplete, setAddressFromAutocomplete] = useState(false);
+  const [googleApiKey] = useState(() => process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || '');
 
   const handleManualAddressChange = useCallback((text: string) => {
     setAddress(text);
@@ -858,9 +862,9 @@ export const CreateEditListingScreen = () => {
 
   const renderLocationStep = () => (
     <View>
-      <View style={[styles.fieldContainer, { zIndex: 1000 }]}>
+      <View style={[styles.fieldContainer, { zIndex: 1000, elevation: 1000 }]}>
         <Text style={styles.label}>Address</Text>
-        {process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY ? (
+        {googleApiKey ? (
           <LazyGooglePlacesAutocomplete
             placeholder="Start typing your address..."
             fetchDetails={true}
@@ -891,7 +895,7 @@ export const CreateEditListingScreen = () => {
               setAddressFromAutocomplete(true);
             }}
             query={{
-              key: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
+              key: googleApiKey,
               language: 'en',
               types: 'address',
             }}
@@ -910,15 +914,17 @@ export const CreateEditListingScreen = () => {
               listView: {
                 backgroundColor: '#1a1a1a', borderWidth: 1,
                 borderColor: 'rgba(255,255,255,0.1)', borderRadius: 12,
-                marginTop: 4, zIndex: 1000,
+                marginTop: 4, position: 'absolute', top: 55, left: 0, right: 0,
+                zIndex: 9999, elevation: 9999,
               },
               row: { paddingHorizontal: 12, paddingVertical: 10, backgroundColor: '#1a1a1a' },
               description: { fontSize: 14, color: '#ccc' },
               separator: { height: 1, backgroundColor: '#333' },
             }}
             enablePoweredByContainer={false}
-            minLength={3}
+            minLength={2}
             debounce={300}
+            nearbyPlacesAPI="GooglePlacesSearch"
             keyboardShouldPersistTaps="handled"
             onFail={(error: any) => console.warn('Places autocomplete error:', error)}
             onNotFound={() => {}}
@@ -934,9 +940,9 @@ export const CreateEditListingScreen = () => {
         )}
       </View>
 
-      <View style={[styles.fieldContainer, { zIndex: 999 }]}>
+      <View style={[styles.fieldContainer, { zIndex: 999, elevation: 999 }]}>
         <Text style={styles.label}>City</Text>
-        {process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY ? (
+        {googleApiKey ? (
           <LazyGooglePlacesAutocomplete
             placeholder="Type a city..."
             fetchDetails={true}
@@ -964,7 +970,7 @@ export const CreateEditListingScreen = () => {
               if (loc) setCoordinates({ lat: loc.lat, lng: loc.lng });
             }}
             query={{
-              key: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
+              key: googleApiKey,
               language: 'en',
               types: '(cities)',
             }}
@@ -976,40 +982,24 @@ export const CreateEditListingScreen = () => {
             styles={{
               container: { flex: 0 },
               textInput: {
-                height: 50,
-                backgroundColor: '#141414',
-                borderWidth: 1,
-                borderColor: 'rgba(255,255,255,0.1)',
-                borderRadius: 12,
-                paddingHorizontal: 16,
-                fontSize: 15,
-                color: '#fff',
+                height: 50, backgroundColor: '#141414', borderWidth: 1,
+                borderColor: 'rgba(255,255,255,0.1)', borderRadius: 12,
+                paddingHorizontal: 16, fontSize: 15, color: '#fff',
               },
               listView: {
-                backgroundColor: '#1a1a1a',
-                borderWidth: 1,
-                borderColor: 'rgba(255,255,255,0.1)',
-                borderRadius: 12,
-                marginTop: 4,
-                zIndex: 999,
+                backgroundColor: '#1a1a1a', borderWidth: 1,
+                borderColor: 'rgba(255,255,255,0.1)', borderRadius: 12,
+                marginTop: 4, position: 'absolute', top: 55, left: 0, right: 0,
+                zIndex: 9999, elevation: 9999,
               },
-              row: {
-                paddingHorizontal: 12,
-                paddingVertical: 10,
-                backgroundColor: '#1a1a1a',
-              },
-              description: {
-                fontSize: 14,
-                color: '#ccc',
-              },
-              separator: {
-                height: 1,
-                backgroundColor: '#333',
-              },
+              row: { paddingHorizontal: 12, paddingVertical: 10, backgroundColor: '#1a1a1a' },
+              description: { fontSize: 14, color: '#ccc' },
+              separator: { height: 1, backgroundColor: '#333' },
             }}
             enablePoweredByContainer={false}
             minLength={2}
             debounce={300}
+            nearbyPlacesAPI="GooglePlacesSearch"
             keyboardShouldPersistTaps="handled"
             onFail={(error: any) => console.warn('City autocomplete error:', error)}
             onNotFound={() => {}}
@@ -1787,6 +1777,7 @@ export const CreateEditListingScreen = () => {
           contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 120 }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
+          nestedScrollEnabled={true}
         >
           {currentStepData?.subtitle ? (
             <Text style={wiz.stepSubtitle}>{currentStepData.subtitle}</Text>
