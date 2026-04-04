@@ -311,6 +311,99 @@ export async function getHostConversations(hostId: string): Promise<any[]> {
   }
 }
 
+export async function searchMessages(userId: string, query: string, limit = 20) {
+  if (!userId || !query || query.length < 2) return [];
+
+  const { data: matches } = await supabase
+    .from('matches')
+    .select('id, user_id_1, user_id_2')
+    .eq('status', 'matched')
+    .or(`user_id_1.eq.${userId},user_id_2.eq.${userId}`);
+
+  if (!matches || matches.length === 0) return [];
+
+  const matchIds = matches.map(m => m.id);
+
+  const { data: messages, error } = await supabase
+    .from('messages')
+    .select(`
+      id,
+      match_id,
+      sender_id,
+      content,
+      message_type,
+      created_at,
+      sender:users!sender_id(id, full_name, avatar_url)
+    `)
+    .in('match_id', matchIds)
+    .ilike('content', `%${query}%`)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (error || !messages) return [];
+
+  return messages.map((msg: any) => {
+    const match = matches.find(m => m.id === msg.match_id);
+    const otherUserId = match
+      ? (match.user_id_1 === userId ? match.user_id_2 : match.user_id_1)
+      : null;
+
+    return {
+      messageId: msg.id,
+      matchId: msg.match_id,
+      content: msg.content,
+      messageType: msg.message_type,
+      senderName: msg.sender?.full_name || 'Unknown',
+      senderPhoto: msg.sender?.avatar_url,
+      senderId: msg.sender_id,
+      createdAt: msg.created_at,
+      otherUserId,
+      isMine: msg.sender_id === userId,
+    };
+  });
+}
+
+export async function searchGroupMessages(userId: string, query: string, limit = 10) {
+  if (!userId || !query || query.length < 2) return [];
+
+  const { data: memberships } = await supabase
+    .from('group_members')
+    .select('group_id')
+    .eq('user_id', userId)
+    .eq('status', 'active');
+
+  if (!memberships || memberships.length === 0) return [];
+
+  const groupIds = memberships.map(m => m.group_id);
+
+  const { data: messages, error } = await supabase
+    .from('group_messages')
+    .select(`
+      id,
+      group_id,
+      sender_id,
+      content,
+      created_at,
+      group:groups!group_id(id, name, type, listing_address)
+    `)
+    .in('group_id', groupIds)
+    .ilike('content', `%${query}%`)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (error || !messages) return [];
+
+  return messages.map((msg: any) => ({
+    messageId: msg.id,
+    groupId: msg.group_id,
+    groupName: msg.group?.name || msg.group?.listing_address || 'Group',
+    groupType: msg.group?.type,
+    content: msg.content,
+    senderId: msg.sender_id,
+    createdAt: msg.created_at,
+  }));
+}
+
 export function joinChatPresence(
   matchId: string,
   userId: string,

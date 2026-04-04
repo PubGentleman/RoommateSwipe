@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable, FlatList, ScrollView, TextInput } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, Pressable, FlatList, ScrollView, TextInput, ActivityIndicator } from 'react-native';
 import Animated, { useSharedValue, useAnimatedScrollHandler, useAnimatedStyle, interpolate, Extrapolation } from 'react-native-reanimated';
 import { Feather } from '../../components/VectorIcons';
 import { Conversation, Match, RoommateProfile } from '../../types/models';
@@ -14,7 +14,7 @@ import { Image } from 'expo-image';
 import { calculateCompatibility } from '../../utils/matchingAlgorithm';
 import { LinearGradient } from 'expo-linear-gradient';
 import { User } from '../../types/models';
-import { getConversations as getSupabaseConversations, subscribeToAllMessages, getHostConversations } from '../../services/messageService';
+import { getConversations as getSupabaseConversations, subscribeToAllMessages, getHostConversations, searchMessages, searchGroupMessages } from '../../services/messageService';
 import { getMyInquiryGroups } from '../../services/groupService';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { Group } from '../../types/models';
@@ -27,6 +27,23 @@ function safeDate(value: any): Date {
     if (!isNaN(d.getTime())) return d;
   }
   return new Date();
+}
+
+function highlightSearchText(text: string, query: string): React.ReactNode {
+  if (!query || query.length < 2) return text;
+  const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const parts = text.split(new RegExp(`(${escaped})`, 'gi'));
+  return (
+    <Text>
+      {parts.map((part, i) =>
+        part.toLowerCase() === query.toLowerCase() ? (
+          <Text key={i} style={{ color: '#ff6b5b', fontWeight: '700' }}>{part}</Text>
+        ) : (
+          <Text key={i}>{part}</Text>
+        )
+      )}
+    </Text>
+  );
 }
 
 type MessagesScreenNavigationProp = NativeStackNavigationProp<MessagesStackParamList, 'MessagesList'>;
@@ -66,6 +83,10 @@ export const MessagesScreen = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchVisible, setIsSearchVisible] = useState(false);
+  const [messageResults, setMessageResults] = useState<any[]>([]);
+  const [groupMessageResults, setGroupMessageResults] = useState<any[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [inquiryGroups, setInquiryGroups] = useState<Group[]>([]);
   const [chatFilter, setChatFilter] = useState<ChatFilterKey>('all');
 
@@ -880,7 +901,37 @@ export const MessagesScreen = () => {
 
   const handleSearchToggle = () => {
     setIsSearchVisible(!isSearchVisible);
-    if (isSearchVisible) setSearchQuery('');
+    if (isSearchVisible) {
+      setSearchQuery('');
+      setMessageResults([]);
+      setGroupMessageResults([]);
+    }
+  };
+
+  const handleSearchChange = (text: string) => {
+    setSearchQuery(text);
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    if (text.length < 2) {
+      setMessageResults([]);
+      setGroupMessageResults([]);
+      setIsSearching(false);
+      return;
+    }
+    setIsSearching(true);
+    searchTimeoutRef.current = setTimeout(async () => {
+      try {
+        const [directResults, groupResults] = await Promise.all([
+          searchMessages(user!.id, text),
+          searchGroupMessages(user!.id, text),
+        ]);
+        setMessageResults(directResults);
+        setGroupMessageResults(groupResults);
+      } catch (err) {
+        console.warn('Message search error:', err);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 500);
   };
 
   const handleCompose = () => {
@@ -958,11 +1009,11 @@ export const MessagesScreen = () => {
               placeholder="Search conversations..."
               placeholderTextColor="rgba(255,255,255,0.3)"
               value={searchQuery}
-              onChangeText={setSearchQuery}
+              onChangeText={handleSearchChange}
               autoFocus
             />
             {searchQuery.length > 0 ? (
-              <Pressable onPress={() => setSearchQuery('')} hitSlop={8}>
+              <Pressable onPress={() => handleSearchChange('')} hitSlop={8}>
                 <Feather name="x-circle" size={14} color="rgba(255,255,255,0.4)" />
               </Pressable>
             ) : null}
@@ -997,21 +1048,114 @@ export const MessagesScreen = () => {
         </ScrollView>
       </View>
 
-      <AnimatedFlatList
-        data={filteredConversations}
-        renderItem={renderConversation}
-        keyExtractor={(item: any) => item.__isDivider ? '__cold_divider__' : item.id}
-        ListHeaderComponent={!isSearchVisible ? renderHeader : null}
-        ListFooterComponent={!isSearchVisible ? renderFooterNudge : null}
-        ListEmptyComponent={!isLoading ? renderEmptyState : null}
-        contentContainerStyle={[
-          styles.list,
-          { paddingBottom: insets.bottom + 100, flexGrow: filteredConversations.length === 0 ? 1 : undefined },
-        ]}
-        showsVerticalScrollIndicator={false}
-        onScroll={msgScrollHandler}
-        scrollEventThrottle={16}
-      />
+      {searchQuery.length >= 2 ? (
+        <ScrollView style={styles.searchResults} contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}>
+          {isSearching ? (
+            <View style={styles.searchLoading}>
+              <ActivityIndicator size="small" color="#ff6b5b" />
+              <Text style={styles.searchLoadingText}>Searching messages...</Text>
+            </View>
+          ) : (
+            <>
+              {messageResults.length > 0 ? (
+                <View>
+                  <Text style={styles.searchSectionTitle}>Messages</Text>
+                  {messageResults.map((result) => (
+                    <Pressable
+                      key={result.messageId}
+                      style={styles.searchResultItem}
+                      onPress={() => {
+                        const convId = `conv_${result.matchId}`;
+                        navigation.navigate('Chat', {
+                          conversationId: convId,
+                          matchId: result.matchId,
+                        } as any);
+                      }}
+                    >
+                      <View>
+                        {result.senderPhoto ? (
+                          <Image source={{ uri: result.senderPhoto }} style={styles.searchAvatar} />
+                        ) : (
+                          <View style={styles.searchAvatarFallback}>
+                            <Text style={styles.searchAvatarText}>
+                              {result.senderName.charAt(0).toUpperCase()}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                      <View style={styles.searchResultContent}>
+                        <Text style={styles.searchResultName}>
+                          {result.isMine ? 'You' : result.senderName}
+                        </Text>
+                        <Text style={styles.searchResultMessage} numberOfLines={2}>
+                          {highlightSearchText(result.content, searchQuery)}
+                        </Text>
+                        <Text style={styles.searchResultDate}>
+                          {new Date(result.createdAt).toLocaleDateString()}
+                        </Text>
+                      </View>
+                    </Pressable>
+                  ))}
+                </View>
+              ) : null}
+
+              {groupMessageResults.length > 0 ? (
+                <View>
+                  <Text style={styles.searchSectionTitle}>Group Messages</Text>
+                  {groupMessageResults.map((result) => (
+                    <Pressable
+                      key={result.messageId}
+                      style={styles.searchResultItem}
+                      onPress={() => {
+                        navigation.navigate('Chat', {
+                          conversationId: `inquiry_${result.groupId}`,
+                          inquiryGroup: { id: result.groupId, name: result.groupName },
+                        } as any);
+                      }}
+                    >
+                      <View style={[styles.searchAvatarFallback, { backgroundColor: 'rgba(99,102,241,0.15)' }]}>
+                        <Feather name="users" size={16} color="#6366f1" />
+                      </View>
+                      <View style={styles.searchResultContent}>
+                        <Text style={styles.searchResultName}>{result.groupName}</Text>
+                        <Text style={styles.searchResultMessage} numberOfLines={2}>
+                          {highlightSearchText(result.content, searchQuery)}
+                        </Text>
+                        <Text style={styles.searchResultDate}>
+                          {new Date(result.createdAt).toLocaleDateString()}
+                        </Text>
+                      </View>
+                    </Pressable>
+                  ))}
+                </View>
+              ) : null}
+
+              {messageResults.length === 0 && groupMessageResults.length === 0 ? (
+                <View style={styles.noSearchResults}>
+                  <Feather name="search" size={32} color="rgba(255,255,255,0.15)" />
+                  <Text style={styles.noSearchText}>No messages found for "{searchQuery}"</Text>
+                </View>
+              ) : null}
+            </>
+          )}
+        </ScrollView>
+      ) : (
+        <AnimatedFlatList
+          data={filteredConversations}
+          renderItem={renderConversation}
+          keyExtractor={(item: any) => item.__isDivider ? '__cold_divider__' : item.id}
+          ListHeaderComponent={!isSearchVisible ? renderHeader : null}
+          ListFooterComponent={!isSearchVisible ? renderFooterNudge : null}
+          ListEmptyComponent={!isLoading ? renderEmptyState : null}
+          contentContainerStyle={[
+            styles.list,
+            { paddingBottom: insets.bottom + 100, flexGrow: filteredConversations.length === 0 ? 1 : undefined },
+          ]}
+          showsVerticalScrollIndicator={false}
+          onScroll={msgScrollHandler}
+          scrollEventThrottle={16}
+        />
+      )}
 
     </View>
   );
@@ -1647,5 +1791,84 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  searchResults: {
+    flex: 1,
+    paddingHorizontal: 16,
+  },
+  searchLoading: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    gap: 8,
+    paddingVertical: 40,
+  },
+  searchLoadingText: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.4)',
+  },
+  searchSectionTitle: {
+    fontSize: 12,
+    fontWeight: '700' as const,
+    color: 'rgba(255,255,255,0.35)',
+    textTransform: 'uppercase' as const,
+    letterSpacing: 1,
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  searchResultItem: {
+    flexDirection: 'row' as const,
+    alignItems: 'flex-start' as const,
+    paddingVertical: 12,
+    gap: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.04)',
+  },
+  searchAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+  },
+  searchAvatarFallback: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,107,91,0.15)',
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  searchAvatarText: {
+    fontSize: 16,
+    fontWeight: '700' as const,
+    color: '#ff6b5b',
+  },
+  searchResultContent: {
+    flex: 1,
+    gap: 2,
+  },
+  searchResultName: {
+    fontSize: 14,
+    fontWeight: '600' as const,
+    color: '#fff',
+  },
+  searchResultMessage: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.55)',
+    lineHeight: 18,
+  },
+  searchResultDate: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.25)',
+    marginTop: 2,
+  },
+  noSearchResults: {
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    paddingVertical: 60,
+    gap: 12,
+  },
+  noSearchText: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.3)',
   },
 });

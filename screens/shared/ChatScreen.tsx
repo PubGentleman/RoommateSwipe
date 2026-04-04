@@ -96,7 +96,7 @@ type ChatScreenProps = {
 };
 
 export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
-  const { conversationId, otherUser: routeOtherUser, inquiryGroup, matchId: routeMatchId } = route.params;
+  const { conversationId, otherUser: routeOtherUser, inquiryGroup, matchId: routeMatchId, highlightMessageId } = route.params as any;
   const isInquiryChat = !!inquiryGroup || conversationId.startsWith('inquiry_');
   const { theme } = useTheme();
   const { user, incrementMessageCount, canSendMessage, canStartNewChat, incrementActiveChatCount, watchAdForCredit, isBasicUser, blockUser, reportUser, canSendColdMessage, useColdMessage, getHostPlan, updateUser } = useAuth();
@@ -106,6 +106,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [otherUserTyping, setOtherUserTyping] = useState(false);
+  const [highlightedId, setHighlightedId] = useState<string | null>(highlightMessageId || null);
   const [showAttachmentPicker, setShowAttachmentPicker] = useState(false);
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
   const typingPresenceRef = useRef<{ setTyping: (v: boolean) => Promise<void>; unsubscribe: () => void } | null>(null);
@@ -486,6 +487,18 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     };
   }, [conversationId, routeMatchId, user?.id, isInquiryChat]);
+
+  useEffect(() => {
+    if (highlightedId && messages.length > 0) {
+      const index = messages.findIndex(m => m.id === highlightedId);
+      if (index >= 0 && flatListRef.current) {
+        setTimeout(() => {
+          flatListRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 });
+        }, 300);
+        setTimeout(() => setHighlightedId(null), 3000);
+      }
+    }
+  }, [messages, highlightedId]);
 
   const handleTextChange = (text: string) => {
     setInputText(text);
@@ -1351,11 +1364,14 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
     const isRead = item.readAt || item.read;
     const isHostMessage = isInquiryChat && inquiryGroup?.hostId && item.senderId === inquiryGroup.hostId;
 
+    const isHighlighted = item.id === highlightedId;
+
     const bubbleContent = (
       <View
         style={[
           styles.messageContainer,
           isOwnMessage ? styles.ownMessage : styles.otherMessage,
+          isHighlighted ? { backgroundColor: 'rgba(255,107,91,0.12)', borderRadius: 16, padding: 4 } : null,
         ]}
       >
         {isHostMessage && !isOwnMessage ? (
