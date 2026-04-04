@@ -18,6 +18,7 @@ import { getConversations as getSupabaseConversations, subscribeToAllMessages, g
 import { getMyInquiryGroups } from '../../services/groupService';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { Group } from '../../types/models';
+import { AppHeader, HeaderIconButton } from '../../components/AppHeader';
 
 function safeDate(value: any): Date {
   if (value instanceof Date && !isNaN(value.getTime())) return value;
@@ -928,28 +929,25 @@ export const MessagesScreen = () => {
 
   return (
     <View style={[styles.container, { backgroundColor: '#111' }]}>
-      <View style={[styles.chatHeader, { paddingTop: insets.top + 12 }]}>
-        <View style={styles.chatHeaderLeft}>
-          <Text style={styles.chatHeaderTitle}>
-            {isHostMode ? 'Renter Chats' : 'Messages'}
-          </Text>
-          {totalUnread > 0 ? (
-            <View style={styles.chatHeaderBadge}>
-              <Text style={styles.chatHeaderBadgeText}>{totalUnread}</Text>
-            </View>
-          ) : null}
-        </View>
-        <View style={styles.chatHeaderActions}>
-          <Pressable style={styles.chatHeaderBtn} onPress={handleSearchToggle}>
-            <Feather name={isSearchVisible ? 'x' : 'search'} size={18} color="rgba(255,255,255,0.6)" />
-          </Pressable>
-          {!isHostMode ? (
-            <Pressable style={styles.chatHeaderBtn} onPress={handleCompose}>
-              <Feather name="edit-2" size={18} color="rgba(255,255,255,0.6)" />
-            </Pressable>
-          ) : null}
-        </View>
-      </View>
+      <AppHeader
+        title={isHostMode ? 'Renter Chats' : 'Messages'}
+        role={isHostMode ? 'host' : 'renter'}
+        hideSeparator
+        rightActions={
+          <>
+            <HeaderIconButton
+              icon={isSearchVisible ? 'x' : 'search'}
+              onPress={handleSearchToggle}
+            />
+            {!isHostMode ? (
+              <HeaderIconButton
+                icon="edit-2"
+                onPress={handleCompose}
+              />
+            ) : null}
+          </>
+        }
+      />
 
       {isSearchVisible ? (
         <Animated.View style={msgCollapsibleStyle}>
