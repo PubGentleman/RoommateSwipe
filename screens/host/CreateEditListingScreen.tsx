@@ -17,8 +17,55 @@ import { DatePickerModal } from '../../components/DatePickerModal';
 import { formatDate } from '../../utils/dateUtils';
 import { geocodeAddress } from '../../utils/transitService';
 import { fetchAreaInfo } from '../../services/neighborhoodService';
+import { NEIGHBORHOOD_TRAINS, SUBWAY_LINE_COLORS } from '../../constants/transitData';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+interface TransitStopDisplay {
+  id: string;
+  name: string;
+  type: string;
+  walkMinutes: number;
+  distanceMi: number;
+  lines: string[];
+}
+
+function cleanStationName(name: string): string {
+  return name
+    .replace(/\s*subway\s*station\s*/i, '')
+    .replace(/\s*station\s*/i, '')
+    .replace(/\s*entrance\s*/i, '')
+    .replace(/\s+line$/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function extractLinesFromName(name: string): string[] {
+  const ALL_LINES = ['A','C','E','B','D','F','M','G','J','Z','L','N','Q','R','W','S','1','2','3','4','5','6','7'];
+  const found: string[] = [];
+  const lineMatch = name.match(/\b([A-Z0-9])\s*line\b/i);
+  if (lineMatch && ALL_LINES.includes(lineMatch[1].toUpperCase())) {
+    found.push(lineMatch[1].toUpperCase());
+  }
+  const tokens = name.split(/[\s\-\/,·]+/);
+  for (const token of tokens) {
+    const upper = token.toUpperCase().trim();
+    if (upper.length === 1 && token.length === 1 && ALL_LINES.includes(upper) && !found.includes(upper)) {
+      found.push(upper);
+    }
+  }
+  return found;
+}
+
+const SubwayLineBadge = ({ line }: { line: string }) => {
+  const color = SUBWAY_LINE_COLORS[line] || '#808183';
+  const isLight = ['N', 'Q', 'R', 'W'].includes(line);
+  return (
+    <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: color, alignItems: 'center', justifyContent: 'center' }}>
+      <Text style={{ fontSize: 13, fontWeight: '800', color: isLight ? '#000' : '#fff', textAlign: 'center' }}>{line}</Text>
+    </View>
+  );
+};
 
 type RouteParams = {
   CreateEditListing: { propertyId?: string };
@@ -78,7 +125,9 @@ export const CreateEditListingScreen = () => {
   );
   const [houseRules, setHouseRules] = useState('');
   const [photos, setPhotos] = useState<string[]>([]);
-  const [transitOverride, setTransitOverride] = useState('');
+  const [transitStops, setTransitStops] = useState<TransitStopDisplay[]>([]);
+  const [transitOverrideText, setTransitOverrideText] = useState('');
+  const [transitManualMode, setTransitManualMode] = useState(false);
   const [coordinates, setCoordinates] = useState<{ lat: number; lng: number } | null>(null);
   const [addressResults, setAddressResults] = useState<any[]>([]);
   const [addressLoading, setAddressLoading] = useState(false);
@@ -91,31 +140,56 @@ export const CreateEditListingScreen = () => {
   const fetchTransitForLocation = useCallback(async (lat: number, lng: number) => {
     setTransitLoading(true);
     try {
-      console.log('Fetching transit for:', lat, lng);
       const areaInfo = await fetchAreaInfo(lat, lng);
-      console.log('Transit results:', areaInfo?.transit?.length ?? 0, 'stops found');
       if (areaInfo && areaInfo.transit && areaInfo.transit.length > 0) {
-        const summary = areaInfo.transit
-          .slice(0, 6)
-          .map(stop => {
-            const walkMin = Math.max(1, Math.round((stop.distanceMi || 0) * 20));
-            return `${stop.type}: ${stop.name} (${walkMin} min walk)`;
-          })
-          .join('\n');
-        if (!transitOverride.trim()) {
-          setTransitOverride(summary);
+        const seen = new Map<string, typeof areaInfo.transit[0]>();
+        for (const stop of areaInfo.transit) {
+          const key = cleanStationName(stop.name).toLowerCase();
+          if (!seen.has(key) || stop.distanceMi < (seen.get(key)?.distanceMi || Infinity)) {
+            seen.set(key, stop);
+          }
         }
+        const uniqueStops = Array.from(seen.values())
+          .sort((a, b) => a.distanceMi - b.distanceMi)
+          .slice(0, 8);
+
+        const neighborhoodLines = neighborhood ? (NEIGHBORHOOD_TRAINS[neighborhood] || []) : [];
+
+        const displayStops: TransitStopDisplay[] = uniqueStops.map((stop, idx) => {
+          const walkMin = Math.max(1, Math.round((stop.distanceMi || 0) * 20));
+          let lines: string[] = [];
+          if (stop.type === 'Subway' || stop.type === 'Train Station') {
+            lines = extractLinesFromName(stop.name);
+            if (lines.length === 0 && neighborhoodLines.length > 0) {
+              lines = neighborhoodLines;
+            }
+          }
+          return {
+            id: `${idx}-${stop.name}`,
+            name: cleanStationName(stop.name),
+            type: stop.type,
+            walkMinutes: walkMin,
+            distanceMi: stop.distanceMi,
+            lines,
+          };
+        });
+
+        setTransitStops(displayStops);
+        const textSummary = displayStops.map(s => {
+          const lineStr = s.lines.length > 0 ? ` (${s.lines.join(', ')})` : '';
+          return `${s.type}: ${s.name}${lineStr} — ${s.walkMinutes} min walk`;
+        }).join('\n');
+        setTransitOverrideText(textSummary);
       } else {
-        if (!transitOverride.trim()) {
-          setTransitOverride('No major transit stations found nearby');
-        }
+        setTransitStops([]);
+        setTransitOverrideText('No major transit stations found nearby');
       }
     } catch (err) {
       console.warn('Transit auto-detect failed:', err);
     } finally {
       setTransitLoading(false);
     }
-  }, [transitOverride]);
+  }, [neighborhood]);
 
   const searchAddress = useCallback(async (text: string) => {
     if (text.length < 3) { setAddressResults([]); return; }
@@ -376,8 +450,20 @@ export const CreateEditListingScreen = () => {
     if (prop.existingRoommatesCount !== undefined) setExistingRoommatesCount(prop.existingRoommatesCount);
     if (prop.requires_background_check !== undefined) setRequiresBackgroundCheck(!!prop.requires_background_check);
     if (prop.preferred_tenant_gender) setPreferredTenantGender(prop.preferred_tenant_gender);
+    if (prop.transitInfo?.stops && prop.transitInfo.stops.length > 0) {
+      const stops: TransitStopDisplay[] = prop.transitInfo.stops.map((s: any, i: number) => ({
+        id: `${i}-${s.name}`,
+        name: s.name || '',
+        type: s.type || 'Subway',
+        walkMinutes: s.walkMinutes || 0,
+        distanceMi: s.distanceMi || 0,
+        lines: s.lines || [],
+      }));
+      setTransitStops(stops);
+    }
     if (prop.transitInfo?.manualOverride) {
-      setTransitOverride(prop.transitInfo.manualOverride);
+      setTransitOverrideText(prop.transitInfo.manualOverride);
+      setTransitManualMode(true);
     }
     if (prop.coordinates) {
       setCoordinates(prop.coordinates);
@@ -516,12 +602,28 @@ export const CreateEditListingScreen = () => {
         } catch {}
       }
 
-      const transitInfo = {
-        stops: [],
-        noTransitNearby: !transitOverride.trim() || transitOverride === 'No major transit stations found nearby',
-        manualOverride: transitOverride.trim() || undefined,
-        fetchedAt: new Date().toISOString(),
-      };
+      let transitInfo: any;
+      if (transitStops.length > 0) {
+        transitInfo = {
+          stops: transitStops.map(s => ({
+            name: s.name,
+            type: s.type,
+            walkMinutes: s.walkMinutes,
+            distanceMi: s.distanceMi,
+            lines: s.lines,
+          })),
+          noTransitNearby: false,
+          manualOverride: transitManualMode ? transitOverrideText.trim() : undefined,
+          fetchedAt: new Date().toISOString(),
+        };
+      } else {
+        transitInfo = {
+          stops: [],
+          noTransitNearby: !transitOverrideText.trim() || transitOverrideText === 'No major transit stations found nearby',
+          manualOverride: transitOverrideText.trim() || undefined,
+          fetchedAt: new Date().toISOString(),
+        };
+      }
 
       const today = new Date().toISOString().split('T')[0];
       const resolvedAvailableDate = availableDate && availableDate !== 'flexible'
@@ -1014,30 +1116,122 @@ export const CreateEditListingScreen = () => {
       </View>
 
       <View style={styles.fieldContainer}>
-        <Text style={styles.label}>
-          Transportation {transitLoading ? '' : '(optional)'}
-        </Text>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Text style={styles.label}>
+            Transportation {transitLoading ? '' : '(optional)'}
+          </Text>
+          {transitStops.length > 0 && !transitLoading ? (
+            <Pressable onPress={() => setTransitManualMode(!transitManualMode)}>
+              <Text style={{ color: '#ff6b5b', fontSize: 12, fontWeight: '600' }}>
+                {transitManualMode ? 'Show detected' : 'Edit manually'}
+              </Text>
+            </Pressable>
+          ) : null}
+        </View>
+
         {transitLoading ? (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 }}>
             <ActivityIndicator size="small" color="#ff6b5b" />
             <Text style={{ color: '#888', fontSize: 13 }}>Detecting nearby transit...</Text>
           </View>
+        ) : transitManualMode ? (
+          <>
+            <Text style={wiz.hintText}>Type your own transit description.</Text>
+            <TextInput
+              style={[styles.input, styles.multilineInput, { minHeight: 80 }]}
+              placeholder="e.g. Near L train at Bedford Ave, G at Nassau Ave"
+              placeholderTextColor="#666"
+              value={transitOverrideText}
+              onChangeText={setTransitOverrideText}
+              multiline
+              numberOfLines={3}
+              textAlignVertical="top"
+            />
+          </>
+        ) : transitStops.length > 0 ? (
+          <>
+            <Text style={wiz.hintText}>Auto-detected from your address. Tap "Edit manually" to customize.</Text>
+            <View style={{ gap: 8, marginTop: 8 }}>
+              {transitStops.map((stop) => (
+                <View
+                  key={stop.id}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    backgroundColor: '#1a1a1a',
+                    borderRadius: 12,
+                    padding: 12,
+                    borderWidth: 1,
+                    borderColor: 'rgba(255,255,255,0.06)',
+                    gap: 10,
+                  }}
+                >
+                  <View style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: 8,
+                    backgroundColor: stop.type === 'Subway' ? '#0039A615'
+                      : stop.type === 'Bus Stop' ? '#FF631915'
+                      : stop.type === 'Train Station' ? '#00933C15'
+                      : '#80818315',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
+                    <Feather
+                      name={
+                        stop.type === 'Subway' ? 'navigation'
+                          : stop.type === 'Bus Stop' ? 'truck'
+                          : stop.type === 'Train Station' ? 'navigation'
+                          : 'map-pin'
+                      }
+                      size={14}
+                      color={
+                        stop.type === 'Subway' ? '#5b8cff'
+                          : stop.type === 'Bus Stop' ? '#FF6319'
+                          : stop.type === 'Train Station' ? '#00933C'
+                          : '#808183'
+                      }
+                    />
+                  </View>
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <Text style={{ color: '#fff', fontSize: 13, fontWeight: '600' }} numberOfLines={1}>
+                      {stop.name}
+                    </Text>
+                    <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 11 }}>
+                      {stop.walkMinutes} min walk · {stop.distanceMi.toFixed(2)} mi
+                    </Text>
+                  </View>
+                  {stop.lines.length > 0 ? (
+                    <View style={{ flexDirection: 'row', gap: 3, flexWrap: 'wrap', maxWidth: 110, justifyContent: 'flex-end' }}>
+                      {stop.lines.slice(0, 5).map((line) => (
+                        <SubwayLineBadge key={line} line={line} />
+                      ))}
+                      {stop.lines.length > 5 ? (
+                        <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, alignSelf: 'center' }}>
+                          +{stop.lines.length - 5}
+                        </Text>
+                      ) : null}
+                    </View>
+                  ) : null}
+                </View>
+              ))}
+            </View>
+          </>
         ) : (
-          <Text style={wiz.hintText}>
-            {transitOverride ? 'Auto-detected from your address. Edit if needed.' : 'We auto-detect nearby transit from your address. Override below if needed.'}
-          </Text>
+          <>
+            <Text style={wiz.hintText}>We auto-detect nearby transit from your address.</Text>
+            <TextInput
+              style={[styles.input, styles.multilineInput, { minHeight: 60 }]}
+              placeholder="e.g. Near L train at Bedford Ave, 5 min walk to station"
+              placeholderTextColor="#666"
+              value={transitOverrideText}
+              onChangeText={setTransitOverrideText}
+              multiline
+              numberOfLines={2}
+              textAlignVertical="top"
+            />
+          </>
         )}
-        <TextInput
-          style={[styles.input, styles.multilineInput, { minHeight: 80 }]}
-          placeholder="e.g. Near Metro Line 2, Bus Route 40, 5 min walk to station"
-          placeholderTextColor="#666"
-          value={transitOverride}
-          onChangeText={setTransitOverride}
-          multiline
-          numberOfLines={3}
-          textAlignVertical="top"
-          editable={!transitLoading}
-        />
       </View>
     </View>
   );
