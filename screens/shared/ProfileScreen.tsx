@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { View, StyleSheet, Pressable, Image, Modal, ScrollView, Text, TouchableOpacity, Platform, Switch } from 'react-native';
+import { View, StyleSheet, Pressable, Image as RNImage, Modal, ScrollView, Text, TouchableOpacity, Platform, Switch } from 'react-native';
+import { Image } from 'expo-image';
 import Animated, { useSharedValue, useAnimatedScrollHandler, useAnimatedStyle, interpolate, Extrapolation } from 'react-native-reanimated';
 import { Feather } from '../../components/VectorIcons';
 import * as Haptics from 'expo-haptics';
@@ -273,6 +274,109 @@ export const ProfileScreen = () => {
     }
   };
 
+  const getLifestyleCards = (u: any): Array<{ icon: string; iconColor: string; label: string; value: string }> => {
+    const prefs = u?.profileData?.preferences || {};
+    const cards: Array<{ icon: string; iconColor: string; label: string; value: string }> = [];
+    const sleep = prefs.sleepSchedule;
+    if (sleep) {
+      cards.push({
+        icon: sleep === 'early_bird' ? 'sunrise' : sleep === 'night_owl' ? 'moon' : 'refresh-cw',
+        iconColor: sleep === 'early_bird' ? '#f59e0b' : sleep === 'night_owl' ? '#6366f1' : '#3b82f6',
+        label: sleep === 'early_bird' ? 'Early Bird' : sleep === 'night_owl' ? 'Night Owl' : 'Flexible',
+        value: 'Sleep',
+      });
+    }
+    const clean = prefs.cleanliness;
+    if (clean) {
+      cards.push({
+        icon: 'check-circle',
+        iconColor: clean === 'very_tidy' ? '#3ECF8E' : clean === 'moderate' ? '#6366f1' : '#f59e0b',
+        label: clean === 'very_tidy' ? 'Very Tidy' : clean === 'moderate' ? 'Moderate' : 'Relaxed',
+        value: 'Clean',
+      });
+    }
+    const pets = prefs.pets;
+    if (pets) {
+      cards.push({
+        icon: pets === 'no_pets' ? 'slash' : 'heart',
+        iconColor: pets === 'have_pets' ? '#ff6b5b' : pets === 'love_pets' ? '#ec4899' : '#888',
+        label: pets === 'have_pets' ? 'Has Pet' : pets === 'love_pets' ? 'Pet Lover' : 'No Pets',
+        value: 'Pets',
+      });
+    }
+    const work = prefs.workLocation;
+    if (work) {
+      cards.push({
+        icon: work === 'wfh' ? 'home' : work === 'office' ? 'briefcase' : 'refresh-cw',
+        iconColor: work === 'wfh' ? '#3ECF8E' : work === 'office' ? '#3b82f6' : '#f59e0b',
+        label: work === 'wfh' ? 'WFH' : work === 'office' ? 'Office' : 'Hybrid',
+        value: 'Work',
+      });
+    }
+    const noise = prefs.noiseTolerance;
+    if (noise) {
+      cards.push({
+        icon: noise === 'quiet' ? 'volume' : noise === 'moderate' ? 'volume-1' : 'volume-2',
+        iconColor: noise === 'quiet' ? '#6366f1' : noise === 'moderate' ? '#3b82f6' : '#f59e0b',
+        label: noise === 'quiet' ? 'Quiet' : noise === 'moderate' ? 'Normal' : 'Loud OK',
+        value: 'Noise',
+      });
+    }
+    const budget = u?.profileData?.budget;
+    if (budget) {
+      cards.push({
+        icon: 'dollar-sign',
+        iconColor: '#3ECF8E',
+        label: budget >= 3000 ? '$3K+' : `$${(budget / 1000).toFixed(1)}K`,
+        value: 'Budget',
+      });
+    }
+    const smoking = prefs.smoking;
+    if (smoking) {
+      cards.push({
+        icon: smoking === 'no' ? 'wind' : 'cloud',
+        iconColor: smoking === 'no' ? '#3ECF8E' : '#888',
+        label: smoking === 'no' ? 'Non-Smoker' : 'Smoker',
+        value: 'Smoking',
+      });
+    }
+    const guests = prefs.guestPolicy;
+    if (guests) {
+      cards.push({
+        icon: guests === 'rarely' ? 'lock' : guests === 'sometimes' ? 'users' : 'user-plus',
+        iconColor: guests === 'rarely' ? '#888' : guests === 'sometimes' ? '#3b82f6' : '#f59e0b',
+        label: guests === 'rarely' ? 'Rarely' : guests === 'sometimes' ? 'Sometimes' : 'Often',
+        value: 'Guests',
+      });
+    }
+    return cards.slice(0, 6);
+  };
+
+  const profileCompletion = useMemo(() => {
+    let filled = 0;
+    const total = 10;
+    if (user?.full_name || user?.name) filled++;
+    if (user?.avatar_url || user?.profilePicture || user?.photos?.[0]) filled++;
+    if (user?.profileData?.bio) filled++;
+    if (user?.profileData?.occupation) filled++;
+    if (user?.profileData?.city || user?.city) filled++;
+    if (user?.profileData?.preferences?.sleepSchedule) filled++;
+    if (user?.profileData?.preferences?.cleanliness) filled++;
+    if (user?.profileData?.preferences?.smoking) filled++;
+    if (user?.profileData?.budget) filled++;
+    if ((user?.profileData?.photos?.length || user?.photos?.length || 0) >= 2) filled++;
+    return Math.round((filled / total) * 100);
+  }, [user]);
+
+  const nextImprovement = useMemo(() => {
+    if (!user?.profileData?.bio) return 'Add a bio to boost your match score by ~8%';
+    if (!user?.profileData?.preferences?.sleepSchedule) return 'Add your sleep schedule for +5% accuracy';
+    if (!user?.profileData?.preferences?.cleanliness) return 'Set your cleanliness level for +5% accuracy';
+    if ((user?.profileData?.photos?.length || user?.photos?.length || 0) < 3) return 'Add more photos — profiles with 3+ get 40% more interest';
+    if (!user?.profileData?.occupation) return 'Add your occupation for better work-style matching';
+    return null;
+  }, [user]);
+
   return (
     <View style={[styles.root, { paddingTop: 0 }]}>
       <AppHeader
@@ -302,7 +406,7 @@ export const ProfileScreen = () => {
           <View style={styles.avatarRing}>
             <View style={styles.avatarWrap}>
               {(user?.photos?.[0] || user?.profilePicture) ? (
-                <Image source={{ uri: user?.photos?.[0] || user?.profilePicture }} style={styles.avatarImage} />
+                <RNImage source={{ uri: user?.photos?.[0] || user?.profilePicture }} style={styles.avatarImage} />
               ) : (
                 <LinearGradient colors={['#667eea', '#764ba2']} style={styles.avatarCircle} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
                   <Text style={styles.avatarInitial}>{userInitial}</Text>
@@ -452,19 +556,118 @@ export const ProfileScreen = () => {
           )}
 
         {!isHost ? (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <View style={styles.sectionTitleRow}>
-                <View style={styles.sectionTitleBar} />
-                <Text style={styles.sectionTitle}>Profile Strength</Text>
-              </View>
-              <Pressable onPress={() => { setShowAISheet(true); setAiSheetContext('profile_reminder'); }}>
-                <Text style={styles.sectionAction}>View all</Text>
+          <View style={styles.renterProfileCard}>
+            <View style={styles.rpPhotoGrid}>
+              <Pressable style={styles.rpMainPhoto} onPress={() => navigation.navigate('ProfileQuestionnaire')}>
+                {(user?.photos?.[0] || user?.profilePicture || user?.avatar_url) ? (
+                  <Image source={{ uri: user?.photos?.[0] || user?.profilePicture || user?.avatar_url }} style={styles.rpMainPhotoImg} contentFit="cover" />
+                ) : (
+                  <LinearGradient colors={['#ff6b5b', '#ff8e53']} style={styles.rpMainPhotoImg}>
+                    <Text style={styles.rpMainPhotoInitial}>
+                      {(user?.name || user?.full_name || 'U').charAt(0).toUpperCase()}
+                    </Text>
+                  </LinearGradient>
+                )}
+                <View style={styles.rpEditPhotoOverlay}>
+                  <Feather name="camera" size={14} color="#fff" />
+                </View>
               </Pressable>
+              <View style={styles.rpThumbPhotos}>
+                {(user?.photos || user?.profileData?.photos || []).slice(1, 4).map((photo: string, i: number) => (
+                  <Image key={i} source={{ uri: photo }} style={styles.rpThumbPhoto} contentFit="cover" />
+                ))}
+                {(user?.photos || user?.profileData?.photos || []).length < 4 ? (
+                  <Pressable style={styles.rpAddPhotoThumb} onPress={() => navigation.navigate('ProfileQuestionnaire')}>
+                    <Feather name="plus" size={18} color="rgba(255,255,255,0.3)" />
+                  </Pressable>
+                ) : null}
+              </View>
             </View>
-            <ProfileCompletionCard user={user} searchType={user?.profileData?.apartment_search_type} onEditProfile={(missingSteps) => {
-              navigation.navigate('ProfileQuestionnaire', { missingSteps });
-            }} />
+
+            <View style={styles.rpIdentity}>
+              <Text style={styles.rpProfileName}>
+                {user?.name || user?.full_name || 'Your Name'}{user?.profileData?.age ? `, ${user.profileData.age}` : ''}
+              </Text>
+              <View style={styles.rpInfoRow}>
+                <Feather name="map-pin" size={12} color="#ff6b5b" />
+                <Text style={styles.rpInfoText}>
+                  {user?.profileData?.neighborhood || user?.profileData?.city || user?.city || 'Add your location'}
+                </Text>
+              </View>
+              {user?.profileData?.occupation ? (
+                <View style={styles.rpInfoRow}>
+                  <Feather name="briefcase" size={12} color="rgba(255,255,255,0.4)" />
+                  <Text style={styles.rpInfoText}>{user.profileData.occupation}</Text>
+                </View>
+              ) : null}
+              <View style={styles.rpBadgeRow}>
+                {(user?.purchases?.hostVerificationBadge || user?.isVerified) ? (
+                  <View style={styles.rpVerifiedBadge}>
+                    <Feather name="shield" size={10} color="#3ECF8E" />
+                    <Text style={styles.rpVerifiedText}>Verified</Text>
+                  </View>
+                ) : null}
+                {renterPlan && renterPlan !== 'basic' ? (
+                  <View style={[styles.rpPlanBadge, {
+                    backgroundColor: renterPlan === 'elite' ? 'rgba(255,215,0,0.1)' : 'rgba(99,102,241,0.1)',
+                  }]}>
+                    <Feather name="star" size={10} color={renterPlan === 'elite' ? '#FFD700' : '#6366f1'} />
+                    <Text style={[styles.rpPlanBadgeText, {
+                      color: renterPlan === 'elite' ? '#FFD700' : '#6366f1',
+                    }]}>
+                      {renterPlan === 'elite' ? 'Elite' : 'Plus'}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+            </View>
+
+            {user?.profileData?.bio ? (
+              <View style={styles.rpBioSection}>
+                <Text style={styles.rpBioText} numberOfLines={3}>
+                  "{user.profileData.bio}"
+                </Text>
+              </View>
+            ) : (
+              <Pressable style={styles.rpAddBioPrompt} onPress={() => navigation.navigate('ProfileQuestionnaire')}>
+                <Feather name="edit-2" size={14} color="#ff6b5b" />
+                <Text style={styles.rpAddBioText}>Add a bio to help roommates get to know you</Text>
+              </Pressable>
+            )}
+
+            {getLifestyleCards(user).length > 0 ? (
+              <View style={styles.rpLifestyleGrid}>
+                {getLifestyleCards(user).map((card, i) => (
+                  <View key={i} style={styles.rpLifestyleCard}>
+                    <Feather name={card.icon as any} size={20} color={card.iconColor} />
+                    <Text style={styles.rpLifestyleLabel}>{card.label}</Text>
+                    <Text style={styles.rpLifestyleValue}>{card.value}</Text>
+                  </View>
+                ))}
+              </View>
+            ) : null}
+
+            <View style={styles.rpCompatPreview}>
+              <Text style={styles.rpCompatPreviewTitle}>Your Match Profile</Text>
+              <Text style={styles.rpCompatPreviewSubtext}>How others see your compatibility score</Text>
+              <View style={styles.rpCompletionBar}>
+                <View style={styles.rpCompletionTrack}>
+                  <View style={[styles.rpCompletionFill, { width: `${profileCompletion}%` }]} />
+                </View>
+                <Text style={styles.rpCompletionPct}>{profileCompletion}%</Text>
+              </View>
+              {nextImprovement ? (
+                <View style={styles.rpImprovementHint}>
+                  <Feather name="zap" size={12} color="#f59e0b" />
+                  <Text style={styles.rpImprovementText}>{nextImprovement}</Text>
+                </View>
+              ) : null}
+            </View>
+
+            <Pressable style={styles.rpEditProfileBtn} onPress={() => navigation.navigate('ProfileQuestionnaire')}>
+              <Feather name="edit-2" size={16} color="#ff6b5b" />
+              <Text style={styles.rpEditProfileText}>Edit Profile</Text>
+            </Pressable>
           </View>
         ) : null}
 
@@ -1111,6 +1314,240 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: '#111',
+  },
+  renterProfileCard: {
+    margin: 16,
+    backgroundColor: '#161616',
+    borderRadius: 20,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+  },
+  rpPhotoGrid: {
+    flexDirection: 'row',
+    gap: 3,
+    padding: 3,
+  },
+  rpMainPhoto: {
+    flex: 2,
+    height: 200,
+    borderRadius: 18,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  rpMainPhotoImg: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rpMainPhotoInitial: {
+    fontSize: 48,
+    fontWeight: '800',
+    color: '#fff',
+  },
+  rpEditPhotoOverlay: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rpThumbPhotos: {
+    flex: 1,
+    gap: 3,
+  },
+  rpThumbPhoto: {
+    flex: 1,
+    borderRadius: 12,
+  },
+  rpAddPhotoThumb: {
+    flex: 1,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    borderStyle: 'dashed',
+  },
+  rpIdentity: {
+    padding: 16,
+    paddingBottom: 8,
+    gap: 6,
+  },
+  rpProfileName: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#fff',
+  },
+  rpInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  rpInfoText: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.55)',
+  },
+  rpBadgeRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 4,
+  },
+  rpVerifiedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(62,207,142,0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  rpVerifiedText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#3ECF8E',
+  },
+  rpPlanBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  rpPlanBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  rpBioSection: {
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+  },
+  rpBioText: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.7)',
+    fontStyle: 'italic',
+    lineHeight: 20,
+  },
+  rpAddBioPrompt: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginHorizontal: 16,
+    marginBottom: 12,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,107,91,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,91,0.15)',
+    borderStyle: 'dashed',
+  },
+  rpAddBioText: {
+    fontSize: 13,
+    color: 'rgba(255,107,91,0.7)',
+    flex: 1,
+  },
+  rpLifestyleGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
+  rpLifestyleCard: {
+    width: '30%',
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderRadius: 12,
+    padding: 10,
+    alignItems: 'center',
+    gap: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+  },
+  rpLifestyleLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  rpLifestyleValue: {
+    fontSize: 10,
+    color: 'rgba(255,255,255,0.35)',
+  },
+  rpCompatPreview: {
+    marginHorizontal: 16,
+    padding: 14,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+    marginBottom: 16,
+    gap: 6,
+  },
+  rpCompatPreviewTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  rpCompatPreviewSubtext: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.35)',
+  },
+  rpCompletionBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 4,
+  },
+  rpCompletionTrack: {
+    flex: 1,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    overflow: 'hidden',
+  },
+  rpCompletionFill: {
+    height: '100%',
+    borderRadius: 3,
+    backgroundColor: '#ff6b5b',
+  },
+  rpCompletionPct: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#ff6b5b',
+  },
+  rpImprovementHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 4,
+  },
+  rpImprovementText: {
+    fontSize: 11,
+    color: '#f59e0b',
+  },
+  rpEditProfileBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginHorizontal: 16,
+    marginBottom: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,107,91,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,91,0.2)',
+  },
+  rpEditProfileText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#ff6b5b',
   },
   topNav: {
     flexDirection: 'row',
