@@ -1345,6 +1345,20 @@ export const HostDashboardScreen = () => {
           </>
         ) : null}
 
+        <Pressable
+          style={{ backgroundColor: '#1a1a1a', borderRadius: 14, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 }}
+          onPress={() => navigation.navigate('RevenueOverview')}
+        >
+          <View style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: 'rgba(108,92,231,0.12)', alignItems: 'center', justifyContent: 'center' }}>
+            <Feather name="credit-card" size={18} color="#6C5CE7" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: '#fff', fontSize: 15, fontWeight: '600' }}>Revenue & Spending</Text>
+            <Text style={{ color: '#888', fontSize: 12 }}>Costs, ROI, transactions</Text>
+          </View>
+          <Feather name="chevron-right" size={16} color="rgba(255,255,255,0.3)" />
+        </Pressable>
+
         <View style={[styles.sectionHeader, { marginTop: 6 }]}>
           <Text style={styles.sectionTitle}>QUICK ACTIONS</Text>
         </View>

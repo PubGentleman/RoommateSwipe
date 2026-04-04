@@ -37,6 +37,25 @@ export async function updateSubscription(userId: string, plan: string, billingCy
 
   if (error) throw error;
 
+  const monthlyPriceCents: Record<string, number> = {
+    starter: 1999, pro: 4999, business: 9999,
+    agent_starter: 4900, agent_pro: 9900, agent_business: 14900,
+    company_starter: 19900, company_pro: 39900, company_enterprise: 0,
+  };
+  const monthlyPrice = monthlyPriceCents[plan] || 0;
+  const cycleMultiplier = billingCycle === '3month' ? 3 : billingCycle === 'annual' ? 12 : 1;
+  const priceCents = monthlyPrice * cycleMultiplier;
+  if (priceCents > 0) {
+    const { error: txErr } = await supabase.from('host_transactions').insert({
+      host_id: userId,
+      type: 'subscription_payment',
+      amount_cents: priceCents,
+      description: `${plan} plan - ${billingCycle}`,
+      metadata: { plan, billingCycle, monthlyPrice },
+    });
+    if (txErr) console.error('[RevenueService] Failed to record subscription tx:', txErr.message);
+  }
+
   const agentPlans = ['pay_per_use', 'starter', 'pro', 'business'];
   if (agentPlans.includes(plan)) {
     await supabase

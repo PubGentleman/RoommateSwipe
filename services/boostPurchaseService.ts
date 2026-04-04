@@ -1,6 +1,7 @@
 import { StorageService } from '../utils/storage';
 import { BOOST_PACKS } from '../utils/hostPricing';
 import { Alert } from 'react-native';
+import { supabase } from '../lib/supabase';
 
 export type BoostType = 'quick' | 'standard' | 'extended';
 
@@ -49,6 +50,15 @@ export async function purchaseBoostPack(
     pricePerBoost: pack.pricePerBoost,
     totalPrice: pack.totalPrice,
   });
+
+  const { error: txErr } = await supabase.from('host_transactions').insert({
+    host_id: userId,
+    type: 'boost_purchase',
+    amount_cents: Math.round(pack.totalPrice * 100),
+    description: `Boost pack: ${packId}`,
+    metadata: { packId, credits: pack.quantity, boostType },
+  });
+  if (txErr) console.error('[RevenueService] Failed to record boost tx:', txErr.message);
 
   return {
     success: true,

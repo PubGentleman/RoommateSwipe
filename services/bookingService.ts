@@ -46,6 +46,21 @@ export async function createBooking(params: {
       .single();
 
     if (error) throw error;
+
+    const { error: txErr } = await supabase.from('host_transactions').insert({
+      host_id: params.hostId,
+      type: 'booking_confirmed',
+      amount_cents: -(params.monthlyRent * 100),
+      description: `Booking confirmed: $${params.monthlyRent}/mo`,
+      metadata: {
+        listingId: params.listingId,
+        monthlyRent: params.monthlyRent,
+        leaseLength: params.leaseLength,
+        renterId: params.renterId,
+      },
+    });
+    if (txErr) console.error('[RevenueService] Failed to record booking tx:', txErr.message);
+
     return { success: true, booking: data };
   } catch (err: any) {
     return { success: false, error: err.message || 'Failed to create booking' };

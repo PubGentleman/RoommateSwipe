@@ -38,6 +38,7 @@ import { TeamManagementScreen } from '../screens/host/TeamManagementScreen';
 import { HostListingDetailScreen } from '../screens/host/HostListingDetailScreen';
 import { ListingPerformanceScreen } from '../screens/host/ListingPerformanceScreen';
 import { InquiryTrendsScreen } from '../screens/host/InquiryTrendsScreen';
+import { RevenueOverviewScreen } from '../screens/host/RevenueOverviewScreen';
 import { useTheme } from '../hooks/useTheme';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotificationContext } from '../contexts/NotificationContext';
@@ -75,6 +76,7 @@ export type HostDashboardStackParamList = {
   AgentGroupBuilder: { preselectedIds?: string[]; preselectedRenters?: any[]; listingId?: string };
   ListingPerformance: { listingId: string };
   InquiryTrends: undefined;
+  RevenueOverview: undefined;
 };
 
 export type HostGroupsStackParamList = {
@@ -143,6 +145,7 @@ function DashboardStackNavigator() {
       <DashboardStack.Screen name="AgentGroupBuilder" component={AgentGroupBuilderScreen} />
       <DashboardStack.Screen name="ListingPerformance" component={ListingPerformanceScreen} />
       <DashboardStack.Screen name="InquiryTrends" component={InquiryTrendsScreen} />
+      <DashboardStack.Screen name="RevenueOverview" component={RevenueOverviewScreen} />
     </DashboardStack.Navigator>
   );
 }
