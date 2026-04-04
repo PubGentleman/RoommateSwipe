@@ -1694,25 +1694,41 @@ export const ProfileQuestionnaireScreen = () => {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={0}
     >
-      <AppHeader
-        title={isMissingMode ? `${currentFilteredIndex + 1} of ${stepsToShow.length}` : (isOnboarding ? 'Create Profile' : 'Edit Profile')}
-        mode="back"
-        onBack={goBack}
-        role={user?.role === 'renter' ? 'renter' : 'host'}
-        hideSeparator
-        rightActions={isMissingMode ? (
-          <Pressable onPress={() => navigation.goBack()} style={styles.navButton}>
-            <Feather name="x" size={24} color="rgba(255,255,255,0.5)" />
+      <View style={{ paddingTop: insets.top + 10, backgroundColor: '#111' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 10, gap: 10 }}>
+          <Pressable
+            onPress={() => {
+              const parent = navigation.getParent?.();
+              if (user?.role === 'renter') {
+                if (parent) parent.navigate('Explore');
+                else { try { (navigation as any).navigate('Explore'); } catch {} }
+              } else {
+                if (parent) parent.navigate('Dashboard', { screen: 'DashboardMain' });
+                else { try { (navigation as any).navigate('DashboardMain'); } catch {} }
+              }
+            }}
+            hitSlop={8}
+          >
+            <RhomeLogo variant="icon-only" size="sm" />
           </Pressable>
-        ) : (
-          <RhomeLogo variant="icon-only" size="sm" />
-        )}
-        bottomContent={
-          <View style={styles.progressWrap}>
-            <ProgressBar currentStep={currentFilteredIndex} totalSteps={stepsToShow.length} />
+          <TouchableOpacity onPress={goBack} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+            <Feather name="arrow-left" size={22} color="rgba(255,255,255,0.8)" />
+          </TouchableOpacity>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 17, fontWeight: '700', color: '#fff' }} numberOfLines={1}>
+              {isMissingMode ? `${currentFilteredIndex + 1} of ${stepsToShow.length}` : (isOnboarding ? 'Create Profile' : 'Edit Profile')}
+            </Text>
           </View>
-        }
-      />
+          {isMissingMode ? (
+            <Pressable onPress={() => navigation.goBack()} style={styles.navButton}>
+              <Feather name="x" size={24} color="rgba(255,255,255,0.5)" />
+            </Pressable>
+          ) : null}
+        </View>
+        <View style={styles.progressWrap}>
+          <ProgressBar currentStep={currentFilteredIndex} totalSteps={stepsToShow.length} />
+        </View>
+      </View>
 
       <ScrollView
         key={currentStepId}
