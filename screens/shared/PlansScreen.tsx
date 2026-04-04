@@ -224,7 +224,7 @@ export const PlansScreen = () => {
       alert({ title: 'Timed Out', message: 'The purchase is taking too long. Please check your subscription status in Account Settings and try again if needed.', variant: 'warning' });
     }, 90000);
     try {
-      const { success, subscriptionId } = await processPayment(user.id, user.email || '', selectedPlan, billingCycle);
+      const { success, subscriptionId } = await processPayment(user.id, user.email || '', selectedPlan, billingCycle, 'renter');
       if (!success) {
         setSubscribing(false);
         setSelectedPlan(null);
@@ -596,7 +596,7 @@ export const PlansScreen = () => {
           currentPlan={RENTER_PLAN_LIMITS[currentPlan].label}
           loading={subscribing}
           onConfirm={handleConfirmSubscription}
-          onCancel={() => setSelectedPlan(null)}
+          onCancel={() => { setSelectedPlan(null); setSubscribing(false); }}
         />
       ) : null}
 

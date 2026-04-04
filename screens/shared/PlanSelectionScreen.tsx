@@ -162,7 +162,8 @@ export const PlanSelectionScreen = () => {
 
     try {
       const stripePlan = planId;
-      const { success, subscriptionId } = await processPayment(user.id, user.email || '', stripePlan, billingCycle);
+      const planType = isHost ? 'host' : 'renter';
+      const { success, subscriptionId } = await processPayment(user.id, user.email || '', stripePlan, billingCycle, planType as any);
 
       if (!success) {
         setProcessing(false);

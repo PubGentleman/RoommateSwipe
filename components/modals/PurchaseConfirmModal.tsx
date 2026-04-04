@@ -111,7 +111,7 @@ export function PurchaseConfirmModal({
     >
       <Pressable
         style={StyleSheet.absoluteFill}
-        onPress={loading ? undefined : onCancel}
+        onPress={onCancel}
       >
         <Animated.View style={[styles.backdrop, { opacity }]} />
       </Pressable>
@@ -182,7 +182,6 @@ export function PurchaseConfirmModal({
           <Pressable
             style={[styles.cancelBtn, { backgroundColor: theme.background, borderColor: theme.border }]}
             onPress={onCancel}
-            disabled={loading}
           >
             <ThemedText style={[Typography.body, { color: theme.textSecondary, fontWeight: '600' }]}>
               Cancel
