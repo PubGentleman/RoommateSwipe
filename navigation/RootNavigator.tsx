@@ -150,6 +150,11 @@ export const RootNavigator = () => {
   }
 
   if (step === 'profile') {
+    const isHostProfessional = user.role === 'host' && (user.hostType === 'agent' || user.hostType === 'company');
+    if (isHostProfessional) {
+      completeOnboardingStep(user.hostType ? 'plan' : 'hostType');
+      return null;
+    }
     return (
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="OnboardingProfile" component={ProfileQuestionnaireScreen} />
