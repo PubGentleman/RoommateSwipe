@@ -97,6 +97,7 @@ function SearchIntentScreen({ navigation }: { navigation: any }) {
     <WhatAreYouLookingForScreen
       isSettings
       onComplete={() => {
+        navigation.goBack();
         navigation.getParent()?.navigate('Explore');
       }}
       initialIntent={currentIntent}
