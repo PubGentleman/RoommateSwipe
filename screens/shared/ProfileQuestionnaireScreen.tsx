@@ -470,6 +470,7 @@ export const ProfileQuestionnaireScreen = () => {
   const [email, setEmail] = useState(user?.email || '');
   const [licenseNumber, setLicenseNumber] = useState(user?.licenseNumber || '');
   const [agencyName, setAgencyName] = useState(user?.agencyName || '');
+  const [companyName, setCompanyName] = useState(user?.companyName || '');
   const [licensePhoto, setLicensePhoto] = useState<string | null>(user?.licenseDocumentUrl || null);
   const [birthday, setBirthday] = useState(user?.birthday || '');
   const [brokerageLicense, setBrokerageLicense] = useState(user?.brokerageLicense || user?.profileData?.brokerageLicense || '');
@@ -679,6 +680,7 @@ export const ProfileQuestionnaireScreen = () => {
         agencyName: agencyName.trim() || undefined,
         licenseDocumentUrl: licensePhoto || undefined,
         brokerageLicense: brokerageLicense.trim() || undefined,
+        companyName: companyName.trim() || undefined,
       } : {}),
       preferredNeighborhoods: preferredNeighborhoods.length > 0 ? preferredNeighborhoods : undefined,
       profileData: {
@@ -1017,6 +1019,18 @@ export const ProfileQuestionnaireScreen = () => {
                     </Pressable>
                   )}
                 </View>
+                {user?.hostType === 'company' ? (
+                  <View style={styles.inputGroup}>
+                    <ThemedText style={styles.inputLabel}>Company Name</ThemedText>
+                    <TextInput
+                      style={styles.textInput}
+                      value={companyName}
+                      onChangeText={setCompanyName}
+                      placeholder="e.g. Skyline Properties LLC"
+                      placeholderTextColor="rgba(255,255,255,0.25)"
+                    />
+                  </View>
+                ) : null}
               </>
             ) : null}
           </View>
