@@ -838,7 +838,7 @@ export const HostDashboardScreen = () => {
           })
         )}
 
-        {activeCount > 0 && !isAgent ? (
+        {activeCount > 0 ? (
           <Pressable
             style={styles.groupMatchCard}
             onPress={() => {
@@ -859,7 +859,7 @@ export const HostDashboardScreen = () => {
           </Pressable>
         ) : null}
 
-        {activeCount > 0 && !isAgent ? (
+        {activeCount > 0 ? (
           <Pressable
             style={styles.groupMatchCard}
             onPress={() => {
@@ -980,7 +980,7 @@ export const HostDashboardScreen = () => {
           </Pressable>
         ) : null}
 
-        {user?.hostType === 'company' ? (
+        {(user?.hostType === 'company' || user?.hostType === 'agent') ? (
           <Pressable
             style={styles.groupMatchCard}
             onPress={() => navigation.navigate('CompanyFillPipeline')}
@@ -998,7 +998,7 @@ export const HostDashboardScreen = () => {
           </Pressable>
         ) : null}
 
-        {user?.hostType === 'company' && activeCount > 0 ? (
+        {(user?.hostType === 'company' || user?.hostType === 'agent') && activeCount > 0 ? (
           <View style={[styles.groupMatchCard, { flexDirection: 'column' as const }]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 }}>
               <View style={[styles.groupMatchIconWrap, { backgroundColor: PURPLE + '20' }]}>
@@ -1006,7 +1006,7 @@ export const HostDashboardScreen = () => {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.groupMatchTitle}>{'\u03C0'} Pi Matchmaker Summary</Text>
-                <Text style={styles.groupMatchSub}>AI-powered renter matching across all company listings</Text>
+                <Text style={styles.groupMatchSub}>AI-powered renter matching across all {user?.hostType === 'company' ? 'company' : 'your'} listings</Text>
               </View>
             </View>
             <View style={{ flexDirection: 'row', gap: 10, marginBottom: piTopPicks.length > 0 ? 12 : 0 }}>
