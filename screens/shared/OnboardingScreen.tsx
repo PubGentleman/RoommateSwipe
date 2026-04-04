@@ -1,388 +1,423 @@
-import React, { useState, useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  Dimensions,
-  FlatList,
-  Pressable,
+  View, Text, Pressable, StyleSheet, Dimensions, FlatList,
+  NativeSyntheticEvent, NativeScrollEvent,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
-  useSharedValue,
-  withSpring,
-  FadeIn,
-  FadeInDown,
+  useSharedValue, useAnimatedStyle, withTiming, withSpring,
+  withDelay, withSequence, withRepeat, interpolate,
+  useAnimatedScrollHandler, Extrapolation,
 } from 'react-native-reanimated';
-import { Feather } from '../../components/VectorIcons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { RhomeLogo } from '../../components/RhomeLogo';
+import { Feather } from '../../components/VectorIcons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
-interface OnboardingFeature {
-  icon: keyof typeof Feather.glyphMap;
-  title: string;
-  subtitle: string;
-}
-
-interface OnboardingPage {
-  id: string;
-  icon: keyof typeof Feather.glyphMap;
-  accentColor: string;
-  accentBg: string;
-  gradient: [string, string];
-  title: string;
-  subtitle: string;
-  features: OnboardingFeature[];
-}
-
-const ACCENT = '#ff6b5b';
-
-const PAGES: OnboardingPage[] = [
-  {
-    id: 'welcome',
-    icon: 'home',
-    accentColor: ACCENT,
-    accentBg: 'rgba(255, 107, 91, 0.15)',
-    gradient: ['#ff6b5b', '#ff4040'],
-    title: 'Welcome to Rhome',
-    subtitle: 'Find your perfect roommate match\nwith smart compatibility scoring',
-    features: [
-      { icon: 'users', title: 'AI-powered roommate matching', subtitle: 'Smart compatibility scores based on your lifestyle' },
-      { icon: 'map-pin', title: 'Location-aware property search', subtitle: 'Find rooms near you, work, or school' },
-      { icon: 'shield', title: 'Verified profiles you can trust', subtitle: 'ID-verified users and background checks' },
-    ],
-  },
-  {
-    id: 'matching',
-    icon: 'heart',
-    accentColor: '#4ECDC4',
-    accentBg: 'rgba(78, 205, 196, 0.15)',
-    gradient: ['#4ECDC4', '#36B5AC'],
-    title: 'Swipe to Match',
-    subtitle: 'Browse compatible roommates and\nfind your ideal living situation',
-    features: [
-      { icon: 'arrow-right', title: 'Swipe right to like', subtitle: 'Show interest in potential roommates' },
-      { icon: 'arrow-left', title: 'Swipe left to pass', subtitle: 'Skip profiles that aren\'t a fit' },
-      { icon: 'star', title: 'Super Like to stand out', subtitle: 'Let someone know you\'re really interested' },
-    ],
-  },
-  {
-    id: 'compatibility',
-    icon: 'bar-chart-2',
-    accentColor: '#5B7FFF',
-    accentBg: 'rgba(91, 127, 255, 0.15)',
-    gradient: ['#5B7FFF', '#4060E0'],
-    title: 'Smart Compatibility',
-    subtitle: 'Our algorithm scores 14 lifestyle\nfactors for accurate matching',
-    features: [
-      { icon: 'moon', title: 'Sleep schedule & cleanliness', subtitle: 'Matched on daily habits and routines' },
-      { icon: 'dollar-sign', title: 'Budget & shared expenses', subtitle: 'Aligned financial expectations' },
-      { icon: 'map-pin', title: 'Neighborhood & timeline', subtitle: 'Coordinated location and move-in dates' },
-    ],
-  },
-  {
-    id: 'groups',
-    icon: 'users',
-    accentColor: '#9B59B6',
-    accentBg: 'rgba(155, 89, 182, 0.15)',
-    gradient: ['#9B59B6', '#8040A0'],
-    title: 'Form Groups',
-    subtitle: 'Team up with compatible roommates\nto find a place together',
-    features: [
-      { icon: 'plus-circle', title: 'Create or join groups', subtitle: 'Build your ideal roommate team' },
-      { icon: 'message-circle', title: 'Group chat', subtitle: 'Coordinate with potential roommates' },
-      { icon: 'search', title: 'Browse as a group', subtitle: 'Find properties that fit everyone' },
-    ],
-  },
-  {
-    id: 'getstarted',
-    icon: 'check-circle',
-    accentColor: '#3ECF8E',
-    accentBg: 'rgba(62, 207, 142, 0.15)',
-    gradient: ['#3ECF8E', '#28B070'],
-    title: 'Ready to Start',
-    subtitle: 'Complete your profile to get\nthe best matches',
-    features: [
-      { icon: 'user', title: 'Add photos & preferences', subtitle: 'Build a profile that attracts great matches' },
-      { icon: 'check', title: 'Verify your identity', subtitle: 'Get more matches with a verified badge' },
-      { icon: 'zap', title: 'Upgrade for premium', subtitle: 'Unlock advanced features anytime' },
-    ],
-  },
-];
+const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
 interface OnboardingScreenProps {
   onComplete: () => void;
 }
 
+const SLIDES = [
+  {
+    id: 'welcome',
+    headline: 'Find your people,\nthen your place',
+    subtext: 'Rhome matches you with compatible roommates and helps you find the perfect apartment together.',
+  },
+  {
+    id: 'matching',
+    headline: '87% compatible?\nHere\'s why',
+    subtext: 'Our algorithm checks sleep schedules, cleanliness, budget, lifestyle, and more \u2014 so you know before you match.',
+  },
+  {
+    id: 'together',
+    headline: 'Apartment hunt\nas a team',
+    subtext: 'Form groups, shortlist apartments together, vote on favorites, and schedule tours \u2014 all in one place.',
+  },
+  {
+    id: 'verified',
+    headline: 'Real people,\nreal listings',
+    subtext: 'ID verification, host badges, and reviews keep the community safe and trustworthy.',
+  },
+  {
+    id: 'start',
+    headline: 'Ready to\nfind home?',
+    subtext: 'Join thousands of renters already matched on Rhome.',
+  },
+];
+
 export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
   const insets = useSafeAreaInsets();
-  const [currentPage, setCurrentPage] = useState(0);
   const flatListRef = useRef<FlatList>(null);
-  const progress = useSharedValue(0);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const scrollX = useSharedValue(0);
 
-  const isLastPage = currentPage === PAGES.length - 1;
-  const page = PAGES[currentPage];
+  const scrollHandler = useAnimatedScrollHandler({
+    onScroll: (event) => {
+      scrollX.value = event.contentOffset.x;
+    },
+  });
 
-  const handleNext = () => {
-    if (isLastPage) {
-      onComplete();
+  const onMomentumEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const idx = Math.max(0, Math.min(SLIDES.length - 1, Math.round(e.nativeEvent.contentOffset.x / SCREEN_W)));
+    setActiveIndex(idx);
+  };
+
+  const goNext = () => {
+    if (activeIndex < SLIDES.length - 1) {
+      flatListRef.current?.scrollToIndex({ index: activeIndex + 1, animated: true });
     } else {
-      const nextPage = currentPage + 1;
-      flatListRef.current?.scrollToIndex({ index: nextPage, animated: true });
-      setCurrentPage(nextPage);
-      progress.value = withSpring(nextPage);
+      onComplete();
     }
   };
-
-  const handleSkip = () => {
-    onComplete();
-  };
-
-  const handleScroll = (event: any) => {
-    const offsetX = event.nativeEvent.contentOffset.x;
-    const newPage = Math.round(offsetX / SCREEN_WIDTH);
-    if (newPage !== currentPage && newPage >= 0 && newPage < PAGES.length) {
-      setCurrentPage(newPage);
-      progress.value = withSpring(newPage);
-    }
-  };
-
-  const renderPage = ({ item }: { item: OnboardingPage }) => (
-    <View style={[styles.page, { width: SCREEN_WIDTH }]}>
-      <View style={styles.pageContent}>
-        {item.id === 'welcome' ? (
-          <Animated.View entering={FadeIn.delay(150).duration(350)}>
-            <RhomeLogo variant="stacked" size="lg" showTagline />
-          </Animated.View>
-        ) : (
-          <Animated.View
-            entering={FadeIn.delay(150).duration(350)}
-            style={[styles.appIcon, {
-              backgroundColor: item.accentBg,
-              borderColor: `${item.accentColor}30`,
-            }]}
-          >
-            <Feather name={item.icon} size={36} color={item.accentColor} />
-          </Animated.View>
-        )}
-
-        <Text style={styles.title}>{item.title}</Text>
-        <Text style={styles.subtitle}>{item.subtitle}</Text>
-
-        <View style={styles.divider} />
-
-        <View style={styles.featuresContainer}>
-          {item.features.map((feature, fIndex) => (
-            <Animated.View
-              key={fIndex}
-              entering={FadeInDown.delay(250 + fIndex * 80).duration(350)}
-              style={styles.featureCard}
-            >
-              <View style={[styles.featureIcon, {
-                backgroundColor: item.accentBg,
-                borderColor: `${item.accentColor}40`,
-              }]}>
-                <Feather name={feature.icon} size={18} color={item.accentColor} />
-              </View>
-              <View style={styles.featureTextWrap}>
-                <Text style={styles.featureTitle}>{feature.title}</Text>
-                <Text style={styles.featureSubtitle}>{feature.subtitle}</Text>
-              </View>
-            </Animated.View>
-          ))}
-        </View>
-      </View>
-    </View>
-  );
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      {!isLastPage ? (
-        <Pressable onPress={handleSkip} style={styles.skipBtn}>
+      {activeIndex < SLIDES.length - 1 ? (
+        <Pressable style={styles.skipBtn} onPress={onComplete}>
           <Text style={styles.skipText}>Skip</Text>
         </Pressable>
       ) : null}
 
-      <FlatList
+      <Animated.FlatList
         ref={flatListRef}
-        data={PAGES}
-        renderItem={renderPage}
+        data={SLIDES}
         keyExtractor={(item) => item.id}
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
-        onMomentumScrollEnd={handleScroll}
+        onScroll={scrollHandler}
+        onMomentumScrollEnd={onMomentumEnd}
         scrollEventThrottle={16}
         bounces={false}
         getItemLayout={(_, index) => ({
-          length: SCREEN_WIDTH,
-          offset: SCREEN_WIDTH * index,
+          length: SCREEN_W,
+          offset: SCREEN_W * index,
           index,
         })}
+        renderItem={({ item, index }) => (
+          <View style={styles.slide}>
+            <View style={styles.visualContainer}>
+              {index === 0 ? <WelcomeVisual active={activeIndex === 0} /> : null}
+              {index === 1 ? <MatchingVisual active={activeIndex === 1} /> : null}
+              {index === 2 ? <TogetherVisual active={activeIndex === 2} /> : null}
+              {index === 3 ? <VerifiedVisual active={activeIndex === 3} /> : null}
+              {index === 4 ? <StartVisual active={activeIndex === 4} /> : null}
+            </View>
+            <Text style={styles.headline}>{item.headline}</Text>
+            <Text style={styles.subtext}>{item.subtext}</Text>
+          </View>
+        )}
       />
 
-      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 20) + 16 }]}>
-        <Pressable onPress={handleNext} style={({ pressed }) => [{ opacity: pressed ? 0.9 : 1, width: '100%' }]}>
-          <LinearGradient
-            colors={page.gradient}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.nextButton}
-          >
-            <Text style={styles.nextButtonText}>
-              {isLastPage ? "Let's Go" : 'Next'}
-            </Text>
-            <Feather
-              name={isLastPage ? 'check' : 'arrow-right'}
-              size={18}
-              color="#FFFFFF"
-            />
-          </LinearGradient>
-        </Pressable>
-
-        <View style={styles.dotsContainer}>
-          {PAGES.map((_, index) => (
-            <View
-              key={index}
-              style={[
-                styles.dot,
-                index === currentPage
-                  ? { width: 22, borderRadius: 4, backgroundColor: page.accentColor }
-                  : { width: 7, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.18)' },
-              ]}
-            />
+      <View style={[styles.bottom, { paddingBottom: insets.bottom + 20 }]}>
+        <View style={styles.dots}>
+          {SLIDES.map((_, i) => (
+            <DotIndicator key={i} index={i} scrollX={scrollX} />
           ))}
         </View>
+
+        <Pressable style={styles.ctaBtn} onPress={goNext}>
+          <LinearGradient
+            colors={['#FF8E53', '#FF6B6B']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.ctaGradient}
+          >
+            <Text style={styles.ctaText}>
+              {activeIndex === SLIDES.length - 1 ? "Let's Go" : 'Next'}
+            </Text>
+            <Feather name={activeIndex === SLIDES.length - 1 ? 'check' : 'arrow-right'} size={18} color="#fff" />
+          </LinearGradient>
+        </Pressable>
       </View>
     </View>
   );
 };
 
+const DotIndicator = ({ index, scrollX }: { index: number; scrollX: Animated.SharedValue<number> }) => {
+  const dotStyle = useAnimatedStyle(() => {
+    const input = scrollX.value / SCREEN_W;
+    const width = interpolate(input, [index - 1, index, index + 1], [8, 24, 8], Extrapolation.CLAMP);
+    const opacity = interpolate(input, [index - 1, index, index + 1], [0.3, 1, 0.3], Extrapolation.CLAMP);
+    return { width, opacity };
+  });
+  return <Animated.View style={[styles.dot, dotStyle]} />;
+};
+
+const WelcomeVisual = ({ active }: { active: boolean }) => {
+  const scale = useSharedValue(0);
+  React.useEffect(() => {
+    if (active) scale.value = withSpring(1, { damping: 12 });
+    else scale.value = 0;
+  }, [active]);
+  const animStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+
+  return (
+    <Animated.View style={[styles.visualCenter, animStyle]}>
+      <LinearGradient colors={['#FF8E53', '#FF6B6B']} style={styles.logoBig}>
+        <Feather name="home" size={48} color="#fff" />
+      </LinearGradient>
+      <View style={styles.orbitRing}>
+        {['#6366f1', '#3ECF8E', '#f59e0b', '#ec4899'].map((color, i) => (
+          <View key={i} style={[styles.orbitDot, {
+            backgroundColor: color,
+            transform: [
+              { rotate: `${i * 90}deg` },
+              { translateX: 60 },
+            ],
+          }]} />
+        ))}
+      </View>
+    </Animated.View>
+  );
+};
+
+const MatchBar = ({ label, pct, color, delay, active }: { label: string; pct: number; color: string; delay: number; active: boolean }) => {
+  const width = useSharedValue(0);
+  React.useEffect(() => {
+    if (active) width.value = withDelay(delay, withTiming(pct, { duration: 600 }));
+    else width.value = 0;
+  }, [active]);
+  const barStyle = useAnimatedStyle(() => ({ width: `${width.value}%` }));
+
+  return (
+    <View style={styles.barRow}>
+      <Text style={styles.barLabel}>{label}</Text>
+      <View style={styles.barTrack}>
+        <Animated.View style={[styles.barFill, { backgroundColor: color }, barStyle]} />
+      </View>
+      <Text style={styles.barPct}>{pct}%</Text>
+    </View>
+  );
+};
+
+const MatchingVisual = ({ active }: { active: boolean }) => {
+  const bars = [
+    { label: 'Location', pct: 85, color: '#3ECF8E' },
+    { label: 'Budget', pct: 100, color: '#3ECF8E' },
+    { label: 'Sleep', pct: 92, color: '#3ECF8E' },
+    { label: 'Cleanliness', pct: 75, color: '#ff6b5b' },
+  ];
+
+  return (
+    <View style={styles.barsVisual}>
+      {bars.map((bar, i) => (
+        <MatchBar key={i} label={bar.label} pct={bar.pct} color={bar.color} delay={i * 200} active={active} />
+      ))}
+    </View>
+  );
+};
+
+const AvatarEntry = ({ colors, delay, active }: { colors: string[]; delay: number; active: boolean }) => {
+  const translateX = useSharedValue(100);
+  React.useEffect(() => {
+    if (active) translateX.value = withDelay(delay, withSpring(0, { damping: 14 }));
+    else translateX.value = 100;
+  }, [active]);
+  const style = useAnimatedStyle(() => ({ transform: [{ translateX: translateX.value }] }));
+
+  return (
+    <Animated.View style={style}>
+      <LinearGradient colors={colors as [string, string]} style={styles.avatarCircle}>
+        <Feather name="user" size={20} color="#fff" />
+      </LinearGradient>
+    </Animated.View>
+  );
+};
+
+const TogetherVisual = ({ active }: { active: boolean }) => {
+  const avatarColors: [string, string][] = [['#667eea', '#764ba2'], ['#f7971e', '#ffd200'], ['#11998e', '#38ef7d']];
+  const cardY = useSharedValue(60);
+  const cardOpacity = useSharedValue(0);
+
+  React.useEffect(() => {
+    if (active) {
+      cardY.value = withDelay(450, withSpring(0, { damping: 14 }));
+      cardOpacity.value = withDelay(450, withTiming(1, { duration: 300 }));
+    } else {
+      cardY.value = 60;
+      cardOpacity.value = 0;
+    }
+  }, [active]);
+
+  const cardStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: cardY.value }],
+    opacity: cardOpacity.value,
+  }));
+
+  return (
+    <View style={styles.togetherVisual}>
+      <View style={styles.avatarRow}>
+        {avatarColors.map((colors, i) => (
+          <AvatarEntry key={i} colors={colors} delay={i * 150} active={active} />
+        ))}
+      </View>
+      <Animated.View style={cardStyle}>
+        <View style={styles.miniCard}>
+          <View style={styles.miniCardPhoto} />
+          <View style={styles.miniCardLines}>
+            <View style={[styles.miniCardLine, { width: '70%' }]} />
+            <View style={[styles.miniCardLine, { width: '50%' }]} />
+          </View>
+        </View>
+      </Animated.View>
+    </View>
+  );
+};
+
+const VerifiedVisual = ({ active }: { active: boolean }) => {
+  const fillHeight = useSharedValue(0);
+  const checkScale = useSharedValue(0);
+
+  React.useEffect(() => {
+    if (active) {
+      fillHeight.value = withDelay(200, withTiming(100, { duration: 800 }));
+      checkScale.value = withDelay(800, withSpring(1, { damping: 10 }));
+    } else {
+      fillHeight.value = 0;
+      checkScale.value = 0;
+    }
+  }, [active]);
+
+  const fillStyle = useAnimatedStyle(() => ({ height: `${fillHeight.value}%` }));
+  const checkStyle = useAnimatedStyle(() => ({ transform: [{ scale: checkScale.value }] }));
+
+  return (
+    <View style={styles.shieldVisual}>
+      <View style={styles.shieldOuter}>
+        <Animated.View style={[styles.shieldFill, fillStyle]} />
+        <Feather name="shield" size={60} color="rgba(255,255,255,0.15)" style={{ position: 'absolute' }} />
+        <Animated.View style={[{ position: 'absolute' }, checkStyle]}>
+          <Feather name="check" size={32} color="#fff" />
+        </Animated.View>
+      </View>
+    </View>
+  );
+};
+
+const StartVisual = ({ active }: { active: boolean }) => {
+  const scale = useSharedValue(1);
+  React.useEffect(() => {
+    if (active) {
+      scale.value = withRepeat(
+        withSequence(
+          withTiming(1.08, { duration: 1000 }),
+          withTiming(1, { duration: 1000 })
+        ),
+        -1, true
+      );
+    } else {
+      scale.value = withTiming(1, { duration: 200 });
+    }
+  }, [active]);
+  const style = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+
+  return (
+    <Animated.View style={[styles.visualCenter, style]}>
+      <LinearGradient colors={['#FF8E53', '#FF6B6B']} style={styles.logoBig}>
+        <Feather name="home" size={48} color="#fff" />
+      </LinearGradient>
+    </Animated.View>
+  );
+};
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#141414',
+  container: { flex: 1, backgroundColor: '#0a0a0a' },
+  skipBtn: { position: 'absolute', top: 60, right: 20, zIndex: 10, padding: 8 },
+  skipText: { fontSize: 14, color: 'rgba(255,255,255,0.4)' },
+  slide: {
+    width: SCREEN_W,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
   },
-  skipBtn: {
-    position: 'absolute',
-    top: 52,
-    right: 28,
-    zIndex: 10,
-  },
-  skipText: {
-    color: 'rgba(255,255,255,0.5)',
-    fontSize: 14,
-    fontWeight: '500',
-    letterSpacing: 0.2,
-  },
-  page: {
-    flex: 1,
+  visualContainer: {
+    height: SCREEN_H * 0.35,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  pageContent: {
-    alignItems: 'center',
-    paddingHorizontal: 28,
-    maxWidth: 400,
-    width: '100%',
-  },
-  appIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 28,
-    borderWidth: 1,
-  },
-  title: {
-    fontSize: 30,
-    fontWeight: '800',
-    color: '#ffffff',
-    letterSpacing: -0.5,
-    lineHeight: 35,
+  headline: {
+    fontSize: 32,
+    fontWeight: '900',
+    color: '#fff',
     textAlign: 'center',
-    marginBottom: 8,
+    lineHeight: 38,
+    marginBottom: 12,
   },
-  subtitle: {
+  subtext: {
     fontSize: 15,
-    color: 'rgba(255,255,255,0.45)',
-    fontWeight: '400',
-    lineHeight: 22,
+    color: 'rgba(255,255,255,0.5)',
     textAlign: 'center',
+    lineHeight: 22,
+    maxWidth: 300,
   },
-  divider: {
-    height: 1,
-    width: '100%',
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    marginVertical: 26,
+  bottom: {
+    paddingHorizontal: 32,
+    gap: 20,
+    alignItems: 'center',
   },
-  featuresContainer: {
-    width: '100%',
-    gap: 14,
-  },
-  featureCard: {
+  dots: {
     flexDirection: 'row',
+    gap: 6,
     alignItems: 'center',
-    gap: 16,
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.07)',
-    borderRadius: 18,
-    paddingVertical: 16,
-    paddingHorizontal: 18,
-  },
-  featureIcon: {
-    width: 46,
-    height: 46,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-  },
-  featureTextWrap: {
-    flex: 1,
-  },
-  featureTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#ffffff',
-    marginBottom: 2,
-  },
-  featureSubtitle: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.38)',
-    fontWeight: '400',
-    lineHeight: 17,
-  },
-  footer: {
-    alignItems: 'center',
-    paddingHorizontal: 28,
-    gap: 18,
-  },
-  nextButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '100%',
-    height: 56,
-    borderRadius: 18,
-    gap: 8,
-  },
-  nextButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '700',
-    letterSpacing: 0.2,
-  },
-  dotsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
   },
   dot: {
-    height: 7,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#ff6b5b',
+  },
+  ctaBtn: { width: '100%' },
+  ctaGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 16,
+    borderRadius: 16,
+  },
+  ctaText: { fontSize: 17, fontWeight: '800', color: '#fff' },
+  visualCenter: { alignItems: 'center', justifyContent: 'center' },
+  logoBig: {
+    width: 100, height: 100, borderRadius: 50,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  orbitRing: {
+    position: 'absolute',
+    width: 140, height: 140,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  orbitDot: {
+    position: 'absolute',
+    width: 20, height: 20, borderRadius: 10,
+  },
+  barsVisual: { gap: 14, width: 260 },
+  barRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  barLabel: { fontSize: 12, color: 'rgba(255,255,255,0.5)', width: 80 },
+  barTrack: { flex: 1, height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.08)', overflow: 'hidden' },
+  barFill: { height: '100%', borderRadius: 4 },
+  barPct: { fontSize: 12, color: 'rgba(255,255,255,0.35)', width: 36, textAlign: 'right' },
+  togetherVisual: { alignItems: 'center', gap: 20 },
+  avatarRow: { flexDirection: 'row', gap: 12 },
+  avatarCircle: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
+  miniCard: {
+    width: 200, backgroundColor: '#161616', borderRadius: 14,
+    overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
+  },
+  miniCardPhoto: { width: '100%', height: 60, backgroundColor: 'rgba(255,255,255,0.04)' },
+  miniCardLines: { padding: 10, gap: 6 },
+  miniCardLine: { height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.08)' },
+  shieldVisual: { alignItems: 'center', justifyContent: 'center' },
+  shieldOuter: {
+    width: 100, height: 100, borderRadius: 50,
+    backgroundColor: 'rgba(62,207,142,0.1)',
+    alignItems: 'center', justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  shieldFill: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    backgroundColor: 'rgba(62,207,142,0.3)',
   },
 });
+
+export default OnboardingScreen;
