@@ -762,7 +762,7 @@ export const AgentGroupsScreen = () => {
 
       {renderPipelineBar()}
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 14, paddingLeft: 20 }} contentContainerStyle={{ paddingRight: 20, gap: 6 }}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 14, paddingLeft: 20, flexGrow: 0 }} contentContainerStyle={{ paddingRight: 20, gap: 6 }}>
         {STATUS_PIPELINE.map(s => {
           const isActive = statusFilter === s.key;
           const count = tabCounts[s.key] || 0;
@@ -786,59 +786,61 @@ export const AgentGroupsScreen = () => {
         })}
       </ScrollView>
 
-      {statusFilter !== 'all' ? (
-        <View style={st.statusHint}>
-          <Feather name={statusIcon(statusFilter) as any} size={14} color={statusColor(statusFilter)} />
-          <Text style={{ fontSize: 12, color: '#888' }}>
-            {STATUS_PIPELINE.find(s => s.key === statusFilter)?.description}
-          </Text>
-        </View>
-      ) : null}
+      <View style={{ flex: 1 }}>
+        {statusFilter !== 'all' ? (
+          <View style={st.statusHint}>
+            <Feather name={statusIcon(statusFilter) as any} size={14} color={statusColor(statusFilter)} />
+            <Text style={{ fontSize: 12, color: '#888' }}>
+              {STATUS_PIPELINE.find(s => s.key === statusFilter)?.description}
+            </Text>
+          </View>
+        ) : null}
 
-      {isStale ? (
-        <View style={{ backgroundColor: '#2a2200', padding: 8, marginHorizontal: 20, borderRadius: 8, marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <Feather name="clock" size={14} color={ACCENT} />
-          <Text style={{ color: ACCENT, fontSize: 12 }}>Using cached data</Text>
-        </View>
-      ) : null}
+        {isStale ? (
+          <View style={{ backgroundColor: '#2a2200', padding: 8, marginHorizontal: 20, borderRadius: 8, marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Feather name="clock" size={14} color={ACCENT} />
+            <Text style={{ color: ACCENT, fontSize: 12 }}>Using cached data</Text>
+          </View>
+        ) : null}
 
-      {loading ? (
-        <ActivityIndicator size="large" color={ACCENT} style={{ marginTop: 40 }} />
-      ) : loadError && groups.length === 0 ? (
-        <View style={st.emptyState}>
-          <Feather name="alert-circle" size={48} color="#999" />
-          <Text style={st.emptyTitle}>Failed to load groups</Text>
-          <Pressable onPress={() => loadGroups()}>
-            <Text style={{ color: ACCENT, marginTop: 12, fontWeight: '600' }}>Tap to retry</Text>
-          </Pressable>
-        </View>
-      ) : filteredGroups.length === 0 ? (
-        statusFilter !== 'all' ? renderEmptyForStatus() : (
+        {loading ? (
+          <ActivityIndicator size="large" color={ACCENT} style={{ marginTop: 40 }} />
+        ) : loadError && groups.length === 0 ? (
           <View style={st.emptyState}>
-            <Feather name="users" size={48} color="#444" />
-            <Text style={st.emptyTitle}>No Groups Yet</Text>
-            <Text style={st.emptyDesc}>Browse renters, shortlist your top picks, and build your first group.</Text>
-            <Pressable
-              style={st.startBtn}
-              onPress={() => {
-                const parent = navigation.getParent();
-                if (parent) parent.navigate('BrowseRenters');
-                else navigation.navigate('BrowseRenters' as never);
-              }}
-            >
-              <Text style={{ color: '#000', fontSize: 15, fontWeight: '700' }}>Browse Renters</Text>
+            <Feather name="alert-circle" size={48} color="#999" />
+            <Text style={st.emptyTitle}>Failed to load groups</Text>
+            <Pressable onPress={() => loadGroups()}>
+              <Text style={{ color: ACCENT, marginTop: 12, fontWeight: '600' }}>Tap to retry</Text>
             </Pressable>
           </View>
-        )
-      ) : (
-        <FlatList
-          data={filteredGroups}
-          keyExtractor={item => item.id}
-          renderItem={renderGroupCard}
-          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 100, paddingTop: 10 }}
-          showsVerticalScrollIndicator={false}
-        />
-      )}
+        ) : filteredGroups.length === 0 ? (
+          statusFilter !== 'all' ? renderEmptyForStatus() : (
+            <View style={st.emptyState}>
+              <Feather name="users" size={48} color="#444" />
+              <Text style={st.emptyTitle}>No Groups Yet</Text>
+              <Text style={st.emptyDesc}>Browse renters, shortlist your top picks, and build your first group.</Text>
+              <Pressable
+                style={st.startBtn}
+                onPress={() => {
+                  const parent = navigation.getParent();
+                  if (parent) parent.navigate('BrowseRenters');
+                  else navigation.navigate('BrowseRenters' as never);
+                }}
+              >
+                <Text style={{ color: '#000', fontSize: 15, fontWeight: '700' }}>Browse Renters</Text>
+              </Pressable>
+            </View>
+          )
+        ) : (
+          <FlatList
+            data={filteredGroups}
+            keyExtractor={item => item.id}
+            renderItem={renderGroupCard}
+            contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 100, paddingTop: 10 }}
+            showsVerticalScrollIndicator={false}
+          />
+        )}
+      </View>
 
       <InvitePreviewSheet
         visible={inviteSheetVisible}
@@ -891,7 +893,7 @@ const st = StyleSheet.create({
   expandedAction: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 9, borderRadius: 8, backgroundColor: SURFACE, borderWidth: 1, borderColor: '#333' },
   expandedActionText: { fontSize: 12, fontWeight: '600', color: '#aaa' },
 
-  emptyState: { alignItems: 'center', paddingTop: 60, paddingHorizontal: 40 },
+  emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 },
   emptyTitle: { color: '#fff', fontSize: 16, fontWeight: '600', marginTop: 16, marginBottom: 8 },
   emptyDesc: { color: '#555', fontSize: 13, textAlign: 'center', lineHeight: 20 },
   startBtn: { backgroundColor: ACCENT, borderRadius: 14, paddingHorizontal: 24, paddingVertical: 12, marginTop: 20 },
