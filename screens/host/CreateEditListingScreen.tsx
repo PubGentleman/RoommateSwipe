@@ -15,7 +15,8 @@ import { Spacing, BorderRadius } from '../../constants/theme';
 import { createListing as createListingSupa, updateListing as updateListingSupa, getListing, deleteListing as deleteListingSupa, mapListingToProperty, getCompanyAgents } from '../../services/listingService';
 import { DatePickerModal } from '../../components/DatePickerModal';
 import { formatDate } from '../../utils/dateUtils';
-import { geocodeAddress, fetchNearbyTransit } from '../../utils/transitService';
+import { geocodeAddress } from '../../utils/transitService';
+import { fetchAreaInfo } from '../../services/neighborhoodService';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -90,13 +91,15 @@ export const CreateEditListingScreen = () => {
   const fetchTransitForLocation = useCallback(async (lat: number, lng: number) => {
     setTransitLoading(true);
     try {
-      const stops = await fetchNearbyTransit(lat, lng);
-      if (stops.length > 0) {
-        const summary = stops.map(stop => {
-          const walkMin = Math.max(1, Math.round((stop.distanceMiles || 0) * 20));
-          const label = (stop.type || 'stop').charAt(0).toUpperCase() + (stop.type || 'stop').slice(1);
-          return `${label}: ${stop.name} (${walkMin} min walk)`;
-        }).join('\n');
+      const areaInfo = await fetchAreaInfo(lat, lng);
+      if (areaInfo && areaInfo.transit && areaInfo.transit.length > 0) {
+        const summary = areaInfo.transit
+          .slice(0, 6)
+          .map(stop => {
+            const walkMin = Math.max(1, Math.round((stop.distanceMi || 0) * 20));
+            return `${stop.type}: ${stop.name} (${walkMin} min walk)`;
+          })
+          .join('\n');
         if (!transitOverride.trim()) {
           setTransitOverride(summary);
         }
@@ -504,37 +507,19 @@ export const CreateEditListingScreen = () => {
         fullDescription += `\n\nHouse Rules: ${houseRules.trim()}`;
       }
 
-      let transitInfo: any = undefined;
-      let savedCoords: any = undefined;
-      try {
-        const override = transitOverride.trim() || undefined;
-        let coords = coordinates;
-        if (!coords) {
-          coords = await geocodeAddress(address.trim(), city.trim(), state.trim());
-        }
-        if (coords) {
-          savedCoords = coords;
-          let stops: any[] = [];
-          if (!override) {
-            stops = await fetchNearbyTransit(coords.lat, coords.lng);
-          }
-          transitInfo = {
-            stops,
-            noTransitNearby: stops.length === 0 && !override,
-            manualOverride: override,
-            fetchedAt: new Date().toISOString(),
-          };
-        } else {
-          transitInfo = {
-            stops: [],
-            noTransitNearby: true,
-            manualOverride: override,
-            fetchedAt: new Date().toISOString(),
-          };
-        }
-      } catch (transitError) {
-        console.warn('Transit fetch failed:', transitError);
+      let savedCoords: any = coordinates;
+      if (!savedCoords) {
+        try {
+          savedCoords = await geocodeAddress(address.trim(), city.trim(), state.trim());
+        } catch {}
       }
+
+      const transitInfo = {
+        stops: [],
+        noTransitNearby: !transitOverride.trim() || transitOverride === 'No major transit stations found nearby',
+        manualOverride: transitOverride.trim() || undefined,
+        fetchedAt: new Date().toISOString(),
+      };
 
       const today = new Date().toISOString().split('T')[0];
       const resolvedAvailableDate = availableDate && availableDate !== 'flexible'
