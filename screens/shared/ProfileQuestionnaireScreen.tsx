@@ -925,9 +925,9 @@ export const ProfileQuestionnaireScreen = () => {
             ) : null}
             {null}
             <View style={{ marginTop: 20 }}>
-              <ThemedText style={styles.inputLabel}>About You *</ThemedText>
+              <ThemedText style={styles.inputLabel}>{user?.hostType === 'company' ? 'About Company *' : 'About You *'}</ThemedText>
               <ThemedText style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 8 }}>
-                Write a short bio to introduce yourself (at least 20 characters)
+                {user?.hostType === 'company' ? 'Write a short description of your company (at least 20 characters)' : 'Write a short bio to introduce yourself (at least 20 characters)'}
               </ThemedText>
               <TextInput
                 style={styles.bioInput}
@@ -936,7 +936,7 @@ export const ProfileQuestionnaireScreen = () => {
                 maxLength={500}
                 value={bio}
                 onChangeText={setBio}
-                placeholder="Tell people a bit about yourself..."
+                placeholder={user?.hostType === 'company' ? "Tell people about your company..." : "Tell people a bit about yourself..."}
                 placeholderTextColor="rgba(255,255,255,0.3)"
                 textAlignVertical="top"
               />
