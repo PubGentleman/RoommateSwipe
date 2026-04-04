@@ -1165,6 +1165,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     'preferredNeighborhoods', 'interestTags', 'profileData',
     'notificationPreferences', 'privacySettings', 'verification', 'acceptAgentOffers',
     'searchPaused', 'searchPausedAt',
+    'hostSubscription', 'subscription', 'agentPlan', 'companyPlan',
+    'purchases',
   ]);
 
   const updateUser = async (updates: Partial<User>) => {
