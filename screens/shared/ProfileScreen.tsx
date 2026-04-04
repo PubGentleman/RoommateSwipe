@@ -81,7 +81,8 @@ export const ProfileScreen = () => {
     return mode.charAt(0).toUpperCase() + mode.slice(1);
   };
 
-  const userInitial = user?.name ? user.name.charAt(0).toUpperCase() : 'U';
+  const displayName = user?.hostType === 'company' ? (user?.companyName || user?.brokerageName || user?.name) : user?.name;
+  const userInitial = displayName ? displayName.charAt(0).toUpperCase() : 'U';
   const renterPlan = normalizeRenterPlan(user?.subscription?.plan);
   const renterLimits = getRenterPlanLimits(renterPlan);
   const [matchCount, setMatchCount] = useState(0);
@@ -314,7 +315,7 @@ export const ProfileScreen = () => {
           </View>
 
           <View style={styles.nameRow}>
-            <Text style={styles.profileName}>{user?.name || 'User'}</Text>
+            <Text style={styles.profileName}>{user?.hostType === 'company' ? (user?.companyName || user?.brokerageName || user?.name || 'Company') : (user?.name || 'User')}</Text>
             {user?.licenseVerificationStatus === 'verified' ? (
               <View style={styles.verifiedBadge}>
                 <Feather name="shield" size={14} color="#3ECF8E" />
