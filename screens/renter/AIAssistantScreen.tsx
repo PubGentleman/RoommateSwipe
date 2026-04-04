@@ -473,7 +473,7 @@ export const AIAssistantScreen = ({ navigation }: AIAssistantScreenProps) => {
               </View>
             ) : null}
           </View>
-          <Text style={styles.aiSubtitle}>Powered by Rhome AI</Text>
+          <Text style={styles.aiSubtitle}>Powered by Pi</Text>
         </View>
       </View>
 

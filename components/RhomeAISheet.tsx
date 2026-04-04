@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
 import { Spacing } from '../constants/theme';
 import { calculateDetailedCompatibility } from '../utils/matchingAlgorithm';
-import { getProfileGaps, getCompletionPercentage, getMatchMultiplier, GAP_MESSAGES } from '../utils/profileReminderUtils';
+import { getProfileGaps, getCompletionPercentage, getMatchMultiplier, GAP_MESSAGES, PLACE_SEEKER_GAP_MESSAGES } from '../utils/profileReminderUtils';
 import { markQuestionAsked, resetRefinementCooldown } from '../utils/refinementEngine';
 import { supabase } from '../lib/supabase';
 import { StorageService } from '../utils/storage';
@@ -983,8 +983,12 @@ export const RhomeAISheet = ({ visible, onDismiss, screenContext, contextData, o
     const gaps = getProfileGaps(user);
     const completion = getCompletionPercentage(user);
     const multiplier = getMatchMultiplier(completion);
-    const heading = contextData?.profileReminder?.heading || 'Boost Your Matches';
-    const subtext = contextData?.profileReminder?.subtext || "Here's what's holding back your profile";
+    const searchType = user.profileData?.apartment_search_type;
+    const isPlaceSeeker = !!searchType && searchType !== 'with_roommates';
+    const defaultHeading = isPlaceSeeker ? 'Complete Your Profile' : 'Boost Your Matches';
+    const defaultSubtext = isPlaceSeeker ? "A few quick steps to finish setup" : "Here's what's holding back your profile";
+    const heading = contextData?.profileReminder?.heading || defaultHeading;
+    const subtext = contextData?.profileReminder?.subtext || defaultSubtext;
 
     if (completion === 100) {
       return (
@@ -1026,7 +1030,7 @@ export const RhomeAISheet = ({ visible, onDismiss, screenContext, contextData, o
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.reminderGapLabel}>{gap.label}</Text>
-              <Text style={styles.reminderGapImpact}>{GAP_MESSAGES[gap.field] || gap.impact}</Text>
+              <Text style={styles.reminderGapImpact}>{(isPlaceSeeker ? PLACE_SEEKER_GAP_MESSAGES[gap.field] : GAP_MESSAGES[gap.field]) || gap.impact}</Text>
             </View>
             <Pressable
               style={styles.reminderFixBtn}
@@ -1052,7 +1056,9 @@ export const RhomeAISheet = ({ visible, onDismiss, screenContext, contextData, o
             <View style={[styles.reminderProgressFill, { width: `${completion}%` }]} />
           </View>
           <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, marginTop: 4 }}>
-            Complete profile to get {multiplier}x more matches
+            {isPlaceSeeker
+              ? 'Complete your profile to get started'
+              : `Complete profile to get ${multiplier}x more matches`}
           </Text>
         </View>
       </View>
@@ -1304,7 +1310,7 @@ export const RhomeAISheet = ({ visible, onDismiss, screenContext, contextData, o
                 <Feather name="cpu" size={18} color="#fff" />
               </LinearGradient>
               <View>
-                <Text style={styles.headerTitle}>Rhome AI</Text>
+                <Text style={styles.headerTitle}>Pi</Text>
                 <View style={styles.contextPill}>
                   <Feather name={contextInfo.icon} size={10} color={ACCENT} />
                   <Text style={styles.contextPillText}>{contextInfo.label}</Text>

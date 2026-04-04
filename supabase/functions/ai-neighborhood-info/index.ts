@@ -212,7 +212,7 @@ USER CONTEXT:
 - Preferred neighborhoods: ${profile.neighborhoods?.join(', ') || 'flexible'}
     `.trim() : '';
 
-    const systemPrompt = `You are Rhome AI, helping a renter evaluate a specific neighborhood before committing to a lease.
+    const systemPrompt = `You are Pi, helping a renter evaluate a specific neighborhood before committing to a lease.
 
 ${listingContext}
 

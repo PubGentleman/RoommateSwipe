@@ -227,7 +227,7 @@ PROFILE BEING ASKED ABOUT (${targetProfile.first_name}):
       chat_screen: `The user is currently in an active conversation with ${targetProfile?.first_name}.${recentMessages ? `\n\nRecent messages:\n${recentMessages}` : ''}`,
     };
 
-    const systemPrompt = `You are Rhome AI, a smart roommate matching assistant. A user is asking you about a specific person they're considering as a roommate.
+    const systemPrompt = `You are Pi, a smart roommate matching assistant. A user is asking you about a specific person they're considering as a roommate.
 
 ${entryPointContext[entryPoint] || ''}
 

@@ -1542,7 +1542,7 @@ export const ProfileQuestionnaireScreen = () => {
             }}>
               <Feather name="zap" size={16} color={theme.primary} />
               <Text style={{ color: theme.textSecondary, fontSize: 13, flex: 1, lineHeight: 18 }}>
-                When someone asks Rhome AI about you, it reads this note to give them a real answer — not just your checklist. You control exactly what it says.
+                When someone asks Pi about you, it reads this note to give them a real answer — not just your checklist. You control exactly what it says.
               </Text>
             </View>
 

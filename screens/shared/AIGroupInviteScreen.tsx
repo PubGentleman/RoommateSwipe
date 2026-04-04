@@ -180,7 +180,7 @@ export function AIGroupInviteScreen() {
     <View style={[styles.screen, { paddingTop: insets.top + 40, paddingBottom: insets.bottom + 24 }]}>
       <View style={styles.aiLabelRow}>
         <Feather name="zap" size={14} color={ACCENT} />
-        <Text style={styles.aiLabel}>Rhome AI matched you</Text>
+        <Text style={styles.aiLabel}>Pi matched you</Text>
       </View>
       <Text style={styles.title}>You've been invited to a group</Text>
 

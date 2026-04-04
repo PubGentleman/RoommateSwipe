@@ -254,7 +254,7 @@ Rent: $${listing.rent}/mo | ${listing.bedrooms}bd/${listing.bathrooms}ba`;
       });
     }
 
-    const systemPrompt = `You are Rhome AI, a neighborhood expert for Rhome, a rental housing app.
+    const systemPrompt = `You are Pi, a neighborhood expert for Rhome, a rental housing app.
 You answer questions about ${neighborhoodName || 'this neighborhood'}${cityName ? ` in ${cityName}` : ''}.
 
 ${listingContext}

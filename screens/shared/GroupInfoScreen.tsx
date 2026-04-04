@@ -922,7 +922,7 @@ export function GroupInfoScreen({ route, navigation }: Props) {
               )
             ) : null}
 
-            <ThemedText style={styles.aiFooter}>Powered by Rhome AI</ThemedText>
+            <ThemedText style={styles.aiFooter}>Powered by Pi</ThemedText>
           </Animated.View>
         ) : null}
 
@@ -1258,7 +1258,7 @@ export function GroupInfoScreen({ route, navigation }: Props) {
                       </View>
                     );
                   })}
-                  <ThemedText style={styles.aiFooter}>Powered by Rhome AI</ThemedText>
+                  <ThemedText style={styles.aiFooter}>Powered by Pi</ThemedText>
                 </>
               ) : (
                 <ThemedText style={styles.noSuggestionsText}>

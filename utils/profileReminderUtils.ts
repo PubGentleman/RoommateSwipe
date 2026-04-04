@@ -18,9 +18,16 @@ export const GAP_MESSAGES: Record<string, string> = {
   preferences: "Pet and smoking preferences help filter out incompatible matches before you even see them.",
 };
 
+export const PLACE_SEEKER_GAP_MESSAGES: Record<string, string> = {
+  photo: "Add a photo so your profile stands out when browsing listings.",
+  bio: "A short bio helps you stand out. Even 2-3 sentences makes a difference.",
+};
+
 export const getProfileGaps = (user: User): ProfileGap[] => {
   const gaps: ProfileGap[] = [];
   const isHostProfessional = user.hostType === 'agent' || user.hostType === 'company';
+  const searchType = user.profileData?.apartment_search_type;
+  const isPlaceSeeker = !!searchType && searchType !== 'with_roommates';
 
   if (!(user.photos?.length || user.profilePicture)) {
     gaps.push({
@@ -45,6 +52,8 @@ export const getProfileGaps = (user: User): ProfileGap[] => {
   }
 
   if (isHostProfessional) return gaps;
+
+  if (isPlaceSeeker) return gaps;
 
   if (!user.profileData?.occupation) {
     gaps.push({
@@ -95,6 +104,19 @@ export const getProfileGaps = (user: User): ProfileGap[] => {
 };
 
 export const getCompletionPercentage = (user: User): number => {
+  const searchType = user.profileData?.apartment_search_type;
+  const isPlaceSeeker = !!searchType && searchType !== 'with_roommates';
+
+  if (isPlaceSeeker) {
+    const fields = [
+      !!(user.photos?.length || user.profilePicture),
+      !!(user.profileData?.bio && user.profileData.bio.trim().length >= 20),
+      !!user.birthday,
+    ];
+    const weights = [35, 35, 30];
+    return fields.reduce((total, done, i) => total + (done ? weights[i] : 0), 0);
+  }
+
   const fields = [
     !!(user.photos?.length || user.profilePicture),
     !!(user.profileData?.bio && user.profileData.bio.trim().length >= 20),

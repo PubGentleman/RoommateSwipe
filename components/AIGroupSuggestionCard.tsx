@@ -157,7 +157,7 @@ export function AIGroupSuggestionCard({ onAccepted, onDismissed }: Props) {
             user_id: memberId,
             type: 'group_invite',
             title: `${user.fullName?.split(' ')[0] || 'Someone'} invited you to a group`,
-            body: `Rhome AI matched you as compatible roommates. Tap to join the group!`,
+            body: `Pi matched you as compatible roommates. Tap to join the group!`,
             data: JSON.stringify({ group_id: group.id }),
           });
         }
@@ -280,7 +280,7 @@ export function AIGroupSuggestionCard({ onAccepted, onDismissed }: Props) {
         </View>
 
         <Text style={styles.footer}>
-          Invites sent automatically · Powered by Rhome AI
+          Invites sent automatically · Powered by Pi
         </Text>
       </LinearGradient>
     </Animated.View>

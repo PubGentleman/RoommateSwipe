@@ -38,7 +38,7 @@ export function AIQuestionCard({ question, onAnswer, onSkip }: Props) {
         <View style={styles.headerRow}>
           <View style={styles.aiLabel}>
             <Feather name="cpu" size={14} color="#fff" />
-            <Text style={styles.aiLabelText}>Rhome AI</Text>
+            <Text style={styles.aiLabelText}>Pi</Text>
           </View>
           {!answered ? (
             <TouchableOpacity onPress={onSkip} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>

@@ -517,7 +517,7 @@ PROFILE COMPLETE — The user has filled in all key profile fields.
 Do not ask profile questions. Focus on helping them find roommates and apartments.
 `;
 
-  let systemPrompt = `You are the AI assistant inside Rhome, a roommate matching app. Your name is Rhome AI.
+  let systemPrompt = `You are Pi, the AI assistant inside Rhome, a roommate and housing matching app.
 
 ${memoryContext}
 
@@ -581,7 +581,7 @@ function buildAgentSystemPrompt(profile: any, listings: any[], plan: string): st
       ).join('; ')
     : 'no active listings found';
 
-  return `You are the AI assistant inside Rhome, a roommate matching app. You are speaking to a REAL ESTATE AGENT or LANDLORD who uses the Agent Matchmaker feature. Your name is Rhome AI.
+  return `You are Pi, the AI assistant inside Rhome, a roommate and housing matching app. You are speaking to a REAL ESTATE AGENT or LANDLORD who uses the Agent Matchmaker feature.
 
 Your personality: professional but approachable — like a sharp analyst who happens to know everything about roommate group dynamics and compatibility. You're not a corporate chatbot. You're direct and data-driven. You give actionable advice.
 

@@ -168,7 +168,7 @@ export function AskAboutPersonModal({
                 Ask about {targetName}{targetAge ? `, ${targetAge}` : ''}
               </Text>
               <Text style={styles.headerSubtitle}>
-                {compatibilityScore ? `${compatibilityScore}% compatible  ` : ''}Rhome AI
+                {compatibilityScore ? `${compatibilityScore}% compatible  ` : ''}Pi
               </Text>
             </View>
           </View>
