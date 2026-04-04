@@ -45,6 +45,7 @@ import { LocationPicker } from '../../components/LocationPicker';
 import { getCoordinatesFromNeighborhood } from '../../utils/locationData';
 import { BOROUGH_NEIGHBORHOODS } from '../../constants/transitData';
 import { updateProfile } from '../../services/profileService';
+import { AppHeader } from '../../components/AppHeader';
 
 const TOTAL_STEPS = 12;
 
@@ -1692,26 +1693,23 @@ export const ProfileQuestionnaireScreen = () => {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={0}
     >
-      <View style={{ paddingTop: insets.top }}>
-        <View style={styles.navHeader}>
-          <TouchableOpacity onPress={goBack} style={styles.navButton} activeOpacity={0.6} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-            <Feather name="arrow-left" size={24} color="#fff" />
-          </TouchableOpacity>
-          <ThemedText style={{ flex: 1, textAlign: 'center', fontSize: 16, fontWeight: '700', color: '#fff' }}>
-            {isMissingMode ? `${currentFilteredIndex + 1} of ${stepsToShow.length}` : (currentFilteredIndex === 0 ? (isOnboarding ? 'Create Profile' : 'Edit Profile') : '')}
-          </ThemedText>
-          {isMissingMode ? (
-            <Pressable onPress={() => navigation.goBack()} style={styles.navButton}>
-              <Feather name="x" size={24} color="rgba(255,255,255,0.5)" />
-            </Pressable>
-          ) : (
-            <View style={styles.navButton} />
-          )}
-        </View>
-        <View style={styles.progressWrap}>
-          <ProgressBar currentStep={currentFilteredIndex} totalSteps={stepsToShow.length} />
-        </View>
-      </View>
+      <AppHeader
+        title={isMissingMode ? `${currentFilteredIndex + 1} of ${stepsToShow.length}` : (isOnboarding ? 'Create Profile' : 'Edit Profile')}
+        mode="back"
+        onBack={goBack}
+        role={user?.role === 'renter' ? 'renter' : 'host'}
+        hideSeparator
+        rightActions={isMissingMode ? (
+          <Pressable onPress={() => navigation.goBack()} style={styles.navButton}>
+            <Feather name="x" size={24} color="rgba(255,255,255,0.5)" />
+          </Pressable>
+        ) : undefined}
+        bottomContent={
+          <View style={styles.progressWrap}>
+            <ProgressBar currentStep={currentFilteredIndex} totalSteps={stepsToShow.length} />
+          </View>
+        }
+      />
 
       <ScrollView
         key={currentStepId}
