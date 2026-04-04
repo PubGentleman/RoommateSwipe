@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Pressable, StyleSheet, Platform, Text } from 'react-native';
 import { createBottomTabNavigator, BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
 import { Feather } from '../components/VectorIcons';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -192,10 +193,18 @@ const HOST_TAB_CONFIG: Record<string, { icon: string; label: string }> = {
   Profile: { icon: 'user', label: 'Profile' },
 };
 
+const SCREENS_HIDE_TAB_BAR = ['CreateEditListing'];
+
 function HostCustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const { theme, isDark } = useTheme();
   const insets = useSafeAreaInsets();
   const { unreadCount } = useNotificationContext();
+
+  const focusedRoute = state.routes[state.index];
+  const focusedChildName = getFocusedRouteNameFromRoute(focusedRoute) ?? '';
+  if (SCREENS_HIDE_TAB_BAR.includes(focusedChildName)) {
+    return null;
+  }
 
   return (
     <View style={[hostTabStyles.wrapper, { paddingBottom: insets.bottom }]}>
