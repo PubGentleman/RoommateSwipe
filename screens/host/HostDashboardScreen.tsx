@@ -387,7 +387,7 @@ export const HostDashboardScreen = () => {
 
   const navigateToTab = (tabName: string) => {
     if (tabName === 'Listings') {
-      if (isAgent) {
+      if (isAgent || isCompany) {
         navigation.navigate('MyListings');
       } else {
         const parent = navigation.getParent();
