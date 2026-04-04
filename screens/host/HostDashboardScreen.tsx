@@ -749,6 +749,7 @@ export const HostDashboardScreen = () => {
             <View style={styles.activeBadge}>
               <Text style={styles.activeBadgeText}>{activeCount} Active</Text>
             </View>
+            <Text style={styles.heroMyListings}>My Listings</Text>
           </View>
         </Pressable>
 
@@ -1560,6 +1561,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   activeBadgeText: { fontSize: 11, fontWeight: '700', color: GREEN },
+  heroMyListings: { fontSize: 11, fontWeight: '600', color: 'rgba(255,255,255,0.5)', marginTop: 4, textAlign: 'center' },
 
   statGrid: {
     flexDirection: 'row',
