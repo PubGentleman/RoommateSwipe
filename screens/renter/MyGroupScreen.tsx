@@ -44,6 +44,9 @@ import {
 } from '../../services/groupService';
 import { PreformedGroup, PreformedGroupMember, GroupShortlistItem } from '../../types/models';
 import { GroupShortlistCard } from '../../components/GroupShortlistCard';
+import { getShortlistWithVotes, castVote, ShortlistItemWithVotes } from '../../services/groupVotingService';
+import ShortlistVoteCard from '../../components/ShortlistVoteCard';
+import CompareListingsModal from '../../components/CompareListingsModal';
 import { TourEventCard } from '../../components/TourEventCard';
 import { TourScheduleForm } from '../../components/TourScheduleForm';
 import * as Linking from 'expo-linking';
@@ -76,6 +79,10 @@ export default function MyGroupScreen() {
   const [showTourForm, setShowTourForm] = useState(false);
   const [tourSubmitting, setTourSubmitting] = useState(false);
   const [shortlistFilter, setShortlistFilter] = useState<'all' | 'everyone' | 'mine'>('all');
+  const [shortlistItems, setShortlistItems] = useState<ShortlistItemWithVotes[]>([]);
+  const [compareItems, setCompareItems] = useState<string[]>([]);
+  const [showCompare, setShowCompare] = useState(false);
+  const [compareMode, setCompareMode] = useState(false);
   const [showGroupReport, setShowGroupReport] = useState(false);
   const [showMemberReport, setShowMemberReport] = useState(false);
   const [reportMemberTarget, setReportMemberTarget] = useState<{ id: string; name: string } | null>(null);
@@ -214,6 +221,32 @@ export default function MyGroupScreen() {
     if (!group) return;
     await removeFromShortlist(group.id, item.listing_id);
     loadData();
+  };
+
+  const loadShortlistVotes = async () => {
+    if (!user?.id || !group?.id) return;
+    const items = await getShortlistWithVotes(group.id, user.id);
+    setShortlistItems(items);
+  };
+
+  useEffect(() => {
+    if (activeTab === 'shortlist' && group?.id) {
+      loadShortlistVotes();
+    }
+  }, [activeTab, group?.id]);
+
+  const handleVote = async (itemId: string, vote: 1 | -1) => {
+    if (!user?.id) return;
+    await castVote(itemId, user.id, vote);
+    await loadShortlistVotes();
+  };
+
+  const toggleCompareSelection = (itemId: string) => {
+    setCompareItems(prev => {
+      if (prev.includes(itemId)) return prev.filter(id => id !== itemId);
+      if (prev.length >= 3) return prev;
+      return [...prev, itemId];
+    });
   };
 
   if (loading) {
@@ -397,60 +430,76 @@ export default function MyGroupScreen() {
       ) : null}
 
       {activeTab === 'shortlist' ? (
-        <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100 }}>
-          <View style={styles.shortlistFilterRow}>
-            {(['all', 'everyone', 'mine'] as const).map(f => (
+        <View style={{ flex: 1 }}>
+          {shortlistItems.length >= 2 ? (
+            <View style={styles.compareToolbar}>
               <Pressable
-                key={f}
-                style={[styles.shortlistFilterBtn, shortlistFilter === f && styles.shortlistFilterBtnActive]}
-                onPress={() => setShortlistFilter(f)}
+                style={styles.compareModeBtn}
+                onPress={() => {
+                  setCompareMode(!compareMode);
+                  setCompareItems([]);
+                }}
               >
-                <Text style={[styles.shortlistFilterText, shortlistFilter === f && { color: '#ff6b5b' }]}>
-                  {f === 'all' ? 'All' : f === 'everyone' ? 'Liked by All' : 'Liked by Me'}
+                <Feather name="columns" size={14} color={compareMode ? '#ff6b5b' : 'rgba(255,255,255,0.5)'} />
+                <Text style={[styles.compareModeText, compareMode ? { color: '#ff6b5b' } : null]}>
+                  {compareMode ? 'Cancel' : 'Compare'}
                 </Text>
               </Pressable>
-            ))}
-          </View>
 
-          {(() => {
-            const totalMembers = members.filter(m => m.status === 'joined').length;
-            let filtered = groupShortlist;
-            if (shortlistFilter === 'everyone') {
-              filtered = groupShortlist.filter(s => s.like_count >= totalMembers && totalMembers > 0);
-            } else if (shortlistFilter === 'mine') {
-              filtered = groupShortlist.filter(s => s.liked_by.some(l => l.user_id === user?.id));
-            }
+              {compareMode && compareItems.length >= 2 ? (
+                <Pressable
+                  style={styles.compareGoBtn}
+                  onPress={() => setShowCompare(true)}
+                >
+                  <Text style={styles.compareGoBtnText}>Compare {compareItems.length}</Text>
+                  <Feather name="arrow-right" size={14} color="#fff" />
+                </Pressable>
+              ) : null}
+            </View>
+          ) : null}
 
-            if (filtered.length === 0) {
-              return (
-                <View style={styles.emptyState}>
-                  <Feather name="heart" size={36} color="rgba(255,255,255,0.15)" />
-                  <Text style={styles.emptyText}>
-                    {shortlistFilter === 'everyone' ? 'No listings liked by everyone yet' : 'No liked listings yet'}
-                  </Text>
-                  <Text style={styles.emptySubtext}>
-                    Start exploring to build your group's shortlist!
-                  </Text>
-                </View>
-              );
-            }
-
-            return filtered.map(item => (
-              <GroupShortlistCard
-                key={item.listing_id}
-                listing={item.listing}
-                likeCount={item.like_count}
-                totalMembers={totalMembers}
-                likedBy={item.liked_by}
+          <FlatList
+            data={shortlistItems}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+            renderItem={({ item }) => (
+              <ShortlistVoteCard
+                item={item}
+                totalMembers={members.filter(m => m.status === 'joined').length}
+                isSelected={compareItems.includes(item.id)}
+                onVoteUp={() => handleVote(item.id, 1)}
+                onVoteDown={() => handleVote(item.id, -1)}
                 onPress={() => {
-                  if (item.listing?.id) {
-                    (navigation as any).navigate('Explore', { screen: 'ExploreMain', params: { viewListingId: item.listing.id } });
+                  if (compareMode) {
+                    toggleCompareSelection(item.id);
+                  } else if (item.listing?.id) {
+                    (navigation as any).navigate('Explore', { screen: 'ExploreMain', params: { viewListingId: item.listingId } });
+                  }
+                }}
+                onLongPress={() => {
+                  if (!compareMode) {
+                    setCompareMode(true);
+                    setCompareItems([item.id]);
                   }
                 }}
               />
-            ));
-          })()}
-        </ScrollView>
+            )}
+            ListEmptyComponent={
+              <View style={styles.emptyState}>
+                <Feather name="bookmark" size={32} color="rgba(255,255,255,0.15)" />
+                <Text style={styles.emptyText}>No shortlisted apartments yet</Text>
+                <Text style={styles.emptySubtext}>Save apartments from Explore to vote on them with your group</Text>
+              </View>
+            }
+          />
+
+          <CompareListingsModal
+            visible={showCompare}
+            onClose={() => { setShowCompare(false); setCompareMode(false); setCompareItems([]); }}
+            items={shortlistItems.filter(i => compareItems.includes(i.id))}
+            totalMembers={members.filter(m => m.status === 'joined').length}
+          />
+        </View>
       ) : null}
 
       {activeTab === 'tours' ? (
@@ -1077,6 +1126,43 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(245,158,11,0.15)',
     marginBottom: 6,
+  },
+  compareToolbar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.06)',
+  },
+  compareModeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+  },
+  compareModeText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.5)',
+  },
+  compareGoBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#ff6b5b',
+  },
+  compareGoBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#fff',
   },
   shortlistFilterRow: {
     flexDirection: 'row',
