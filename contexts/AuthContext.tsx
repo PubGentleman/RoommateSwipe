@@ -2623,26 +2623,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const getTeamMembers = async (): Promise<TeamMember[]> => {
     if (!user || user.hostType !== 'company') return [];
     if (isSupabaseConfigured) {
-      const { data, error } = await supabase
-        .from('team_members')
-        .select('*')
-        .eq('company_user_id', user.id)
-        .neq('status', 'removed')
-        .order('created_at', { ascending: true });
-      if (!error && data && data.length > 0) {
-        return data.map((d: any) => ({
-          id: d.id,
-          companyUserId: d.company_user_id,
-          memberUserId: d.member_user_id ?? undefined,
-          email: d.email,
-          fullName: d.full_name ?? undefined,
-          role: d.role,
-          status: d.status,
-          invitedAt: d.invited_at,
-          joinedAt: d.joined_at ?? undefined,
-          agentLicenseNumber: d.agent_license_number ?? undefined,
-          agentSpecialties: d.agent_specialties ?? undefined,
-        }));
+      try {
+        const queryPromise = supabase
+          .from('team_members')
+          .select('*')
+          .eq('company_user_id', user.id)
+          .neq('status', 'removed')
+          .order('created_at', { ascending: true });
+        const timeoutPromise = new Promise<{ data: null; error: { message: string } }>((resolve) =>
+          setTimeout(() => resolve({ data: null, error: { message: 'Supabase query timed out' } }), 8000)
+        );
+        const { data, error } = await Promise.race([queryPromise, timeoutPromise]);
+        if (error) {
+          console.warn('[AuthContext] Supabase team_members query failed:', error.message);
+        } else if (data && data.length > 0) {
+          return data.map((d: any) => ({
+            id: d.id,
+            companyUserId: d.company_user_id,
+            memberUserId: d.member_user_id ?? undefined,
+            email: d.email,
+            fullName: d.full_name ?? undefined,
+            role: d.role,
+            status: d.status,
+            invitedAt: d.invited_at,
+            joinedAt: d.joined_at ?? undefined,
+            agentLicenseNumber: d.agent_license_number ?? undefined,
+            agentSpecialties: d.agent_specialties ?? undefined,
+          }));
+        } else if (data && data.length === 0) {
+          return [];
+        }
+      } catch (e: any) {
+        console.warn('[AuthContext] Supabase team_members error:', e?.message);
       }
     }
     try {
