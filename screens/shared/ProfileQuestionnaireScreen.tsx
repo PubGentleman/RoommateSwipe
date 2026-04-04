@@ -472,6 +472,7 @@ export const ProfileQuestionnaireScreen = () => {
   const [agencyName, setAgencyName] = useState(user?.agencyName || '');
   const [licensePhoto, setLicensePhoto] = useState<string | null>(user?.licenseDocumentUrl || null);
   const [birthday, setBirthday] = useState(user?.birthday || '');
+  const [brokerageLicense, setBrokerageLicense] = useState(user?.brokerageLicense || user?.profileData?.brokerageLicense || '');
   const [birthdayError, setBirthdayError] = useState('');
   const [showBirthdayPicker, setShowBirthdayPicker] = useState(false);
   const [bio, setBio] = useState(user?.profileData?.bio || '');
@@ -599,15 +600,22 @@ export const ProfileQuestionnaireScreen = () => {
         if (photos.length === 0) { await showAlert({ title: 'Required', message: 'Please add at least one photo', variant: 'warning' }); return false; }
         return true;
       case 'basicInfo': {
-        if (!name.trim()) { await showAlert({ title: 'Required', message: 'Please enter your name', variant: 'warning' }); return false; }
+        if (!name.trim()) {
+          const nameLabel = isHostProfessional ? (user?.hostType === 'company' ? 'company name' : 'agency name') : 'name';
+          await showAlert({ title: 'Required', message: `Please enter your ${nameLabel}`, variant: 'warning' });
+          return false;
+        }
         if (!email.trim()) { await showAlert({ title: 'Required', message: 'Please enter your email', variant: 'warning' }); return false; }
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(email)) { await showAlert({ title: 'Error', message: 'Please enter a valid email', variant: 'warning' }); return false; }
-        if (!birthday.trim()) { await showAlert({ title: 'Required', message: 'Please enter your date of birth', variant: 'warning' }); return false; }
-        const v = validateBirthday(birthday);
-        if (!v.valid) { setBirthdayError(v.error); await showAlert({ title: 'Error', message: v.error, variant: 'warning' }); return false; }
-        if (!gender) { await showAlert({ title: 'Required', message: 'Please select your gender', variant: 'warning' }); return false; }
-        if (bio.trim().length < 20) { await showAlert({ title: 'About You', message: 'Please write at least 20 characters about yourself', variant: 'warning' }); return false; }
+        if (!isHostProfessional) {
+          if (!birthday.trim()) { await showAlert({ title: 'Required', message: 'Please enter your date of birth', variant: 'warning' }); return false; }
+          const v = validateBirthday(birthday);
+          if (!v.valid) { setBirthdayError(v.error); await showAlert({ title: 'Error', message: v.error, variant: 'warning' }); return false; }
+          if (!gender) { await showAlert({ title: 'Required', message: 'Please select your gender', variant: 'warning' }); return false; }
+        }
+        const bioLabel = isHostProfessional ? 'about your company' : 'about yourself';
+        if (bio.trim().length < 20) { await showAlert({ title: 'Required', message: `Please write at least 20 characters ${bioLabel}`, variant: 'warning' }); return false; }
         return true;
       }
       case 'budgetLocation':
@@ -670,11 +678,13 @@ export const ProfileQuestionnaireScreen = () => {
         licenseNumber: licenseNumber.trim() || undefined,
         agencyName: agencyName.trim() || undefined,
         licenseDocumentUrl: licensePhoto || undefined,
+        brokerageLicense: brokerageLicense.trim() || undefined,
       } : {}),
       preferredNeighborhoods: preferredNeighborhoods.length > 0 ? preferredNeighborhoods : undefined,
       profileData: {
         ...user?.profileData,
         bio: bio.trim() || undefined,
+        ...(isHostProfessional ? { brokerageLicense: brokerageLicense.trim() || undefined } : {}),
         budget: budget.trim() ? parseInt(budget) : undefined,
         budgetMin: budgetMin.trim() ? parseInt(budgetMin) : undefined,
         lookingFor,
@@ -755,7 +765,20 @@ export const ProfileQuestionnaireScreen = () => {
     if (!(await validateCurrentStep())) return;
     setIsSaving(true);
 
-    await updateUser(buildProfileData());
+    const safetyTimeout = setTimeout(() => {
+      setIsSaving(false);
+      showAlert({ title: 'Timed Out', message: 'Saving is taking too long. Please check your connection and try again.', variant: 'warning' });
+    }, 30000);
+
+    try {
+      await updateUser(buildProfileData());
+    } catch (e) {
+      console.warn('[ProfileQuestionnaire] updateUser failed:', e);
+      clearTimeout(safetyTimeout);
+      setIsSaving(false);
+      await showAlert({ title: 'Error', message: 'Failed to save your profile. Please try again.', variant: 'warning' });
+      return;
+    }
 
     try {
       await updateProfile(user!.id, {
@@ -773,6 +796,7 @@ export const ProfileQuestionnaireScreen = () => {
       console.warn('[ProfileQuestionnaire] Profile sync failed:', e);
     }
 
+    clearTimeout(safetyTimeout);
     try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
     setIsSaving(false);
     if (user?.onboardingStep === 'profile') {
@@ -859,40 +883,59 @@ export const ProfileQuestionnaireScreen = () => {
                 autoCapitalize="none"
               />
             </View>
-            <View style={styles.inputGroup}>
-              <ThemedText style={styles.inputLabel}>Date of Birth *</ThemedText>
-              <Pressable
-                style={[styles.dateTrigger, { borderColor: birthdayError ? theme.error : '#2a2a2a' }]}
-                onPress={() => setShowBirthdayPicker(true)}
-              >
-                <Feather name="calendar" size={18} color="rgba(255,255,255,0.35)" style={{ marginRight: 12 }} />
-                <ThemedText style={{ color: birthday ? '#fff' : 'rgba(255,255,255,0.3)', fontSize: 16, flex: 1 }}>
-                  {birthday ? formatDate(birthday) : 'Select your birthday'}
+            {!isHostProfessional ? (
+              <>
+                <View style={styles.inputGroup}>
+                  <ThemedText style={styles.inputLabel}>Date of Birth *</ThemedText>
+                  <Pressable
+                    style={[styles.dateTrigger, { borderColor: birthdayError ? theme.error : '#2a2a2a' }]}
+                    onPress={() => setShowBirthdayPicker(true)}
+                  >
+                    <Feather name="calendar" size={18} color="rgba(255,255,255,0.35)" style={{ marginRight: 12 }} />
+                    <ThemedText style={{ color: birthday ? '#fff' : 'rgba(255,255,255,0.3)', fontSize: 16, flex: 1 }}>
+                      {birthday ? formatDate(birthday) : 'Select your birthday'}
+                    </ThemedText>
+                    <Feather name="chevron-right" size={16} color="rgba(255,255,255,0.2)" />
+                  </Pressable>
+                  {birthdayError ? (
+                    <ThemedText style={{ color: theme.error, fontSize: 12, marginTop: 4 }}>{birthdayError}</ThemedText>
+                  ) : null}
+                  <DatePickerModal
+                    visible={showBirthdayPicker}
+                    onClose={() => setShowBirthdayPicker(false)}
+                    onConfirm={(date) => { setBirthday(date); setBirthdayError(''); }}
+                    mode="birthday"
+                    title="Enter Your Birthday"
+                    initialDate={birthday || undefined}
+                  />
+                </View>
+                {renderSubSectionHeader('Gender *')}
+                <EmojiTileGrid
+                  options={[
+                    { value: 'male', emoji: '\uD83D\uDE4B\u200D\u2642\uFE0F', label: 'Male' },
+                    { value: 'female', emoji: '\uD83D\uDE4B\u200D\u2640\uFE0F', label: 'Female' },
+                    { value: 'other', emoji: '\uD83C\uDF08', label: 'Other' },
+                  ]}
+                  selected={gender || ''}
+                  onSelect={(v) => setGender(v as any)}
+                />
+              </>
+            ) : null}
+            {isHostProfessional ? (
+              <View style={styles.inputGroup}>
+                <ThemedText style={styles.inputLabel}>Brokerage License Number</ThemedText>
+                <ThemedText style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 8 }}>
+                  Your real estate brokerage license number (optional — helps verify your business)
                 </ThemedText>
-                <Feather name="chevron-right" size={16} color="rgba(255,255,255,0.2)" />
-              </Pressable>
-              {birthdayError ? (
-                <ThemedText style={{ color: theme.error, fontSize: 12, marginTop: 4 }}>{birthdayError}</ThemedText>
-              ) : null}
-              <DatePickerModal
-                visible={showBirthdayPicker}
-                onClose={() => setShowBirthdayPicker(false)}
-                onConfirm={(date) => { setBirthday(date); setBirthdayError(''); }}
-                mode="birthday"
-                title="Enter Your Birthday"
-                initialDate={birthday || undefined}
-              />
-            </View>
-            {renderSubSectionHeader('Gender *')}
-            <EmojiTileGrid
-              options={[
-                { value: 'male', emoji: '\uD83D\uDE4B\u200D\u2642\uFE0F', label: 'Male' },
-                { value: 'female', emoji: '\uD83D\uDE4B\u200D\u2640\uFE0F', label: 'Female' },
-                { value: 'other', emoji: '\uD83C\uDF08', label: 'Other' },
-              ]}
-              selected={gender || ''}
-              onSelect={(v) => setGender(v as any)}
-            />
+                <TextInput
+                  style={[styles.textInput, { borderColor: '#2a2a2a', color: '#fff' }]}
+                  value={brokerageLicense}
+                  onChangeText={setBrokerageLicense}
+                  placeholder="Enter your license number"
+                  placeholderTextColor="rgba(255,255,255,0.3)"
+                />
+              </View>
+            ) : null}
             <View style={{ marginTop: 20 }}>
               <ThemedText style={styles.inputLabel}>About You *</ThemedText>
               <ThemedText style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 8 }}>
