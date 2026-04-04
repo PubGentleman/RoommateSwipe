@@ -1449,6 +1449,16 @@ export const StorageService = {
         const teamMembers = createMockTeamMembers(userId);
         await AsyncStorage.setItem(`@rhome/team_members_${userId}`, JSON.stringify(teamMembers));
         console.log('[StorageService] Seeded company team members');
+
+        const companyUser = await this.getCurrentUser();
+        if (companyUser && companyUser.id === userId && !companyUser.companyName) {
+          companyUser.companyName = 'Skyline Properties LLC';
+          companyUser.brokerageLicense = 'NY-BRK-2024-1234';
+          companyUser.licensingState = 'NY';
+          companyUser.unitsManaged = 45;
+          await this.setCurrentUser(companyUser);
+          console.log('[StorageService] Seeded company profile data');
+        }
       }
 
       const { createMockNotifications, createHostMockNotifications, createAgentMockNotifications, createCompanyMockNotifications, createMockInterestCards, createMockReceivedLikes, MOCK_SAVED_PROPERTY_IDS, createMockHostConversations, createMockPreformedGroup, createMockGroupMembers, createMockGroupShortlist, createMockGroupTours } = await import('./mockSeedData');

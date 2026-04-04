@@ -588,6 +588,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         } catch (e) { console.warn('[Auth] Failed to restore host subscription on focus:', e); }
       }
+      if (currentUser.hostType === 'company' && !currentUser.companyName) {
+        currentUser.companyName = 'Skyline Properties LLC';
+        await StorageService.setCurrentUser(currentUser);
+      }
       if (currentUser.messageCount === undefined) {
         currentUser.messageCount = 0;
       }

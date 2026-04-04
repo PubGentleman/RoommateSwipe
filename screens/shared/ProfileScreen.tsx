@@ -81,7 +81,11 @@ export const ProfileScreen = () => {
     return mode.charAt(0).toUpperCase() + mode.slice(1);
   };
 
-  const displayName = user?.hostType === 'company' ? (user?.companyName || user?.brokerageName || user?.name) : user?.name;
+  const displayName = user?.hostType === 'company'
+    ? (user?.companyName || user?.agencyName || user?.brokerageName || user?.profileData?.companyName || user?.name)
+    : user?.hostType === 'agent'
+      ? (user?.agencyName || user?.companyName || user?.name)
+      : user?.name;
   const userInitial = displayName ? displayName.charAt(0).toUpperCase() : 'U';
   const renterPlan = normalizeRenterPlan(user?.subscription?.plan);
   const renterLimits = getRenterPlanLimits(renterPlan);
