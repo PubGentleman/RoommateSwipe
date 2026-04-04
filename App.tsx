@@ -17,6 +17,7 @@ import { ProfileReminderProvider } from "./contexts/ProfileReminderContext";
 import { ConfirmProvider } from "./contexts/ConfirmContext";
 import { StripeWrapper } from "./components/StripeWrapper";
 import { RevenueCatProvider } from "./contexts/RevenueCatContext";
+import { TourProvider } from "./contexts/TourContext";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { StorageService } from "./utils/storage";
 import { isDev } from "./utils/dataUtils";
@@ -143,6 +144,7 @@ export default function App() {
                     <NotificationProvider>
                       <ConfirmProvider>
                         <RevenueCatProvider>
+                          <TourProvider>
                           <NavigationContainer
                             ref={navigationRef}
                             linking={{
@@ -169,6 +171,7 @@ export default function App() {
                             <ResponseTracker />
                           </NavigationContainer>
                           <StatusBar style="light" />
+                          </TourProvider>
                         </RevenueCatProvider>
                       </ConfirmProvider>
                     </NotificationProvider>

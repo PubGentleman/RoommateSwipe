@@ -28,6 +28,9 @@ import { getAgentPlanLimits, type AgentPlan } from '../../constants/planLimits';
 import { resolveEffectiveAgentPlan } from '../../utils/planResolver';
 import { CommonActions } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import CoachMarkOverlay from '../../components/CoachMark';
+import { useTourSetup } from '../../hooks/useTourSetup';
+import { TOUR_CONTENT } from '../../constants/tourSteps';
 import { getAgentResponseAlerts } from '../../services/responseTrackingService';
 import { getHostCompletionPercentage } from '../../utils/profileReminderUtils';
 import { HostReviewsScreen } from '../shared/HostReviewsScreen';
@@ -111,6 +114,7 @@ export const HostDashboardScreen = () => {
   const [showUpgradeBanner, setShowUpgradeBanner] = useState(false);
   const [completionBannerDismissed, setCompletionBannerDismissed] = useState(false);
   const hostCompletion = user ? getHostCompletionPercentage(user) : 100;
+  const dashboardTour = useTourSetup('hostDashboard', TOUR_CONTENT.hostDashboard);
   const [agentStats, setAgentStats] = useState<{ agentId: string; agentName: string; activeListings: number; pendingBookings: number; confirmedBookings: number }[]>([]);
   const [expandedAgentId, setExpandedAgentId] = useState<string | null>(null);
   const [teamFilter, setTeamFilter] = useState<'all' | 'active' | 'pending' | 'confirmed'>('all');
@@ -374,6 +378,12 @@ export const HostDashboardScreen = () => {
       loadData();
     }, [loadData])
   );
+
+  useEffect(() => {
+    if (listings.length > 0 && dashboardTour.shouldShowTour) {
+      dashboardTour.startTour();
+    }
+  }, [listings.length, dashboardTour.shouldShowTour]);
 
   const activeCount = listings.filter(p => p.available && !p.rentedDate).length;
   const rentedCount = listings.filter(p => !!p.rentedDate).length;
@@ -751,7 +761,7 @@ export const HostDashboardScreen = () => {
           </View>
         </Pressable>
 
-        <View style={styles.statGrid}>
+        <View style={styles.statGrid} ref={dashboardTour.setRef('stats')} collapsable={false}>
           {statCards.map((stat, idx) => {
             const arrow = getStatArrowText(stat.label, stat.value);
             return (
@@ -1127,7 +1137,7 @@ export const HostDashboardScreen = () => {
 
         {user?.hostType === 'company' && agentStats.length > 0 ? (
           <>
-            <View style={[styles.sectionHeader, { marginTop: 6 }]}>
+            <View style={[styles.sectionHeader, { marginTop: 6 }]} ref={dashboardTour.setRef('team')} collapsable={false}>
               <Text style={styles.sectionTitle}>TEAM ACTIVITY</Text>
               <Pressable onPress={() => navigateToTab('Team')}>
                 <Text style={styles.sectionLink}>Manage</Text>
@@ -1303,7 +1313,7 @@ export const HostDashboardScreen = () => {
         <View style={[styles.sectionHeader, { marginTop: 6 }]}>
           <Text style={styles.sectionTitle}>QUICK ACTIONS</Text>
         </View>
-        <View style={styles.quickActions}>
+        <View style={styles.quickActions} ref={dashboardTour.setRef('createListing')} collapsable={false}>
           <Pressable style={styles.qaPrimary} onPress={() => {
             const result = canAddListing(activeCount);
             if (!result.allowed) {
@@ -1451,6 +1461,12 @@ export const HostDashboardScreen = () => {
           />
         </Modal>
       ) : null}
+
+      <CoachMarkOverlay
+        steps={dashboardTour.tourSteps}
+        visible={dashboardTour.showTour}
+        onComplete={dashboardTour.completeTour}
+      />
     </View>
   );
 };

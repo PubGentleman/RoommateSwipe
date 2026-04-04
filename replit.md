@@ -31,6 +31,7 @@ The application is built with React Native, Expo, and TypeScript. React Navigati
 -   **Role-Specific Features:**
     -   **Renter:** Swipe-based matching, 1-on-1 messaging, group management, advanced property search filters, saved properties, AI Match Assistant, property reviews, and chat scheduling. Features an "Renter Intent System" for onboarding.
     -   **Host:** Dashboard for listing management (create, edit, delete, boost), inquiry handling, analytics, property review management, and group matches monetization. Includes a multi-step listing wizard. Supports Individual, Company, and Agent host types with features like Rhome Select Badge, Company Teams, and Group Bookings. Company hosts can invite and manage agents.
+-   **Welcome Tour (Coach Marks):** Spotlight-style onboarding overlays shown on first visit to key screens. TourProvider context with AsyncStorage persistence, reusable CoachMark overlay component, and useTourSetup hook. Tours: Explore (3 stops), Roommates (3 stops), Messages (2 stops), Host Dashboard (3 stops).
 -   **Group Apartment Voting & Comparison:** Shortlisting with voting, progress bars, and side-by-side listing comparisons.
 -   **Smart Recommendations Feed:** Personalized sections on the Explore screen including "Best Match Today," "New This Week," and "Price Drops."
 -   **AI-Powered Enhancements:** AI Assistant for housing help, AI-generated match explanations, listing suggestions, AI tools for agents/companies, AI-suggested meetups, and AI Neighborhood Intelligence.

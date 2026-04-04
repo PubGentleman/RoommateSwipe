@@ -28,6 +28,9 @@ import { MatchCelebrationModal } from '../../components/MatchCelebrationModal';
 import { PaywallSheet } from '../../components/PaywallSheet';
 import { VerificationBadgeInline, getVerificationLevel } from '../../components/VerificationBadge';
 import { LinearGradient } from 'expo-linear-gradient';
+import CoachMarkOverlay from '../../components/CoachMark';
+import { useTourSetup } from '../../hooks/useTourSetup';
+import { TOUR_CONTENT } from '../../constants/tourSteps';
 import { RhomeLogo } from '../../components/RhomeLogo';
 import { AppHeader, HeaderIconButton } from '../../components/AppHeader';
 import { RoommateFilterSheet, MatchFilters, DEFAULT_FILTERS, getActiveFilterCount, getActiveFilterChips, removeFilterChip, loadSavedFilters, saveFilters, applyFiltersToProfiles } from '../../components/RoommateFilterSheet';
@@ -201,6 +204,7 @@ export const RoommatesScreen = () => {
   const [unfilteredCount, setUnfilteredCount] = useState(0);
   const [unfilteredProfiles, setUnfilteredProfiles] = useState<RoommateProfile[]>([]);
   const [showAISheet, setShowAISheet] = useState(false);
+  const roommatesTour = useTourSetup('roommates', TOUR_CONTENT.roommates);
   const [aiSheetContext, setAiSheetContext] = useState<ScreenContext>('match');
   const [showWhyModal, setShowWhyModal] = useState(false);
   const [piCardSummary, setPiCardSummary] = useState<string | null>(null);
@@ -555,6 +559,12 @@ export const RoommatesScreen = () => {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!isLoading && profiles.length > 0 && roommatesTour.shouldShowTour) {
+      roommatesTour.startTour();
+    }
+  }, [isLoading, profiles.length, roommatesTour.shouldShowTour]);
 
   const prefetchNextImages = useCallback((profileList: RoommateProfile[], fromIndex: number) => {
     const nextProfiles = profileList.slice(fromIndex, fromIndex + 3);
@@ -1826,7 +1836,10 @@ export const RoommatesScreen = () => {
           </View>
         ) : null}
         <GestureDetector gesture={composedGesture}>
-          <Animated.View style={[
+          <Animated.View
+            ref={roommatesTour.setRef('swipeCard')}
+            collapsable={false}
+            style={[
             styles.card,
             animatedCardStyle,
             { zIndex: 1 },
@@ -2023,7 +2036,7 @@ export const RoommatesScreen = () => {
         )}
       </View>
 
-      <View style={styles.actionRow}>
+      <View style={styles.actionRow} ref={roommatesTour.setRef('matchInsights')} collapsable={false}>
         <Pressable
           style={[styles.actionBtnSm, styles.actionUndo, { opacity: lastSwipedProfile ? 1 : 0.4 }]}
           onPress={handleUndo}
@@ -2036,7 +2049,7 @@ export const RoommatesScreen = () => {
         >
           <Feather name="x" size={24} color="#ff4d4d" />
         </Pressable>
-        <Animated.View style={superInterestBtnStyle}>
+        <Animated.View style={superInterestBtnStyle} ref={roommatesTour.setRef('superLike')} collapsable={false}>
           <Pressable
             style={[styles.actionBtnSuperInterest, getSuperInterestCount() === 0 && user?.subscription?.plan !== 'elite' ? { opacity: 0.4 } : null]}
             onPress={handleSuperInterest}
@@ -3255,6 +3268,11 @@ export const RoommatesScreen = () => {
             (navigation as any).navigate(screen, params);
           }
         }}
+      />
+      <CoachMarkOverlay
+        steps={roommatesTour.tourSteps}
+        visible={roommatesTour.showTour}
+        onComplete={roommatesTour.completeTour}
       />
     </View>
   );

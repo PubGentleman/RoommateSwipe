@@ -65,6 +65,9 @@ import {
 } from '../../constants/amenities';
 import { HostBadge } from '../../components/HostBadge';
 import { useHostBadge, BADGE_CONFIG, HostBadgeType } from '../../hooks/useHostBadge';
+import CoachMarkOverlay from '../../components/CoachMark';
+import { useTourSetup } from '../../hooks/useTourSetup';
+import { TOUR_CONTENT } from '../../constants/tourSteps';
 
 const BG = '#111';
 const CARD_BG = '#1a1a1a';
@@ -142,6 +145,7 @@ export const ExploreScreen = () => {
   const [photoIndex, setPhotoIndex] = useState(0);
   const [showMatchBreakdown, setShowMatchBreakdown] = useState(false);
   const [viewMode, setViewMode] = useState<'all' | 'saved'>('all');
+  const exploreTour = useTourSetup('explore', TOUR_CONTENT.explore);
   const [recommendations, setRecommendations] = useState<RecommendationSection[]>([]);
   const [displayMode, setDisplayMode] = useState<'list' | 'map'>('list');
   const [showLocationSheet, setShowLocationSheet] = useState(false);
@@ -327,6 +331,12 @@ export const ExploreScreen = () => {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!isLoading && filteredProperties.length > 0 && exploreTour.shouldShowTour) {
+      exploreTour.startTour();
+    }
+  }, [isLoading, filteredProperties.length, exploreTour.shouldShowTour]);
 
   useEffect(() => {
     if (selectedProperty && showPropertyDetail) {
@@ -1255,6 +1265,7 @@ export const ExploreScreen = () => {
 
     return (
       <Pressable
+        ref={index === 0 ? exploreTour.setRef('listingCard') : undefined}
         style={styles.propCard}
         onPress={() => {
           const viewCheck = canViewListing();
@@ -1627,20 +1638,24 @@ export const ExploreScreen = () => {
         rightActions={
           <>
             <AIFloatingButton onPress={() => setShowAISheet(true)} position="inline" />
-            <HeaderIconButton
-              icon={displayMode === 'list' ? 'map' : 'list'}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                setDisplayMode(displayMode === 'list' ? 'map' : 'list');
-              }}
-              active={displayMode === 'map'}
-            />
-            <HeaderIconButton
-              icon="sliders"
-              onPress={handleFilterPress}
-              badge={hasActiveFilters()}
-              active={hasActiveFilters()}
-            />
+            <View ref={exploreTour.setRef('mapToggle')} collapsable={false}>
+              <HeaderIconButton
+                icon={displayMode === 'list' ? 'map' : 'list'}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setDisplayMode(displayMode === 'list' ? 'map' : 'list');
+                }}
+                active={displayMode === 'map'}
+              />
+            </View>
+            <View ref={exploreTour.setRef('filter')} collapsable={false}>
+              <HeaderIconButton
+                icon="sliders"
+                onPress={handleFilterPress}
+                badge={hasActiveFilters()}
+                active={hasActiveFilters()}
+              />
+            </View>
           </>
         }
         bottomContent={
@@ -3721,6 +3736,12 @@ export const ExploreScreen = () => {
           />
         </Modal>
       ) : null}
+
+      <CoachMarkOverlay
+        steps={exploreTour.tourSteps}
+        visible={exploreTour.showTour}
+        onComplete={exploreTour.completeTour}
+      />
     </View>
   );
 };

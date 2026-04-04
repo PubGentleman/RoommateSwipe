@@ -19,6 +19,9 @@ import { getMyInquiryGroups } from '../../services/groupService';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { Group } from '../../types/models';
 import { AppHeader, HeaderIconButton } from '../../components/AppHeader';
+import CoachMarkOverlay from '../../components/CoachMark';
+import { useTourSetup } from '../../hooks/useTourSetup';
+import { TOUR_CONTENT } from '../../constants/tourSteps';
 
 function safeDate(value: any): Date {
   if (value instanceof Date && !isNaN(value.getTime())) return value;
@@ -89,6 +92,7 @@ export const MessagesScreen = () => {
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [inquiryGroups, setInquiryGroups] = useState<Group[]>([]);
   const [chatFilter, setChatFilter] = useState<ChatFilterKey>('all');
+  const messagesTour = useTourSetup('messages', TOUR_CONTENT.messages);
 
   const MSG_COLLAPSE_H = 50;
   const msgScrollY = useSharedValue(0);
@@ -340,6 +344,12 @@ export const MessagesScreen = () => {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!isLoading && messagesTour.shouldShowTour) {
+      messagesTour.startTour();
+    }
+  }, [isLoading, messagesTour.shouldShowTour]);
 
   const formatTime = (date: Date) => {
     const now = new Date();
@@ -986,10 +996,12 @@ export const MessagesScreen = () => {
         hideSeparator
         rightActions={
           <>
-            <HeaderIconButton
-              icon={isSearchVisible ? 'x' : 'search'}
-              onPress={handleSearchToggle}
-            />
+            <View ref={messagesTour.setRef('search')} collapsable={false}>
+              <HeaderIconButton
+                icon={isSearchVisible ? 'x' : 'search'}
+                onPress={handleSearchToggle}
+              />
+            </View>
             {!isHostMode ? (
               <HeaderIconButton
                 icon="edit-2"
@@ -1021,7 +1033,7 @@ export const MessagesScreen = () => {
         </Animated.View>
       ) : null}
 
-      <View style={styles.chatFilterWrap}>
+      <View style={styles.chatFilterWrap} ref={messagesTour.setRef('filters')} collapsable={false}>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -1157,6 +1169,11 @@ export const MessagesScreen = () => {
         />
       )}
 
+      <CoachMarkOverlay
+        steps={messagesTour.tourSteps}
+        visible={messagesTour.showTour}
+        onComplete={messagesTour.completeTour}
+      />
     </View>
   );
 };
