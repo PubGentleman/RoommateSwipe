@@ -812,9 +812,18 @@ export const HostDashboardScreen = () => {
 
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>RECENT INQUIRIES</Text>
-          <Pressable onPress={() => navigation.navigate('Inquiries')}>
-            <Text style={styles.sectionLink}>View all</Text>
-          </Pressable>
+          <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
+            <Pressable
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+              onPress={() => navigation.navigate('InquiryTrends')}
+            >
+              <Feather name="trending-up" size={13} color="#8b5cf6" />
+              <Text style={[styles.sectionLink, { color: '#8b5cf6' }]}>Trends</Text>
+            </Pressable>
+            <Pressable onPress={() => navigation.navigate('Inquiries')}>
+              <Text style={styles.sectionLink}>View all</Text>
+            </Pressable>
+          </View>
         </View>
 
         {recentPendingInquiries.length === 0 ? (

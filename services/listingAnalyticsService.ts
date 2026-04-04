@@ -92,7 +92,7 @@ export async function getListingPerformance(
   const { data: cards } = await supabase
     .from('interest_cards')
     .select('created_at, responded_at')
-    .eq('property_id', listingId)
+    .eq('listing_id', listingId)
     .not('responded_at', 'is', null)
     .gte('created_at', sinceISO);
 
@@ -166,6 +166,196 @@ export async function getListingPerformance(
     savesByDay: groupByDay(saves),
     viewsBySource: [],
     boostImpact,
+  };
+}
+
+export interface FunnelData {
+  views: number;
+  saves: number;
+  inquiries: number;
+  accepted: number;
+  booked: number;
+  conversionRates: {
+    viewToSave: number;
+    saveToInquiry: number;
+    viewToInquiry: number;
+    inquiryToAccept: number;
+    acceptToBook: number;
+    overallConversion: number;
+  };
+}
+
+export interface InquiryTrendData {
+  dailyCounts: { date: string; pending: number; accepted: number; passed: number; expired: number }[];
+  statusBreakdown: { status: string; count: number; color: string }[];
+  avgResponseTimeByDay: { date: string; hours: number }[];
+  superInterestRate: number;
+  topInquiryListings: { listingId: string; title: string; count: number }[];
+}
+
+export async function getConversionFunnel(
+  hostId: string,
+  days: number = 30,
+  listingId?: string
+): Promise<FunnelData> {
+  const since = new Date();
+  since.setDate(since.getDate() - days);
+  const sinceISO = since.toISOString();
+
+  let listingIds: string[];
+  if (listingId) {
+    listingIds = [listingId];
+  } else {
+    const { data: listings } = await supabase
+      .from('properties')
+      .select('id')
+      .or(`host_id.eq.${hostId},assigned_agent_id.eq.${hostId}`);
+    listingIds = (listings || []).map(l => l.id);
+  }
+
+  if (listingIds.length === 0) {
+    return {
+      views: 0, saves: 0, inquiries: 0, accepted: 0, booked: 0,
+      conversionRates: {
+        viewToSave: 0, saveToInquiry: 0, viewToInquiry: 0,
+        inquiryToAccept: 0, acceptToBook: 0, overallConversion: 0,
+      },
+    };
+  }
+
+  const { data: events } = await supabase
+    .from('listing_events')
+    .select('event_type')
+    .in('listing_id', listingIds)
+    .gte('created_at', sinceISO);
+
+  const views = (events || []).filter(e => e.event_type === 'view').length;
+  const saves = (events || []).filter(e => e.event_type === 'save').length;
+
+  const { data: cards } = await supabase
+    .from('interest_cards')
+    .select('status')
+    .in('listing_id', listingIds)
+    .gte('created_at', sinceISO);
+
+  const allCards = cards || [];
+  const inquiries = allCards.length;
+  const accepted = allCards.filter(c => c.status === 'accepted').length;
+
+  const { data: bookings } = await supabase
+    .from('bookings')
+    .select('id')
+    .in('listing_id', listingIds)
+    .gte('created_at', sinceISO)
+    .eq('status', 'confirmed');
+
+  const booked = (bookings || []).length;
+
+  const safe = (num: number, den: number) => den > 0 ? Math.round((num / den) * 1000) / 10 : 0;
+
+  return {
+    views, saves, inquiries, accepted, booked,
+    conversionRates: {
+      viewToSave: safe(saves, views),
+      saveToInquiry: safe(inquiries, saves),
+      viewToInquiry: safe(inquiries, views),
+      inquiryToAccept: safe(accepted, inquiries),
+      acceptToBook: safe(booked, accepted),
+      overallConversion: safe(booked, views),
+    },
+  };
+}
+
+export async function getInquiryTrends(
+  hostId: string,
+  days: number = 30
+): Promise<InquiryTrendData> {
+  const since = new Date();
+  since.setDate(since.getDate() - days);
+  const sinceISO = since.toISOString();
+
+  const { data: listings } = await supabase
+    .from('properties')
+    .select('id, title')
+    .or(`host_id.eq.${hostId},assigned_agent_id.eq.${hostId}`);
+  const listingIds = (listings || []).map(l => l.id);
+
+  if (listingIds.length === 0) {
+    return {
+      dailyCounts: [], statusBreakdown: [], avgResponseTimeByDay: [],
+      superInterestRate: 0, topInquiryListings: [],
+    };
+  }
+
+  const { data: cards } = await supabase
+    .from('interest_cards')
+    .select('*')
+    .in('listing_id', listingIds)
+    .gte('created_at', sinceISO)
+    .order('created_at', { ascending: true });
+
+  const allCards = cards || [];
+
+  const dailyMap: Record<string, { pending: number; accepted: number; passed: number; expired: number }> = {};
+  const cursor = new Date(sinceISO);
+  const today = new Date();
+  while (cursor <= today) {
+    const key = cursor.toISOString().substring(0, 10);
+    dailyMap[key] = { pending: 0, accepted: 0, passed: 0, expired: 0 };
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  allCards.forEach(card => {
+    const day = card.created_at.substring(0, 10);
+    if (dailyMap[day]) {
+      const status = card.status as 'pending' | 'accepted' | 'passed' | 'expired';
+      if (dailyMap[day][status] !== undefined) dailyMap[day][status]++;
+    }
+  });
+  const dailyCounts = Object.entries(dailyMap).map(([date, counts]) => ({ date, ...counts }));
+
+  const statusBreakdown = [
+    { status: 'Pending', count: allCards.filter(c => c.status === 'pending').length, color: '#F39C12' },
+    { status: 'Accepted', count: allCards.filter(c => c.status === 'accepted').length, color: '#27AE60' },
+    { status: 'Passed', count: allCards.filter(c => c.status === 'passed').length, color: '#E74C3C' },
+    { status: 'Expired', count: allCards.filter(c => c.status === 'expired').length, color: '#95A5A6' },
+  ];
+
+  const respondedCards = allCards.filter(c => c.responded_at);
+  const responseByDay: Record<string, { total: number; count: number }> = {};
+  respondedCards.forEach(card => {
+    const day = card.responded_at.substring(0, 10);
+    const hours = (new Date(card.responded_at).getTime() - new Date(card.created_at).getTime()) / 3600000;
+    if (!responseByDay[day]) responseByDay[day] = { total: 0, count: 0 };
+    responseByDay[day].total += hours;
+    responseByDay[day].count++;
+  });
+  const avgResponseTimeByDay = Object.entries(responseByDay).map(([date, d]) => ({
+    date,
+    hours: Math.round((d.total / d.count) * 10) / 10,
+  }));
+
+  const superCount = allCards.filter(c => c.is_super_interest).length;
+  const superInterestRate = allCards.length > 0 ? Math.round((superCount / allCards.length) * 100) : 0;
+
+  const listingCounts: Record<string, number> = {};
+  allCards.forEach(c => {
+    listingCounts[c.listing_id] = (listingCounts[c.listing_id] || 0) + 1;
+  });
+  const topInquiryListings = Object.entries(listingCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([id, count]) => ({
+      listingId: id,
+      title: (listings || []).find(l => l.id === id)?.title || 'Unknown',
+      count,
+    }));
+
+  return {
+    dailyCounts,
+    statusBreakdown,
+    avgResponseTimeByDay,
+    superInterestRate,
+    topInquiryListings,
   };
 }
 

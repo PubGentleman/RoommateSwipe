@@ -355,6 +355,20 @@ export const HostAnalyticsScreen = () => {
         </ThemedText>
       ) : null}
 
+      <Pressable
+        style={[styles.card, { backgroundColor: CARD_BG, marginBottom: Spacing.md, flexDirection: 'row', alignItems: 'center', gap: 12 }]}
+        onPress={() => navigation.navigate('InquiryTrends')}
+      >
+        <View style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: 'rgba(139,92,246,0.12)', alignItems: 'center', justifyContent: 'center' }}>
+          <Feather name="filter" size={18} color="#8b5cf6" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <ThemedText type="h3">Inquiry Funnel</ThemedText>
+          <ThemedText style={{ color: '#888', fontSize: 12 }}>View to Inquiry to Booking</ThemedText>
+        </View>
+        <Feather name="chevron-right" size={16} color="rgba(255,255,255,0.3)" />
+      </Pressable>
+
       <ThemedText type="h2" style={styles.sectionTitle}>Per-Listing Breakdown</ThemedText>
       {perListingInquiries.length === 0 ? (
         <View style={[styles.card, { backgroundColor: CARD_BG, alignItems: 'center', paddingVertical: Spacing.xxl }]}>
