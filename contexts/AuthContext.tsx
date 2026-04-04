@@ -778,10 +778,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await StorageService.setCurrentUser(updated);
     await StorageService.addOrUpdateUser(updated);
 
-    await supabase
-      .from('users')
-      .update({ onboarding_step: step })
-      .eq('id', user.id);
+    try {
+      await supabase
+        .from('users')
+        .update({ onboarding_step: step })
+        .eq('id', user.id);
+    } catch (e) {
+      console.warn('[Auth] Supabase onboarding step sync failed:', e);
+    }
 
     setUser(updated);
   };

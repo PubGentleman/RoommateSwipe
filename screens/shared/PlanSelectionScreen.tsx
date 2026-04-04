@@ -148,10 +148,14 @@ export const PlanSelectionScreen = () => {
       setProcessing(true);
       try {
         await completeOnboardingStep('complete');
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      } catch {}
-      setShowConfirm(false);
-      setProcessing(false);
+        try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
+      } catch (err: any) {
+        console.error('[PlanSelection] Free plan activation failed:', err);
+        await alert({ title: 'Error', message: err?.message || 'Could not activate your plan. Please try again.', variant: 'warning' });
+      } finally {
+        setShowConfirm(false);
+        setProcessing(false);
+      }
       return;
     }
 
