@@ -16,7 +16,7 @@ import { isBoostExpired, getBoostDuration, getBoostTimeRemaining, RENTER_BOOST_O
 import { dispatchInsightTrigger } from '../../utils/insightRefresh';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scaleFont, moderateScale, getResponsiveSpacing } from '../../utils/responsive';
-import { calculateCompatibility, getMatchQualityColor, getCleanlinessLabel, getSocialLevelLabel, getWorkScheduleLabel, getWorkStyleTag, validateProfileDataConsistency, formatMoveInDate, getGenderSymbol } from '../../utils/matchingAlgorithm';
+import { calculateCompatibility, calculateDetailedCompatibility, MatchScore, getMatchQualityColor, getCleanlinessLabel, getSocialLevelLabel, getWorkScheduleLabel, getWorkStyleTag, validateProfileDataConsistency, formatMoveInDate, getGenderSymbol } from '../../utils/matchingAlgorithm';
 import { getTagLabel, INTEREST_TAGS } from '../../constants/interestTags';
 import { getCityFromNeighborhood } from '../../utils/locationData';
 import { useCityContext } from '../../contexts/CityContext';
@@ -67,6 +67,99 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 // Limit card size for web/desktop viewing
 const MAX_CARD_WIDTH = 420;
 const CARD_WIDTH = Math.min(SCREEN_WIDTH - Spacing.xxl, MAX_CARD_WIDTH);
+
+const CATEGORY_MAXES: Record<string, number> = {
+  location: 16, budget: 12, sleepSchedule: 12, cleanliness: 12,
+  smoking: 10, age: 8, workLocation: 6, guestPolicy: 6,
+  noiseTolerance: 4, pets: 4, moveInTimeline: 4,
+  roommateRelationship: 2, sharedExpenses: 2, lifestyle: 2, zodiac: 2,
+};
+const CATEGORY_LABELS: Record<string, string> = {
+  location: 'Location', budget: 'Budget', sleepSchedule: 'Sleep',
+  cleanliness: 'Cleanliness', smoking: 'Smoking', age: 'Age',
+  workLocation: 'Work Style', guestPolicy: 'Guests', noiseTolerance: 'Noise',
+  pets: 'Pets', moveInTimeline: 'Move-in', roommateRelationship: 'Vibe',
+  sharedExpenses: 'Expenses', lifestyle: 'Lifestyle', zodiac: 'Zodiac',
+};
+
+const MatchInsights = ({ score }: { score: MatchScore }) => {
+  const { breakdown, reasons } = score;
+  const strengths = reasons.strengths.slice(0, 3);
+  const topConcern = reasons.concerns[0];
+
+  const topCategories = Object.entries(breakdown)
+    .filter(([key]) => CATEGORY_MAXES[key])
+    .map(([key, val]) => ({
+      key,
+      label: CATEGORY_LABELS[key] || key,
+      pct: Math.round(((val as number) / CATEGORY_MAXES[key]) * 100),
+    }))
+    .sort((a, b) => b.pct - a.pct)
+    .slice(0, 4);
+
+  return (
+    <View style={insightStyles.container}>
+      {strengths.length > 0 ? (
+        <View style={insightStyles.chipRow}>
+          {strengths.map((s, i) => (
+            <View key={i} style={insightStyles.strengthChip}>
+              <Feather name="check-circle" size={10} color="#3ECF8E" />
+              <Text style={insightStyles.strengthText} numberOfLines={1}>{s}</Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
+      {topConcern ? (
+        <View style={insightStyles.chipRow}>
+          <View style={insightStyles.concernChip}>
+            <Feather name="alert-circle" size={10} color="#f59e0b" />
+            <Text style={insightStyles.concernText} numberOfLines={1}>{topConcern}</Text>
+          </View>
+        </View>
+      ) : null}
+      <View style={insightStyles.barsContainer}>
+        {topCategories.map((cat) => (
+          <View key={cat.key} style={insightStyles.barRow}>
+            <Text style={insightStyles.barLabel}>{cat.label}</Text>
+            <View style={insightStyles.barTrack}>
+              <View
+                style={[
+                  insightStyles.barFill,
+                  {
+                    width: `${Math.max(5, cat.pct)}%`,
+                    backgroundColor: cat.pct >= 80 ? '#3ECF8E' : cat.pct >= 50 ? '#ff6b5b' : '#f59e0b',
+                  },
+                ]}
+              />
+            </View>
+            <Text style={insightStyles.barPct}>{cat.pct}%</Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+};
+
+const insightStyles = StyleSheet.create({
+  container: { paddingHorizontal: 16, paddingVertical: 10, gap: 8 },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  strengthChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: 'rgba(62,207,142,0.1)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12,
+  },
+  strengthText: { fontSize: 11, color: '#3ECF8E', fontWeight: '600', maxWidth: 140 },
+  concernChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: 'rgba(245,158,11,0.1)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12,
+  },
+  concernText: { fontSize: 11, color: '#f59e0b', fontWeight: '600', maxWidth: 200 },
+  barsContainer: { gap: 6, marginTop: 4 },
+  barRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  barLabel: { fontSize: 10, color: 'rgba(255,255,255,0.45)', width: 60, fontWeight: '600' },
+  barTrack: { flex: 1, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.08)', overflow: 'hidden' },
+  barFill: { height: '100%', borderRadius: 2 },
+  barPct: { fontSize: 10, color: 'rgba(255,255,255,0.35)', width: 28, textAlign: 'right' },
+});
 
 export const RoommatesScreen = () => {
   const { theme } = useTheme();
@@ -2475,6 +2568,7 @@ export const RoommatesScreen = () => {
                 ? [currentProfile.photos]
                 : [];
             const matchScore = currentProfile.compatibility || 50;
+            const detailedScore = user ? calculateDetailedCompatibility(user, currentProfile) : null;
             const verifyLevel = getVerificationLevel(currentProfile.verification);
 
             return (
@@ -2597,6 +2691,15 @@ export const RoommatesScreen = () => {
                       </View>
                     ))}
                   </View>
+
+                  {detailedScore && matchScore >= 50 ? (
+                    <View style={styles.pdSection}>
+                      <Text style={styles.pdSectionLabel}>Match Insights</Text>
+                      <View style={styles.pdCard}>
+                        <MatchInsights score={detailedScore} />
+                      </View>
+                    </View>
+                  ) : null}
 
                   {currentProfile.bio ? (
                     <View style={styles.pdSection}>
