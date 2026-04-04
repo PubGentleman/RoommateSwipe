@@ -30,7 +30,7 @@ export async function fetchNearbyTransit(
   lat: number,
   lng: number
 ): Promise<TransitStop[]> {
-  const radius = 800;
+  const radius = 1000;
   const stops: TransitStop[] = [];
   const seen = new Set<string>();
 

@@ -92,24 +92,25 @@ export const CreateEditListingScreen = () => {
     try {
       const stops = await fetchNearbyTransit(lat, lng);
       if (stops.length > 0) {
-        const summary = stops
-          .slice(0, 5)
-          .map(stop => {
-            const label = (stop.type || 'stop').charAt(0).toUpperCase() + (stop.type || 'stop').slice(1);
-            const walkMin = Math.round((stop.distanceMiles || 0) * 20);
-            return `${label}: ${stop.name} (${walkMin} min walk)`;
-          })
-          .join('\n');
-        setTransitOverride(prev => prev.trim() ? prev : summary);
+        const summary = stops.map(stop => {
+          const walkMin = Math.max(1, Math.round((stop.distanceMiles || 0) * 20));
+          const label = (stop.type || 'stop').charAt(0).toUpperCase() + (stop.type || 'stop').slice(1);
+          return `${label}: ${stop.name} (${walkMin} min walk)`;
+        }).join('\n');
+        if (!transitOverride.trim()) {
+          setTransitOverride(summary);
+        }
       } else {
-        setTransitOverride(prev => prev.trim() ? prev : 'No major transit stations found nearby');
+        if (!transitOverride.trim()) {
+          setTransitOverride('No major transit stations found nearby');
+        }
       }
     } catch (err) {
       console.warn('Transit auto-detect failed:', err);
     } finally {
       setTransitLoading(false);
     }
-  }, []);
+  }, [transitOverride]);
 
   const searchAddress = useCallback(async (text: string) => {
     if (text.length < 3) { setAddressResults([]); return; }
@@ -133,24 +134,63 @@ export const CreateEditListingScreen = () => {
 
   const handleAddressSelect = useCallback((result: any) => {
     const addr = result.address || {};
+    const displayParts = (result.display_name || '').split(',').map((s: string) => s.trim());
+    console.log('Nominatim result:', JSON.stringify(result.address, null, 2));
+    console.log('Display name:', result.display_name);
+
     const houseNumber = addr.house_number || '';
     const road = addr.road || '';
-    const streetAddress = `${houseNumber} ${road}`.trim();
-    const cityName = addr.borough || addr.suburb || addr.city || addr.town || addr.village || addr.hamlet || addr.county || '';
+    const streetAddress = `${houseNumber} ${road}`.trim() || displayParts[0] || '';
+
+    let cityName = '';
+    if (addr.borough && addr.borough !== addr.city) {
+      cityName = addr.borough;
+    } else if (addr.suburb && addr.city && addr.suburb !== addr.city) {
+      cityName = addr.suburb;
+    } else if (addr.city) {
+      cityName = addr.city;
+    } else if (addr.town) {
+      cityName = addr.town;
+    } else if (addr.village) {
+      cityName = addr.village;
+    } else {
+      cityName = displayParts[2] || displayParts[1] || '';
+    }
+
+    let neighborhoodName = '';
+    if (addr.neighbourhood) {
+      neighborhoodName = addr.neighbourhood;
+    } else if (addr.suburb && addr.suburb !== cityName) {
+      neighborhoodName = addr.suburb;
+    } else if (addr.quarter) {
+      neighborhoodName = addr.quarter;
+    } else {
+      const candidate = displayParts[1] || '';
+      if (candidate && candidate !== cityName && !candidate.includes('County')) {
+        neighborhoodName = candidate;
+      }
+    }
+
     const stateName = addr.state || '';
-    const neighborhoodName = addr.neighbourhood || addr.quarter || '';
-    const zip = addr.postcode || '';
+    let zip = addr.postcode || '';
+    if (!zip) {
+      const zipPart = displayParts.find((p: string) => /^\d{5}$/.test(p));
+      if (zipPart) zip = zipPart;
+    }
+
     if (streetAddress) setAddress(streetAddress);
     if (cityName) setCity(cityName);
     if (stateName) setState(stateName);
     if (neighborhoodName) setNeighborhood(neighborhoodName);
     if (zip) setZipCode(zip);
+
     if (result.lat && result.lon) {
       const lat = parseFloat(result.lat);
       const lng = parseFloat(result.lon);
       setCoordinates({ lat, lng });
       fetchTransitForLocation(lat, lng);
     }
+
     setAddressResults([]);
   }, [fetchTransitForLocation]);
 
@@ -175,10 +215,25 @@ export const CreateEditListingScreen = () => {
 
   const handleCitySelect = useCallback((result: any) => {
     const addr = result.address || {};
-    const cityName = addr.borough || addr.suburb || addr.city || addr.town || addr.village || result.display_name.split(',')[0];
+    const displayParts = (result.display_name || '').split(',').map((s: string) => s.trim());
+
+    let cityName = '';
+    if (addr.borough && addr.borough !== addr.city) {
+      cityName = addr.borough;
+    } else if (addr.suburb && addr.city && addr.suburb !== addr.city) {
+      cityName = addr.suburb;
+    } else if (addr.city) {
+      cityName = addr.city;
+    } else if (addr.town) {
+      cityName = addr.town;
+    } else {
+      cityName = displayParts[0] || '';
+    }
+
     const stateName = addr.state || '';
     const zip = addr.postcode || '';
-    const neighborhoodName = addr.neighbourhood || addr.quarter || '';
+    const neighborhoodName = addr.neighbourhood || (addr.suburb && addr.suburb !== cityName ? addr.suburb : '') || '';
+
     if (cityName) setCity(cityName);
     if (stateName) setState(stateName);
     if (zip) setZipCode(zip);
