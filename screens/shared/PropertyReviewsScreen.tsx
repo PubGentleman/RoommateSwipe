@@ -7,6 +7,8 @@ import {
   ScrollView,
   ActivityIndicator,
   TextInput,
+  Alert,
+  Platform,
 } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
 import { useAuth } from '../../contexts/AuthContext';
@@ -20,12 +22,12 @@ import {
   checkReviewEligibility,
   PropertyReview,
   ReviewSummary,
+  reportReview,
 } from '../../services/reviewService';
 import { WriteReviewSheet } from '../../components/WriteReviewSheet';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Linking from 'expo-linking';
-import { Platform } from 'react-native';
 
 interface PropertyReviewsScreenProps {
   listingId: string;
@@ -95,6 +97,26 @@ export const PropertyReviewsScreen: React.FC<PropertyReviewsScreenProps> = ({
       prev.map(r => r.id === reviewId ? { ...r, helpful_count: r.helpful_count + 1 } : r)
     );
     await incrementHelpful(reviewId);
+  };
+
+  const handleReportReview = async (reviewId: string, reason: string) => {
+    if (!user) return;
+    const result = await reportReview(reviewId, 'property', user.id, reason);
+    if (result.success) {
+      await showAlert({ title: 'Reported', message: 'Thank you for your report. We will review it.' });
+    } else {
+      await showAlert({ title: 'Error', message: result.error || 'Could not submit report.' });
+    }
+  };
+
+  const showReportOptions = (reviewId: string) => {
+    Alert.alert('Report Review', 'Why are you reporting this review?', [
+      { text: 'Fake review', onPress: () => handleReportReview(reviewId, 'fake') },
+      { text: 'Harassment', onPress: () => handleReportReview(reviewId, 'harassment') },
+      { text: 'Inappropriate', onPress: () => handleReportReview(reviewId, 'inappropriate') },
+      { text: 'Spam', onPress: () => handleReportReview(reviewId, 'spam') },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
   };
 
   const handleAppealReview = (review: PropertyReview) => {
@@ -293,7 +315,7 @@ export const PropertyReviewsScreen: React.FC<PropertyReviewsScreenProps> = ({
                         Helpful{review.helpful_count > 0 ? ` (${review.helpful_count})` : ''}
                       </Text>
                     </Pressable>
-                    <Pressable style={s.reportBtn}>
+                    <Pressable style={s.reportBtn} onPress={() => showReportOptions(review.id)}>
                       <Feather name="flag" size={14} color="rgba(255,255,255,0.3)" />
                       <Text style={s.reportText}>Report</Text>
                     </Pressable>

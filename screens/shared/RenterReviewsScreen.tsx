@@ -8,42 +8,38 @@ import {
   ActivityIndicator,
   TextInput,
   Alert,
-  Platform,
 } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
 import { useAuth } from '../../contexts/AuthContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import {
-  getHostReviews,
-  getHostReviewSummary,
-  submitHostReview,
-  submitHostReviewReply,
-  incrementHostReviewHelpful,
-  checkHostReviewEligibility,
-  HostReview,
-  ReviewSummary,
+  getRenterReviews,
+  submitRenterReview,
+  submitRenterReply,
+  incrementRenterReviewHelpful,
   reportReview,
+  RenterReview,
+  ReviewSummary,
 } from '../../services/reviewService';
 import { WriteReviewSheet } from '../../components/WriteReviewSheet';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Linking from 'expo-linking';
 
-interface HostReviewsScreenProps {
-  hostId: string;
-  hostName: string;
+interface RenterReviewsScreenProps {
+  renterId: string;
+  renterName: string;
   onClose: () => void;
 }
 
-export const HostReviewsScreen: React.FC<HostReviewsScreenProps> = ({
-  hostId,
-  hostName,
+export const RenterReviewsScreen: React.FC<RenterReviewsScreenProps> = ({
+  renterId,
+  renterName,
   onClose,
 }) => {
   const { user } = useAuth();
   const { alert: showAlert } = useConfirm();
   const insets = useSafeAreaInsets();
-  const [reviews, setReviews] = useState<HostReview[]>([]);
+  const [reviews, setReviews] = useState<RenterReview[]>([]);
   const [summary, setSummary] = useState<ReviewSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [showWriteReview, setShowWriteReview] = useState(false);
@@ -52,18 +48,20 @@ export const HostReviewsScreen: React.FC<HostReviewsScreenProps> = ({
   const [replyText, setReplyText] = useState('');
   const [submittingReply, setSubmittingReply] = useState(false);
 
-  const isHost = user?.id === hostId;
+  const isRenter = user?.id === renterId;
 
   const loadData = useCallback(async () => {
     setLoading(true);
-    const [reviewData, summaryData] = await Promise.all([
-      getHostReviews(hostId),
-      getHostReviewSummary(hostId),
-    ]);
-    setReviews(reviewData);
-    setSummary(summaryData);
+    try {
+      const result = await getRenterReviews(renterId);
+      setReviews(result.reviews);
+      setSummary(result.summary);
+    } catch {
+      setReviews([]);
+      setSummary(null);
+    }
     setLoading(false);
-  }, [hostId]);
+  }, [renterId]);
 
   useEffect(() => {
     loadData();
@@ -71,13 +69,13 @@ export const HostReviewsScreen: React.FC<HostReviewsScreenProps> = ({
 
   const handleSubmitReview = async (data: { rating: number; reviewText: string; tags: string[] }) => {
     if (!user) return;
-    const result = await submitHostReview({
-      hostId,
-      reviewerId: user.id,
-      rating: data.rating,
-      reviewText: data.reviewText,
-      tags: data.tags,
-    });
+    const result = await submitRenterReview(
+      user.id,
+      renterId,
+      data.rating,
+      data.reviewText || null,
+      data.tags,
+    );
     if (result.success) {
       setShowWriteReview(false);
       await loadData();
@@ -94,12 +92,12 @@ export const HostReviewsScreen: React.FC<HostReviewsScreenProps> = ({
     setReviews(prev =>
       prev.map(r => r.id === reviewId ? { ...r, helpful_count: r.helpful_count + 1 } : r)
     );
-    await incrementHostReviewHelpful(reviewId);
+    await incrementRenterReviewHelpful(reviewId);
   };
 
-  const handleReportReview = async (reviewId: string, reason: string) => {
+  const handleReport = async (reviewId: string, reason: string) => {
     if (!user) return;
-    const result = await reportReview(reviewId, 'host', user.id, reason);
+    const result = await reportReview(reviewId, 'renter', user.id, reason);
     if (result.success) {
       await showAlert({ title: 'Reported', message: 'Thank you for your report. We will review it.' });
     } else {
@@ -109,31 +107,18 @@ export const HostReviewsScreen: React.FC<HostReviewsScreenProps> = ({
 
   const showReportOptions = (reviewId: string) => {
     Alert.alert('Report Review', 'Why are you reporting this review?', [
-      { text: 'Fake review', onPress: () => handleReportReview(reviewId, 'fake') },
-      { text: 'Harassment', onPress: () => handleReportReview(reviewId, 'harassment') },
-      { text: 'Inappropriate', onPress: () => handleReportReview(reviewId, 'inappropriate') },
-      { text: 'Spam', onPress: () => handleReportReview(reviewId, 'spam') },
+      { text: 'Fake review', onPress: () => handleReport(reviewId, 'fake') },
+      { text: 'Harassment', onPress: () => handleReport(reviewId, 'harassment') },
+      { text: 'Inappropriate', onPress: () => handleReport(reviewId, 'inappropriate') },
+      { text: 'Spam', onPress: () => handleReport(reviewId, 'spam') },
       { text: 'Cancel', style: 'cancel' },
     ]);
   };
 
-  const handleAppealReview = (review: HostReview) => {
-    const subject = encodeURIComponent('Review Appeal Request');
-    const body = encodeURIComponent(
-      `Hi Rhome Support,\n\nI'd like to appeal a review on my profile.\n\nReview ID: ${review.id}\nReviewer: ${review.reviewer_name || 'Anonymous'}\nRating: ${review.rating}/5\nDate: ${formatDate(review.created_at)}\nReview text: "${review.review_text || '(no text)'}"\n\nReason for appeal:\n[Please describe why this review should be removed]\n\nAccount email: ${user?.email}\n\nThank you.`
-    );
-    const url = `mailto:hello@rhomeapp.io?subject=${subject}&body=${body}`;
-    if (Platform.OS === 'web') {
-      window.open(url);
-    } else {
-      Linking.openURL(url);
-    }
-  };
-
-  const handleSubmitHostReply = async (reviewId: string) => {
+  const handleSubmitRenterReply = async (reviewId: string) => {
     if (!replyText.trim() || submittingReply) return;
     setSubmittingReply(true);
-    const result = await submitHostReviewReply(reviewId, replyText.trim());
+    const result = await submitRenterReply(reviewId, renterId, replyText.trim());
     if (result.success) {
       setReplyingTo(null);
       setReplyText('');
@@ -149,7 +134,7 @@ export const HostReviewsScreen: React.FC<HostReviewsScreenProps> = ({
     return (
       <View key={star} style={s.starBarRow}>
         <Text style={s.starBarLabel}>{star}</Text>
-        <Feather name="star" size={12} color="#a78bfa" />
+        <Feather name="star" size={12} color={ACCENT} />
         <View style={s.starBarTrack}>
           <View style={[s.starBarFill, { width: `${fillPct}%` }]} />
         </View>
@@ -168,27 +153,18 @@ export const HostReviewsScreen: React.FC<HostReviewsScreenProps> = ({
     : 1;
 
   const hasReviewed = reviews.some(r => r.reviewer_id === user?.id);
-  const [eligibleToReview, setEligibleToReview] = useState(false);
-  const [eligibilityChecked, setEligibilityChecked] = useState(false);
+  const canWrite = !!user && !isRenter && !hasReviewed;
 
-  useEffect(() => {
-    if (user?.id && hostId && !isHost) {
-      checkHostReviewEligibility(user.id, hostId)
-        .then(({ eligible }) => {
-          setEligibleToReview(eligible);
-          setEligibilityChecked(true);
-        })
-        .catch(() => {
-          setEligibleToReview(false);
-          setEligibilityChecked(true);
-        });
-    } else {
-      setEligibleToReview(false);
-      setEligibilityChecked(true);
-    }
-  }, [user?.id, hostId, isHost]);
-
-  const canWrite = !!user && !isHost && !hasReviewed && eligibilityChecked && eligibleToReview;
+  const tagCounts: Record<string, number> = {};
+  reviews.forEach(r => {
+    (r.tags || []).forEach(tag => {
+      tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+    });
+  });
+  const topTags = Object.entries(tagCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 8)
+    .map(([tag]) => tag);
 
   if (loading) {
     return (
@@ -197,11 +173,11 @@ export const HostReviewsScreen: React.FC<HostReviewsScreenProps> = ({
           <Pressable onPress={onClose} hitSlop={8}>
             <Feather name="arrow-left" size={22} color="#fff" />
           </Pressable>
-          <Text style={s.headerTitle}>Host Reviews</Text>
+          <Text style={s.headerTitle}>Renter Reviews</Text>
           <View style={{ width: 22 }} />
         </View>
         <View style={s.loadingWrap}>
-          <ActivityIndicator size="large" color="#a78bfa" />
+          <ActivityIndicator size="large" color={ACCENT} />
         </View>
       </View>
     );
@@ -213,14 +189,14 @@ export const HostReviewsScreen: React.FC<HostReviewsScreenProps> = ({
         <Pressable onPress={onClose} hitSlop={8}>
           <Feather name="arrow-left" size={22} color="#fff" />
         </Pressable>
-        <Text style={s.headerTitle} numberOfLines={1}>Reviews for {hostName}</Text>
+        <Text style={s.headerTitle} numberOfLines={1}>Reviews for {renterName}</Text>
         <View style={{ width: 22 }} />
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scrollContent}>
         <View style={s.typeBanner}>
-          <Feather name="user" size={14} color="#a78bfa" />
-          <Text style={s.typeBannerText}>These reviews are about the host/agent, not a specific property</Text>
+          <Feather name="user" size={14} color={ACCENT} />
+          <Text style={s.typeBannerText}>These reviews are about the renter as a tenant/roommate</Text>
         </View>
 
         {summary && summary.reviewCount > 0 ? (
@@ -234,7 +210,7 @@ export const HostReviewsScreen: React.FC<HostReviewsScreenProps> = ({
                       key={star}
                       name="star"
                       size={18}
-                      color={star <= Math.round(summary.averageRating || 0) ? '#a78bfa' : 'rgba(255,255,255,0.15)'}
+                      color={star <= Math.round(summary.averageRating || 0) ? ACCENT : 'rgba(255,255,255,0.15)'}
                     />
                   ))}
                 </View>
@@ -250,15 +226,28 @@ export const HostReviewsScreen: React.FC<HostReviewsScreenProps> = ({
         ) : (
           <View style={s.emptyCard}>
             <Feather name="user-check" size={32} color="rgba(255,255,255,0.2)" />
-            <Text style={s.emptyText}>No host reviews yet</Text>
-            <Text style={s.emptySubtext}>Be the first to share your experience with this host</Text>
+            <Text style={s.emptyText}>No renter reviews yet</Text>
+            <Text style={s.emptySubtext}>Be the first to share your experience with this renter</Text>
           </View>
         )}
 
+        {topTags.length > 0 ? (
+          <View style={s.tagCloudCard}>
+            <Text style={s.tagCloudLabel}>Common Tags</Text>
+            <View style={s.tagCloudRow}>
+              {topTags.map(tag => (
+                <View key={tag} style={s.tagCloudChip}>
+                  <Text style={s.tagCloudText}>{tag}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        ) : null}
+
         {canWrite ? (
           <Pressable style={s.writeBtn} onPress={() => setShowWriteReview(true)}>
-            <Feather name="edit-3" size={16} color="#a78bfa" />
-            <Text style={s.writeBtnText}>Review this Host</Text>
+            <Feather name="edit-3" size={16} color={ACCENT} />
+            <Text style={s.writeBtnText}>Review this Renter</Text>
           </Pressable>
         ) : null}
 
@@ -282,7 +271,7 @@ export const HostReviewsScreen: React.FC<HostReviewsScreenProps> = ({
                     key={star}
                     name="star"
                     size={14}
-                    color={star <= review.rating ? '#a78bfa' : 'rgba(255,255,255,0.15)'}
+                    color={star <= review.rating ? ACCENT : 'rgba(255,255,255,0.15)'}
                   />
                 ))}
               </View>
@@ -302,38 +291,31 @@ export const HostReviewsScreen: React.FC<HostReviewsScreenProps> = ({
               ) : null}
 
               <View style={s.reviewActions}>
-                {isHost ? (
-                  <Pressable style={s.appealBtn} onPress={() => handleAppealReview(review)}>
-                    <Feather name="alert-circle" size={14} color="#f59e0b" />
-                    <Text style={s.appealText}>Appeal Review</Text>
+                <Pressable
+                  style={[s.helpfulBtn, helpedIds.has(review.id) ? s.helpfulBtnActive : null]}
+                  onPress={() => handleHelpful(review.id)}
+                >
+                  <Feather name="thumbs-up" size={14} color={helpedIds.has(review.id) ? ACCENT : 'rgba(255,255,255,0.4)'} />
+                  <Text style={[s.helpfulText, helpedIds.has(review.id) ? { color: ACCENT } : null]}>
+                    Helpful{review.helpful_count > 0 ? ` (${review.helpful_count})` : ''}
+                  </Text>
+                </Pressable>
+                {review.reviewer_id !== user?.id ? (
+                  <Pressable style={s.reportBtn} onPress={() => showReportOptions(review.id)}>
+                    <Feather name="flag" size={14} color="rgba(255,255,255,0.3)" />
+                    <Text style={s.reportText}>Report</Text>
                   </Pressable>
-                ) : (
-                  <>
-                    <Pressable
-                      style={[s.helpfulBtn, helpedIds.has(review.id) ? s.helpfulBtnActive : null]}
-                      onPress={() => handleHelpful(review.id)}
-                    >
-                      <Feather name="thumbs-up" size={14} color={helpedIds.has(review.id) ? '#a78bfa' : 'rgba(255,255,255,0.4)'} />
-                      <Text style={[s.helpfulText, helpedIds.has(review.id) ? { color: '#a78bfa' } : null]}>
-                        Helpful{review.helpful_count > 0 ? ` (${review.helpful_count})` : ''}
-                      </Text>
-                    </Pressable>
-                    <Pressable style={s.reportBtn} onPress={() => showReportOptions(review.id)}>
-                      <Feather name="flag" size={14} color="rgba(255,255,255,0.3)" />
-                      <Text style={s.reportText}>Report</Text>
-                    </Pressable>
-                  </>
-                )}
+                ) : null}
               </View>
 
-              {review.host_reply ? (
-                <View style={s.hostReplyBox}>
-                  <Text style={s.hostReplyLabel}>Host Reply</Text>
-                  <Text style={s.hostReplyText}>{review.host_reply}</Text>
+              {review.renter_reply ? (
+                <View style={s.replyBox}>
+                  <Text style={s.replyLabel}>Renter Reply</Text>
+                  <Text style={s.replyBoxText}>{review.renter_reply}</Text>
                 </View>
               ) : null}
 
-              {isHost && !review.host_reply ? (
+              {isRenter && !review.renter_reply ? (
                 replyingTo === review.id ? (
                   <View style={s.replyInputWrap}>
                     <TextInput
@@ -351,7 +333,7 @@ export const HostReviewsScreen: React.FC<HostReviewsScreenProps> = ({
                       </Pressable>
                       <Pressable
                         style={[s.replySendBtn, !replyText.trim() ? { opacity: 0.4 } : null]}
-                        onPress={() => handleSubmitHostReply(review.id)}
+                        onPress={() => handleSubmitRenterReply(review.id)}
                         disabled={!replyText.trim() || submittingReply}
                       >
                         {submittingReply ? (
@@ -364,7 +346,7 @@ export const HostReviewsScreen: React.FC<HostReviewsScreenProps> = ({
                   </View>
                 ) : (
                   <Pressable style={s.addReplyBtn} onPress={() => setReplyingTo(review.id)}>
-                    <Feather name="corner-down-right" size={14} color="#a78bfa" />
+                    <Feather name="corner-down-right" size={14} color={ACCENT} />
                     <Text style={s.addReplyText}>Reply to this review</Text>
                   </Pressable>
                 )
@@ -380,13 +362,13 @@ export const HostReviewsScreen: React.FC<HostReviewsScreenProps> = ({
         visible={showWriteReview}
         onClose={() => setShowWriteReview(false)}
         onSubmit={handleSubmitReview}
-        reviewType="host"
+        reviewType="renter"
       />
     </View>
   );
 };
 
-const ACCENT = '#a78bfa';
+const ACCENT = '#3ECF8E';
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#121212' },
@@ -400,8 +382,8 @@ const s = StyleSheet.create({
   scrollContent: { padding: 16 },
   typeBanner: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: 'rgba(167,139,250,0.1)', borderRadius: 12, padding: 12, marginBottom: 16,
-    borderWidth: 1, borderColor: 'rgba(167,139,250,0.2)',
+    backgroundColor: 'rgba(62,207,142,0.1)', borderRadius: 12, padding: 12, marginBottom: 16,
+    borderWidth: 1, borderColor: 'rgba(62,207,142,0.2)',
   },
   typeBannerText: { fontSize: 12, color: ACCENT, flex: 1, lineHeight: 17 },
   summaryCard: { backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 16, padding: 20, marginBottom: 16 },
@@ -421,16 +403,26 @@ const s = StyleSheet.create({
   },
   emptyText: { fontSize: 16, fontWeight: '600', color: 'rgba(255,255,255,0.5)' },
   emptySubtext: { fontSize: 13, color: 'rgba(255,255,255,0.3)', textAlign: 'center' },
+  tagCloudCard: {
+    backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 14, padding: 14, marginBottom: 16,
+  },
+  tagCloudLabel: { fontSize: 13, fontWeight: '600', color: 'rgba(255,255,255,0.5)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.5 },
+  tagCloudRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  tagCloudChip: {
+    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12,
+    backgroundColor: 'rgba(62,207,142,0.12)', borderWidth: 1, borderColor: 'rgba(62,207,142,0.2)',
+  },
+  tagCloudText: { fontSize: 13, color: ACCENT },
   writeBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
     paddingVertical: 14, borderRadius: 14, borderWidth: 1,
-    borderColor: 'rgba(167,139,250,0.3)', backgroundColor: 'rgba(167,139,250,0.08)', marginBottom: 20,
+    borderColor: 'rgba(62,207,142,0.3)', backgroundColor: 'rgba(62,207,142,0.08)', marginBottom: 20,
   },
   writeBtnText: { fontSize: 15, fontWeight: '600', color: ACCENT },
   reviewCard: { backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 14, padding: 16, marginBottom: 12 },
   reviewHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10 },
   reviewerAvatar: {
-    width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(167,139,250,0.2)',
+    width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(62,207,142,0.2)',
     alignItems: 'center', justifyContent: 'center',
   },
   reviewerInitial: { fontSize: 16, fontWeight: '700', color: ACCENT },
@@ -442,7 +434,7 @@ const s = StyleSheet.create({
   reviewTags: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 10 },
   reviewTagChip: {
     paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12,
-    backgroundColor: 'rgba(167,139,250,0.12)', borderWidth: 1, borderColor: 'rgba(167,139,250,0.2)',
+    backgroundColor: 'rgba(62,207,142,0.12)', borderWidth: 1, borderColor: 'rgba(62,207,142,0.2)',
   },
   reviewTagText: { fontSize: 12, color: ACCENT },
   reviewActions: { flexDirection: 'row', alignItems: 'center', gap: 16 },
@@ -451,14 +443,12 @@ const s = StyleSheet.create({
   helpfulText: { fontSize: 13, color: 'rgba(255,255,255,0.4)' },
   reportBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 4 },
   reportText: { fontSize: 13, color: 'rgba(255,255,255,0.3)' },
-  appealBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 4 },
-  appealText: { fontSize: 13, color: '#f59e0b', fontWeight: '500' },
-  hostReplyBox: {
+  replyBox: {
     marginTop: 12, padding: 12, borderRadius: 10,
-    backgroundColor: 'rgba(167,139,250,0.08)', borderLeftWidth: 3, borderLeftColor: ACCENT,
+    backgroundColor: 'rgba(62,207,142,0.08)', borderLeftWidth: 3, borderLeftColor: ACCENT,
   },
-  hostReplyLabel: { fontSize: 12, fontWeight: '700', color: ACCENT, marginBottom: 4 },
-  hostReplyText: { fontSize: 13, color: 'rgba(255,255,255,0.7)', lineHeight: 18 },
+  replyLabel: { fontSize: 12, fontWeight: '700', color: ACCENT, marginBottom: 4 },
+  replyBoxText: { fontSize: 13, color: 'rgba(255,255,255,0.7)', lineHeight: 18 },
   replyInputWrap: { marginTop: 10 },
   replyInput: {
     backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',

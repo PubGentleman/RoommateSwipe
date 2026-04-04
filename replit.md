@@ -41,6 +41,7 @@ The application is built with React Native, Expo, and TypeScript. React Navigati
 -   **Contact Info Protection:** Platform-level contact information blurring in chat for free users.
 -   **Agent/Company Messaging Paywall:** Blurred message previews for free-tier agents/companies.
 -   **Verification & Safety:** Features Instagram verification, multi-photo enforcement, chat leakage detection, background checks, identity verification (with selfie match step), a References System, Agent License Verification, email domain blocking, email verification, password recovery, a comprehensive block/report system, and a Trust Score system (0-100) combining phone/ID/selfie/social/background/reviews/account age signals with TrustBadge component and verification nudges on profiles/chat/host dashboard.
+-   **Enhanced Reviews & Ratings:** Three review types (property, host, renter), renter review tags, review prompt system (auto-prompts after 7-day bookings), aggregate rating display on listing cards and detail screens, review moderation with report/auto-flag system, renter reply support, and ReviewPromptBanner on host dashboard.
 -   **Profile Pause:** Renters can pause their search profiles.
 -   **Activity Decay Ranking:** Inactive user profiles are deprioritized in discovery.
 -   **Boost System:** A three-tier system for hosts to improve listing visibility with various benefits and analytics.

@@ -28,6 +28,9 @@ import { getAgentPlanLimits, type AgentPlan } from '../../constants/planLimits';
 import { resolveEffectiveAgentPlan } from '../../utils/planResolver';
 import { CommonActions } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { ReviewPromptBanner } from '../../components/ReviewPromptBanner';
+import { RenterReviewsScreen } from '../shared/RenterReviewsScreen';
+import type { ReviewPrompt } from '../../services/reviewPromptService';
 import CoachMarkOverlay from '../../components/CoachMark';
 import { useTourSetup } from '../../hooks/useTourSetup';
 import { TOUR_CONTENT } from '../../constants/tourSteps';
@@ -141,6 +144,7 @@ export const HostDashboardScreen = () => {
   const [hostAvgRating, setHostAvgRating] = useState(0);
   const [teamMemberCount, setTeamMemberCount] = useState(0);
   const [showHostReviews, setShowHostReviews] = useState(false);
+  const [renterReviewTarget, setRenterReviewTarget] = useState<{ id: string; name: string } | null>(null);
   const [checklistStatus, setChecklistStatus] = useState<HostChecklistStatus | null>(null);
 
   const DASH_COLLAPSE_H = 50;
@@ -1359,6 +1363,16 @@ export const HostDashboardScreen = () => {
           <Feather name="chevron-right" size={16} color="rgba(255,255,255,0.3)" />
         </Pressable>
 
+        <View style={{ paddingHorizontal: 16, marginBottom: 4 }}>
+          <ReviewPromptBanner
+            onNavigateToReview={(prompt: ReviewPrompt) => {
+              if (prompt.type === 'renter') {
+                setRenterReviewTarget({ id: prompt.targetId, name: prompt.targetName });
+              }
+            }}
+          />
+        </View>
+
         {!user?.identity_verified && !user?.verification?.government_id?.verified ? (
           <Pressable
             style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(108,92,231,0.08)', borderRadius: 14, padding: 14, marginHorizontal: 16, marginBottom: 8, gap: 12 }}
@@ -1523,6 +1537,16 @@ export const HostDashboardScreen = () => {
             hostId={user?.id || ''}
             hostName={user?.name || 'Host'}
             onClose={() => setShowHostReviews(false)}
+          />
+        </Modal>
+      ) : null}
+
+      {renterReviewTarget ? (
+        <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setRenterReviewTarget(null)}>
+          <RenterReviewsScreen
+            renterId={renterReviewTarget.id}
+            renterName={renterReviewTarget.name}
+            onClose={() => setRenterReviewTarget(null)}
           />
         </Modal>
       ) : null}

@@ -706,6 +706,8 @@ export interface User {
     };
   };
   createdAt?: string;
+  renter_avg_rating?: number;
+  renter_review_count?: number;
 }
 
 export interface InterestCard {

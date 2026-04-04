@@ -38,6 +38,25 @@ export interface ReviewSummary {
   starBreakdown: Record<number, number>;
 }
 
+export interface RenterReview {
+  id: string;
+  renter_id: string;
+  reviewer_id: string;
+  booking_id: string | null;
+  match_id: string | null;
+  rating: number;
+  review_text: string | null;
+  tags: string[];
+  status: string;
+  renter_reply: string | null;
+  renter_replied_at: string | null;
+  helpful_count: number;
+  created_at: string;
+  updated_at: string;
+  reviewer_name?: string;
+  reviewer_photo?: string;
+}
+
 const REVIEW_TAGS = [
   'Clean',
   'Responsive host',
@@ -62,9 +81,16 @@ const HOST_REVIEW_TAGS = [
   'Great communicator',
 ] as const;
 
+const RENTER_REVIEW_TAGS = [
+  'Respectful', 'Clean', 'Communicative', 'Punctual', 'Honest',
+  'Reliable', 'Friendly', 'Quiet',
+  'Messy', 'Unresponsive', 'Late payments', 'Noisy', 'Difficult',
+] as const;
+
 export type ReviewTag = typeof REVIEW_TAGS[number];
 export type HostReviewTag = typeof HOST_REVIEW_TAGS[number];
-export { REVIEW_TAGS, HOST_REVIEW_TAGS };
+export type RenterReviewTag = typeof RENTER_REVIEW_TAGS[number];
+export { REVIEW_TAGS, HOST_REVIEW_TAGS, RENTER_REVIEW_TAGS };
 
 export async function getReviewsForListing(listingId: string): Promise<PropertyReview[]> {
   try {
@@ -399,6 +425,148 @@ export async function incrementHostReviewHelpful(reviewId: string): Promise<void
   } catch (err) {
     console.warn('Failed to increment host review helpful count:', err);
   }
+}
+
+export async function getRenterReviews(
+  renterId: string,
+  limit: number = 20
+): Promise<{ reviews: RenterReview[]; summary: ReviewSummary }> {
+  const { data, error } = await supabase
+    .from('renter_reviews')
+    .select('*')
+    .eq('renter_id', renterId)
+    .eq('status', 'published')
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (error) throw error;
+
+  const reviews: RenterReview[] = (data || []).map(r => ({
+    ...r,
+    reviewer_name: r.reviewer_name || undefined,
+    reviewer_photo: r.reviewer_photo || undefined,
+  }));
+
+  const ratings = reviews.map(r => r.rating);
+  const summary: ReviewSummary = {
+    averageRating: ratings.length > 0 ? ratings.reduce((s, r) => s + r, 0) / ratings.length : null,
+    reviewCount: ratings.length,
+    starBreakdown: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+  };
+  ratings.forEach(r => { summary.starBreakdown[r]++; });
+
+  return { reviews, summary };
+}
+
+export async function submitRenterReview(
+  reviewerId: string,
+  renterId: string,
+  rating: number,
+  reviewText: string | null,
+  tags: string[],
+  bookingId?: string,
+  matchId?: string
+): Promise<{ success: boolean; error?: string }> {
+  const { error } = await supabase.from('renter_reviews').insert({
+    reviewer_id: reviewerId,
+    renter_id: renterId,
+    booking_id: bookingId || null,
+    match_id: matchId || null,
+    rating,
+    review_text: reviewText,
+    tags,
+  });
+
+  if (error) {
+    if (error.code === '23505') return { success: false, error: 'You already reviewed this renter' };
+    return { success: false, error: error.message };
+  }
+
+  await updateRenterRatingCache(renterId);
+  return { success: true };
+}
+
+async function updateRenterRatingCache(renterId: string) {
+  try {
+    const { data } = await supabase
+      .from('renter_reviews')
+      .select('rating')
+      .eq('renter_id', renterId)
+      .eq('status', 'published');
+
+    if (data && data.length > 0) {
+      const avg = data.reduce((s, r) => s + r.rating, 0) / data.length;
+      await supabase
+        .from('users')
+        .update({
+          renter_avg_rating: Math.round(avg * 10) / 10,
+          renter_review_count: data.length,
+        })
+        .eq('id', renterId);
+    }
+  } catch {}
+}
+
+export async function submitRenterReply(
+  reviewId: string,
+  renterId: string,
+  reply: string
+): Promise<{ success: boolean; error?: string }> {
+  const { error } = await supabase
+    .from('renter_reviews')
+    .update({
+      renter_reply: reply,
+      renter_replied_at: new Date().toISOString(),
+    })
+    .eq('id', reviewId)
+    .eq('renter_id', renterId);
+
+  if (error) return { success: false, error: error.message };
+  return { success: true };
+}
+
+export async function incrementRenterReviewHelpful(reviewId: string): Promise<void> {
+  try {
+    await supabase.rpc('increment_helpful_count', { review_id: reviewId });
+  } catch (err) {
+    console.warn('Failed to increment renter review helpful count:', err);
+  }
+}
+
+export async function reportReview(
+  reviewId: string,
+  reviewType: 'property' | 'host' | 'renter',
+  reporterId: string,
+  reason: string,
+  details?: string
+): Promise<{ success: boolean; error?: string }> {
+  const { error } = await supabase.from('review_reports').insert({
+    review_id: reviewId,
+    review_type: reviewType,
+    reporter_id: reporterId,
+    reason,
+    details,
+  });
+
+  if (error) {
+    if (error.code === '23505') return { success: false, error: 'You already reported this review' };
+    return { success: false, error: error.message };
+  }
+
+  const { count } = await supabase
+    .from('review_reports')
+    .select('id', { count: 'exact', head: true })
+    .eq('review_id', reviewId)
+    .eq('status', 'pending');
+
+  if (count && count >= 3) {
+    const table = reviewType === 'property' ? 'property_reviews'
+      : reviewType === 'host' ? 'host_reviews'
+      : 'renter_reviews';
+    await supabase.from(table).update({ status: 'flagged' }).eq('id', reviewId);
+  }
+
+  return { success: true };
 }
 
 async function recalculateHostRating(hostId: string): Promise<void> {

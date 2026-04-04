@@ -17,6 +17,7 @@ import { SUBWAY_LINE_COLORS } from '../../constants/transitData';
 import SubwayLineBadge from '../../components/SubwayLineBadge';
 import { getLinesForStop } from '../../utils/transitHelpers';
 import * as Haptics from 'expo-haptics';
+import { PropertyReviewsScreen } from '../shared/PropertyReviewsScreen';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -37,6 +38,7 @@ export function HostListingDetailScreen() {
 
   const [property, setProperty] = useState<Property | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showReviews, setShowReviews] = useState(false);
   const [photoIndex, setPhotoIndex] = useState(0);
 
   const loadListing = useCallback(async () => {
@@ -346,7 +348,10 @@ export function HostListingDetailScreen() {
           </View>
         </View>
 
-        <View style={styles.section}>
+        <Pressable
+          style={styles.section}
+          onPress={() => setShowReviews(true)}
+        >
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <Feather name="star" size={16} color={property.average_rating ? '#FFD700' : theme.textSecondary} />
             <Text style={[styles.sectionTitle, { color: theme.text, marginBottom: 0 }]}>
@@ -354,8 +359,9 @@ export function HostListingDetailScreen() {
                 ? `${property.average_rating.toFixed(1)} · ${property.review_count || 0} reviews`
                 : 'No reviews yet'}
             </Text>
+            <Feather name="chevron-right" size={14} color={theme.textSecondary} />
           </View>
-        </View>
+        </Pressable>
 
       </ScrollView>
 
@@ -398,6 +404,17 @@ export function HostListingDetailScreen() {
           <Feather name="zap" size={16} color="#a855f7" />
         </Pressable>
       </View>
+
+      {showReviews && property ? (
+        <View style={StyleSheet.absoluteFill}>
+          <PropertyReviewsScreen
+            listingId={property.id}
+            listingTitle={property.title || 'Listing'}
+            hostId={property.hostId || user?.id || ''}
+            onClose={() => setShowReviews(false)}
+          />
+        </View>
+      ) : null}
     </View>
   );
 }
