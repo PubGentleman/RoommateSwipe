@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, Modal, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, Modal, ActivityIndicator, Linking } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -28,6 +28,7 @@ interface PlanOption {
   badgeColor?: string;
   features: { text: string; included: boolean }[];
   isFree?: boolean;
+  isContactSales?: boolean;
 }
 
 const RENTER_PLANS: PlanOption[] = [
@@ -107,6 +108,7 @@ const getPrice = (plan: PlanOption, cycle: BillingCycle): number => {
 };
 
 const getPerMonth = (plan: PlanOption, cycle: BillingCycle): string => {
+  if (plan.isContactSales) return 'Custom';
   if (plan.isFree) return 'Free';
   if (cycle === 'monthly') return `$${plan.monthlyPrice.toFixed(2)}/mo`;
   if (cycle === '3month') return `$${(plan.threeMonthPrice / 3).toFixed(2)}/mo`;
@@ -254,7 +256,11 @@ export const PlanSelectionScreen = () => {
               <Text style={s.planName}>{plan.name}</Text>
 
               <View style={s.priceRow}>
-                {plan.isFree ? (
+                {plan.isContactSales ? (
+                  <>
+                    <Text style={s.priceMain}>Custom</Text>
+                  </>
+                ) : plan.isFree ? (
                   <Text style={s.priceMain}>Free</Text>
                 ) : (
                   <>
@@ -265,7 +271,9 @@ export const PlanSelectionScreen = () => {
                   </>
                 )}
               </View>
-              {!plan.isFree && billingCycle !== 'monthly' ? (
+              {plan.isContactSales ? (
+                <Text style={s.perMonthNote}>Tailored to your portfolio</Text>
+              ) : !plan.isFree && billingCycle !== 'monthly' ? (
                 <Text style={s.perMonthNote}>{perMonth}</Text>
               ) : null}
 
@@ -282,32 +290,47 @@ export const PlanSelectionScreen = () => {
                 ))}
               </View>
 
-              <Pressable
-                style={({ pressed }) => [
-                  s.selectBtn,
-                  plan.isFree ? s.selectBtnFree : null,
-                  isRecommended ? s.selectBtnAccent : null,
-                  pressed ? { opacity: 0.8 } : null,
-                ]}
-                onPress={() => handleSelectPlan(plan.id)}
-              >
-                {isRecommended ? (
-                  <LinearGradient
-                    colors={[ACCENT, ACCENT_DARK]}
-                    style={s.selectBtnGradient}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                  >
-                    <Text style={s.selectBtnText}>
+              {plan.isContactSales ? (
+                <Pressable
+                  style={({ pressed }) => [
+                    s.selectBtn,
+                    { backgroundColor: 'transparent', borderWidth: 1, borderColor: GOLD },
+                    pressed ? { opacity: 0.8 } : null,
+                  ]}
+                  onPress={() => {
+                    Linking.openURL('mailto:hello@rhomeapp.io?subject=Enterprise%20Plan%20Inquiry&body=Hi%2C%20I%27m%20interested%20in%20the%20Enterprise%20plan%20for%20my%20company.');
+                  }}
+                >
+                  <Text style={[s.selectBtnText, { color: GOLD }]}>Contact Sales</Text>
+                </Pressable>
+              ) : (
+                <Pressable
+                  style={({ pressed }) => [
+                    s.selectBtn,
+                    plan.isFree ? s.selectBtnFree : null,
+                    isRecommended ? s.selectBtnAccent : null,
+                    pressed ? { opacity: 0.8 } : null,
+                  ]}
+                  onPress={() => handleSelectPlan(plan.id)}
+                >
+                  {isRecommended ? (
+                    <LinearGradient
+                      colors={[ACCENT, ACCENT_DARK]}
+                      style={s.selectBtnGradient}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                    >
+                      <Text style={s.selectBtnText}>
+                        {plan.isFree ? 'Start Free' : 'Select Plan'}
+                      </Text>
+                    </LinearGradient>
+                  ) : (
+                    <Text style={[s.selectBtnText, plan.isFree ? s.selectBtnTextFree : null]}>
                       {plan.isFree ? 'Start Free' : 'Select Plan'}
                     </Text>
-                  </LinearGradient>
-                ) : (
-                  <Text style={[s.selectBtnText, plan.isFree ? s.selectBtnTextFree : null]}>
-                    {plan.isFree ? 'Start Free' : 'Select Plan'}
-                  </Text>
-                )}
-              </Pressable>
+                  )}
+                </Pressable>
+              )}
             </View>
           );
         })}
