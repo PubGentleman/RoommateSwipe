@@ -218,6 +218,11 @@ export const PlansScreen = () => {
   const handleConfirmSubscription = async () => {
     if (!selectedPlan || !user) return;
     setSubscribing(true);
+    const safetyTimeout = setTimeout(() => {
+      setSubscribing(false);
+      setSelectedPlan(null);
+      alert({ title: 'Timed Out', message: 'The purchase is taking too long. Please check your subscription status in Account Settings and try again if needed.', variant: 'warning' });
+    }, 90000);
     try {
       const { success, subscriptionId } = await processPayment(user.id, user.email || '', selectedPlan, billingCycle);
       if (!success) {
@@ -244,6 +249,7 @@ export const PlansScreen = () => {
     } catch (err: any) {
       await alert({ title: 'Error', message: err.message || 'Something went wrong.', variant: 'warning' });
     } finally {
+      clearTimeout(safetyTimeout);
       setSubscribing(false);
     }
   };

@@ -98,16 +98,27 @@ export const RevenueCatProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       agent: agentOffering,
       company: companyOffering,
     };
-    const offering = offeringMap[planType] || hostOffering;
-    const pkg = findPackage(offering || undefined, plan, billingCycle);
+    const offering = offeringMap[planType] || null;
+    if (!offering) {
+      return { success: false, error: 'Subscription plans are loading. Please close this screen and try again in a moment.' };
+    }
+    const pkg = findPackage(offering, plan, billingCycle);
     if (!pkg) {
-      return { success: false, error: 'This plan is not currently available. Please try again later.' };
+      return { success: false, error: `The ${plan} plan (${billingCycle}) is not currently available. Please try again later.` };
     }
-    const result = await rcPurchase(pkg);
-    if (result.success && result.customerInfo) {
-      setCustomerInfo(result.customerInfo);
+    try {
+      const purchasePromise = rcPurchase(pkg);
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Purchase timed out. Please try again.')), 60000)
+      );
+      const result = await Promise.race([purchasePromise, timeoutPromise]);
+      if (result.success && result.customerInfo) {
+        setCustomerInfo(result.customerInfo);
+      }
+      return { success: result.success, error: result.error };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Purchase failed. Please try again.' };
     }
-    return { success: result.success, error: result.error };
   }, [renterOffering, hostOffering, agentOffering, companyOffering]);
 
   const restore = useCallback(async (): Promise<{ success: boolean; error?: string }> => {

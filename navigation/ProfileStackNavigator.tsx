@@ -86,7 +86,7 @@ const darkHeaderOptions = {
   headerShadowVisible: false,
 };
 
-function SearchIntentScreen({ navigation }: { navigation: { goBack: () => void } }) {
+function SearchIntentScreen({ navigation }: { navigation: any }) {
   const { user } = useAuth();
   const currentSearchType = user?.profileData?.apartment_search_type;
   const currentIntent = currentSearchType === 'with_roommates' ? 'find_roommates' as const
@@ -96,7 +96,9 @@ function SearchIntentScreen({ navigation }: { navigation: { goBack: () => void }
   return (
     <WhatAreYouLookingForScreen
       isSettings
-      onComplete={() => navigation.goBack()}
+      onComplete={() => {
+        navigation.getParent()?.navigate('Explore');
+      }}
       initialIntent={currentIntent}
       initialSubIntent={currentSearchType}
       initialListingPref={user?.profileData?.listing_type_preference}

@@ -23,11 +23,17 @@ export function useStripePayment() {
       if (plan.startsWith('host_')) {
         rcPlan = plan.replace('host_', '');
       }
-      const result = await purchase(rcPlan, billingCycle, effectivePlanType as 'renter' | 'host');
-      if (!result.success && result.error) {
-        await showAlert({ title: 'Purchase Failed', message: result.error, variant: 'warning' });
+      try {
+        const result = await purchase(rcPlan, billingCycle, effectivePlanType as 'renter' | 'host');
+        if (!result.success) {
+          const errorMsg = result.error || 'Purchase could not be completed. Please try again.';
+          await showAlert({ title: 'Purchase Failed', message: errorMsg, variant: 'warning' });
+        }
+        return { success: result.success, subscriptionId: result.success ? `rc_${plan}_${billingCycle}` : undefined };
+      } catch (err: any) {
+        await showAlert({ title: 'Purchase Failed', message: err.message || 'Something went wrong. Please try again.', variant: 'warning' });
+        return { success: false };
       }
-      return { success: result.success, subscriptionId: result.success ? `rc_${plan}_${billingCycle}` : undefined };
     }
 
     const priceId = getPriceId(plan, billingCycle);
