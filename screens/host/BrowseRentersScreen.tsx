@@ -167,7 +167,7 @@ export const BrowseRentersScreen = () => {
   const [listings, setListings] = useState<Property[]>([]);
   const [selectedListing, setSelectedListing] = useState<Property | null>(null);
   const [showListingPicker, setShowListingPicker] = useState(false);
-  const [roomTypeFilter, setRoomTypeFilter] = useState<string>('room');
+  const [roomTypeFilter, setRoomTypeFilter] = useState<string>('entire_apartment');
   const [neighborhoodFilter, setNeighborhoodFilter] = useState<string>('');
   const [transitFilterSummary, setTransitFilterSummary] = useState<TransitFilterSummary | null>(null);
   const [allProfiles, setAllProfiles] = useState<RoommateProfile[]>([]);
@@ -1265,7 +1265,7 @@ export const BrowseRentersScreen = () => {
 
       <View style={st.controlsRow}>
         <View style={st.roomToggle}>
-          {['room', 'entire_apartment'].map(type => (
+          {['entire_apartment', 'room'].map(type => (
             <Pressable
               key={type}
               onPress={() => { setRoomTypeFilter(type); setActiveFilters(new Set()); }}
@@ -1523,7 +1523,7 @@ export const BrowseRentersScreen = () => {
               </Text>
               {(selectedListing || neighborhoodFilter || activeFilters.size > 0 || searchText) ? (
                 <Pressable
-                  onPress={() => { setSelectedListing(null); setRoomTypeFilter('room'); setNeighborhoodFilter(''); setSearchText(''); setActiveFilters(new Set()); }}
+                  onPress={() => { setSelectedListing(null); setRoomTypeFilter('entire_apartment'); setNeighborhoodFilter(''); setSearchText(''); setActiveFilters(new Set()); }}
                   style={{ marginTop: 20, paddingVertical: 10, paddingHorizontal: 20, backgroundColor: ACCENT, borderRadius: 10 }}
                 >
                   <Text style={{ color: '#000', fontWeight: '600', fontSize: 14 }}>Clear all filters</Text>

@@ -1010,6 +1010,7 @@ export const CreateEditListingScreen = () => {
         if (isProfessionalHost) setExistingRoommatesCount(0);
       })}
       {renderSelectionCard('user', 'Private Room', 'Renters get a private room in a shared space', roomType === 'room', () => setRoomType('room'))}
+
     </View>
   );
 

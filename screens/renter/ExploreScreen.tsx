@@ -78,8 +78,8 @@ const QUICK_FILTERS = [
 ];
 
 const LISTING_TYPE_CHIPS: { key: string; label: string; icon: 'user' | 'home' | 'file-text' | 'clock' }[] = [
-  { key: 'room', label: 'Private Room', icon: 'user' },
   { key: 'entire', label: 'Entire Unit', icon: 'home' },
+  { key: 'room', label: 'Private Room', icon: 'user' },
 ];
 
 const LEASE_TYPE_CHIPS: { key: string; label: string; icon: 'file-text' | 'clock' }[] = [
@@ -89,8 +89,8 @@ const LEASE_TYPE_CHIPS: { key: string; label: string; icon: 'file-text' | 'clock
 
 const LISTING_TYPE_OPTIONS = [
   { key: 'any' as const, icon: 'grid' as const, label: 'Any Type' },
-  { key: 'room' as const, icon: 'user' as const, label: 'Private Room' },
   { key: 'entire' as const, icon: 'home' as const, label: 'Entire Unit' },
+  { key: 'room' as const, icon: 'user' as const, label: 'Private Room' },
   { key: 'sublet' as const, icon: 'clock' as const, label: 'Sublet' },
 ];
 
