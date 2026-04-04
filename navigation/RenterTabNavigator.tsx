@@ -4,7 +4,7 @@ import { createBottomTabNavigator, BottomTabBarProps } from '@react-navigation/b
 import { Feather } from '../components/VectorIcons';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ExploreScreen } from '../screens/renter/ExploreScreen';
+import { ExploreStackNavigator } from './ExploreStackNavigator';
 import { RoommatesStackNavigator } from './RoommatesStackNavigator';
 import { GroupsStackNavigator } from './GroupsStackNavigator';
 import { MyGroupStackNavigator } from './MyGroupStackNavigator';
@@ -68,6 +68,8 @@ function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
                 navigation.navigate('Messages' as any, { screen: 'MessagesList' } as any);
               } else if (route.name === 'Profile') {
                 navigation.navigate('Profile' as any, { screen: 'ProfileMain' } as any);
+              } else if (route.name === 'Explore' && isFocused) {
+                navigation.navigate('Explore' as any, { screen: 'ExploreMain' } as any);
               } else if (!isFocused) {
                 navigation.navigate(route.name);
               }
@@ -161,7 +163,7 @@ export const RenterTabNavigator = () => {
         freezeOnBlur: true,
       }}
     >
-      <Tab.Screen name="Explore" component={ExploreScreen} />
+      <Tab.Screen name="Explore" component={ExploreStackNavigator} />
       {showRoommates ? (
         <Tab.Screen name="Roommates" component={RoommatesStackNavigator} />
       ) : null}

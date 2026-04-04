@@ -1423,65 +1423,80 @@ export const ExploreScreen = () => {
               <Text style={styles.areaInfoPillText}>Area info</Text>
             </Pressable>
           </View>
-          <View style={styles.hostRow}>
-            <LinearGradient colors={avatarGradient} style={styles.hostAvatar}>
-              <Text style={styles.hostAvatarText}>{hostInitials}</Text>
-            </LinearGradient>
-            <View style={styles.hostInfo}>
-              <View style={styles.hostNameRow}>
-                <Text style={styles.hostName}>
-                  {itemHostType === 'company' && hostUser?.companyName
-                    ? hostUser.companyName
-                    : `${hostName.split(' ')[0]}${hostName.split(' ')[1]?.[0] ? ` ${hostName.split(' ')[1][0]}.` : ''}`}
+          <Pressable
+            onPress={(e) => {
+              e.stopPropagation?.();
+              const hId = item.hostProfileId || (item as any).hostId;
+              if (hId) {
+                (navigation as any).navigate('HostPublicProfile', {
+                  hostId: hId,
+                  hostName: itemHostType === 'company' && hostUser?.companyName ? hostUser.companyName : hostName,
+                  hostType: itemHostType || 'individual',
+                });
+              }
+            }}
+          >
+            <View style={styles.hostRow}>
+              <LinearGradient colors={avatarGradient} style={styles.hostAvatar}>
+                <Text style={styles.hostAvatarText}>{hostInitials}</Text>
+              </LinearGradient>
+              <View style={styles.hostInfo}>
+                <View style={styles.hostNameRow}>
+                  <Text style={styles.hostName}>
+                    {itemHostType === 'company' && hostUser?.companyName
+                      ? hostUser.companyName
+                      : `${hostName.split(' ')[0]}${hostName.split(' ')[1]?.[0] ? ` ${hostName.split(' ')[1][0]}.` : ''}`}
+                  </Text>
+                  {hostUser?.licenseVerificationStatus === 'verified' ? (
+                    <View style={styles.verifiedHostBadge}>
+                      <Feather name="shield" size={10} color="#3ECF8E" />
+                      <Text style={styles.verifiedHostText}>Verified Agent</Text>
+                    </View>
+                  ) : hostUser?.licenseVerificationStatus === 'manual_review' || hostUser?.licenseVerificationStatus === 'pending' ? (
+                    <View style={[styles.verifiedHostBadge, { backgroundColor: 'rgba(245,158,11,0.15)', borderColor: 'rgba(245,158,11,0.3)' }]}>
+                      <Feather name="clock" size={10} color="#F59E0B" />
+                      <Text style={[styles.verifiedHostText, { color: '#F59E0B' }]}>Pending</Text>
+                    </View>
+                  ) : hostUser?.purchases?.hostVerificationBadge === true || hostUser?.verifiedBusiness || ((hostUser as any)?.hostSubscription?.plan && (hostUser as any).hostSubscription.plan !== 'free' && (hostUser as any).hostSubscription.plan !== 'none') || (hostUser?.hostPlan && hostUser.hostPlan !== 'free' && hostUser.hostPlan !== 'none') ? (
+                    <View style={styles.verifiedHostBadge}>
+                      <Feather name="shield" size={10} color="#3ECF8E" />
+                      <Text style={styles.verifiedHostText}>Verified</Text>
+                    </View>
+                  ) : null}
+                </View>
+                <Text style={styles.hostStatus}>
+                  {itemHostType === 'company'
+                    ? `${hostUser?.unitsManaged ?? 1} units managed`
+                    : itemHostType === 'agent'
+                      ? (() => {
+                          const parts: string[] = [];
+                          if (hostUser?.agencyName) parts.push(hostUser.agencyName);
+                          const count = hostUser?.unitsManaged ?? 1;
+                          parts.push(`${count} ${count === 1 ? 'listing' : 'listings'}`);
+                          return parts.join(' · ');
+                        })()
+                      : (() => {
+                          const count = hostUser?.unitsManaged ?? 1;
+                          return `Host · ${count} ${count === 1 ? 'listing' : 'listings'}`;
+                        })()}
                 </Text>
-                {hostUser?.licenseVerificationStatus === 'verified' ? (
-                  <View style={styles.verifiedHostBadge}>
-                    <Feather name="shield" size={10} color="#3ECF8E" />
-                    <Text style={styles.verifiedHostText}>Verified Agent</Text>
-                  </View>
-                ) : hostUser?.licenseVerificationStatus === 'manual_review' || hostUser?.licenseVerificationStatus === 'pending' ? (
-                  <View style={[styles.verifiedHostBadge, { backgroundColor: 'rgba(245,158,11,0.15)', borderColor: 'rgba(245,158,11,0.3)' }]}>
-                    <Feather name="clock" size={10} color="#F59E0B" />
-                    <Text style={[styles.verifiedHostText, { color: '#F59E0B' }]}>Pending</Text>
-                  </View>
-                ) : hostUser?.purchases?.hostVerificationBadge === true || hostUser?.verifiedBusiness || ((hostUser as any)?.hostSubscription?.plan && (hostUser as any).hostSubscription.plan !== 'free' && (hostUser as any).hostSubscription.plan !== 'none') || (hostUser?.hostPlan && hostUser.hostPlan !== 'free' && hostUser.hostPlan !== 'none') ? (
-                  <View style={styles.verifiedHostBadge}>
-                    <Feather name="shield" size={10} color="#3ECF8E" />
-                    <Text style={styles.verifiedHostText}>Verified</Text>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                {hostUser?.hostReviewCount && hostUser.hostReviewCount > 0 ? (
+                  <View style={[styles.respBadge, { backgroundColor: 'rgba(167,139,250,0.12)', borderColor: 'rgba(167,139,250,0.25)' }]}>
+                    <Feather name="star" size={9} color="#a78bfa" />
+                    <Text style={[styles.respBadgeText, { color: '#a78bfa' }]}>{hostUser.hostAvgRating}</Text>
                   </View>
                 ) : null}
+                {(hostUser?.licenseVerified || hostUser?.verifiedBusiness || (hostUser?.hostPlan && hostUser.hostPlan !== 'free' && hostUser.hostPlan !== 'none') || itemHostType === 'company' || itemHostType === 'agent') ? (
+                  <View style={styles.respBadge}>
+                    <Text style={styles.respBadgeText}>Fast reply</Text>
+                  </View>
+                ) : null}
+                <Feather name="chevron-right" size={14} color="rgba(255,255,255,0.3)" />
               </View>
-              <Text style={styles.hostStatus}>
-                {itemHostType === 'company'
-                  ? `${hostUser?.unitsManaged ?? 1} units managed`
-                  : itemHostType === 'agent'
-                    ? (() => {
-                        const parts: string[] = [];
-                        if (hostUser?.agencyName) parts.push(hostUser.agencyName);
-                        const count = hostUser?.unitsManaged ?? 1;
-                        parts.push(`${count} ${count === 1 ? 'listing' : 'listings'}`);
-                        return parts.join(' · ');
-                      })()
-                    : (() => {
-                        const count = hostUser?.unitsManaged ?? 1;
-                        return `Host · ${count} ${count === 1 ? 'listing' : 'listings'}`;
-                      })()}
-              </Text>
             </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              {hostUser?.hostReviewCount && hostUser.hostReviewCount > 0 ? (
-                <View style={[styles.respBadge, { backgroundColor: 'rgba(167,139,250,0.12)', borderColor: 'rgba(167,139,250,0.25)' }]}>
-                  <Feather name="star" size={9} color="#a78bfa" />
-                  <Text style={[styles.respBadgeText, { color: '#a78bfa' }]}>{hostUser.hostAvgRating}</Text>
-                </View>
-              ) : null}
-              {(hostUser?.licenseVerified || hostUser?.verifiedBusiness || (hostUser?.hostPlan && hostUser.hostPlan !== 'free' && hostUser.hostPlan !== 'none') || itemHostType === 'company' || itemHostType === 'agent') ? (
-                <View style={styles.respBadge}>
-                  <Text style={styles.respBadgeText}>Fast reply</Text>
-                </View>
-              ) : null}
-            </View>
-          </View>
+          </Pressable>
           {discoverableGroups.has(item.id) ? (
             <Pressable
               style={styles.groupDiscoveryBadge}
@@ -2401,6 +2416,21 @@ export const ExploreScreen = () => {
                     ) : null}
 
                     <View style={styles.pdHostCard}>
+                      <Pressable
+                        onPress={() => {
+                          const hId = selectedProperty.hostProfileId || (selectedProperty as any).hostId;
+                          if (hId) {
+                            setShowPropertyDetail(false);
+                            (navigation as any).navigate('HostPublicProfile', {
+                              hostId: hId,
+                              hostName: detailHostType === 'company' && detailHostUser?.companyName
+                                ? detailHostUser.companyName
+                                : selectedProperty.hostName || 'Host',
+                              hostType: detailHostType || 'individual',
+                            });
+                          }
+                        }}
+                      >
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                         {detailHostPhoto ? (
                           <Image source={{ uri: detailHostPhoto }} style={styles.pdHostAvatar} />
@@ -2417,11 +2447,14 @@ export const ExploreScreen = () => {
                           <Text style={styles.pdHostLabel}>
                             {detailHostType === 'company' ? 'Property Management' : detailHostType === 'agent' ? 'Licensed Agent' : 'Host'}
                           </Text>
-                          <Text style={styles.pdHostName}>
-                            {detailHostType === 'company' && detailHostUser?.companyName
-                              ? detailHostUser.companyName
-                              : selectedProperty.hostName}
-                          </Text>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <Text style={styles.pdHostName}>
+                              {detailHostType === 'company' && detailHostUser?.companyName
+                                ? detailHostUser.companyName
+                                : selectedProperty.hostName}
+                            </Text>
+                            <Feather name="chevron-right" size={14} color="rgba(255,255,255,0.3)" />
+                          </View>
                           {detailHostType === 'agent' && detailHostUser?.companyName ? (
                             <Text style={styles.pdHostMeta}>{detailHostUser.companyName}</Text>
                           ) : detailHostType === 'company' && detailHostUser?.unitsManaged ? (
@@ -2460,6 +2493,7 @@ export const ExploreScreen = () => {
                           </View>
                         ) : null}
                       </View>
+                      </Pressable>
 
                       {(detailHostType === 'agent' || detailHostType === 'company') ? (
                         <View style={styles.pdAgentDetails}>
@@ -2508,6 +2542,25 @@ export const ExploreScreen = () => {
                               <Text style={styles.pdAgentBioText} numberOfLines={4}>{detailHostUser.profileData.bio}</Text>
                             </View>
                           ) : null}
+                          <Pressable
+                            onPress={() => {
+                              const hId = selectedProperty.hostProfileId || (selectedProperty as any).hostId;
+                              if (hId) {
+                                setShowPropertyDetail(false);
+                                (navigation as any).navigate('HostPublicProfile', {
+                                  hostId: hId,
+                                  hostName: detailHostType === 'company' && detailHostUser?.companyName
+                                    ? detailHostUser.companyName
+                                    : selectedProperty.hostName || 'Host',
+                                  hostType: detailHostType || 'individual',
+                                });
+                              }
+                            }}
+                            style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, marginTop: 4 }}
+                          >
+                            <Text style={{ fontSize: 13, fontWeight: '600', color: '#3b82f6' }}>View Full Profile</Text>
+                            <Feather name="chevron-right" size={13} color="#3b82f6" />
+                          </Pressable>
                         </View>
                       ) : null}
                       {selectedProperty.host_badge ? (

@@ -1378,7 +1378,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
                 if (inquiryGroup?.listingId) {
                   const tabNav = navigation.getParent();
                   if (tabNav) {
-                    tabNav.navigate('Explore', { viewListingId: inquiryGroup.listingId });
+                    tabNav.navigate('Explore', { screen: 'ExploreMain', params: { viewListingId: inquiryGroup.listingId } });
                   }
                 }
               }} style={{ paddingLeft: 8 }}>
@@ -1693,7 +1693,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
             const tabNav = navigation.getParent();
             if (tabNav && linkedListing.id) {
               try {
-                tabNav.navigate('Explore', { viewListingId: linkedListing.id });
+                tabNav.navigate('Explore', { screen: 'ExploreMain', params: { viewListingId: linkedListing.id } });
               } catch {
                 try {
                   tabNav.navigate('Listings', { viewListingId: linkedListing.id });

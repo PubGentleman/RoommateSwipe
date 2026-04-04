@@ -444,7 +444,7 @@ export default function MyGroupScreen() {
                 likedBy={item.liked_by}
                 onPress={() => {
                   if (item.listing?.id) {
-                    (navigation as any).navigate('Explore', { viewListingId: item.listing.id });
+                    (navigation as any).navigate('Explore', { screen: 'ExploreMain', params: { viewListingId: item.listing.id } });
                   }
                 }}
               />
