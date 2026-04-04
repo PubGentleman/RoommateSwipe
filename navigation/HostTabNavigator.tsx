@@ -184,7 +184,6 @@ function AgentGroupsStackNavigator() {
 const HOST_TAB_CONFIG: Record<string, { icon: string; label: string }> = {
   Dashboard: { icon: 'grid', label: 'Dashboard' },
   Listings: { icon: 'home', label: 'Listings' },
-  Team: { icon: 'users', label: 'Team' },
   Groups: { icon: 'users', label: 'Groups' },
   Roommates: { icon: 'heart', label: 'Match' },
   BrowseRenters: { icon: 'search', label: 'Renters' },
@@ -332,9 +331,9 @@ export const HostTabNavigator = () => {
         }}
       >
         <Tab.Screen name="Dashboard" component={DashboardStackNavigator} />
-        <Tab.Screen name="Listings" component={ListingsStackNavigator} />
-        <Tab.Screen name="Team" component={TeamManagementScreen} />
-        <Tab.Screen name="Messages" component={HostMessagesStackNavigator} />
+        <Tab.Screen name="BrowseRenters" component={AgentBrowseStackNavigator} />
+        <Tab.Screen name="AgentGroups" component={AgentGroupsStackNavigator} />
+        <Tab.Screen name="Messages" component={HostMessagesStackNavigator} initialParams={{ role: 'company' }} />
         <Tab.Screen name="Profile" component={ProfileStackNavigator} />
       </Tab.Navigator>
     );

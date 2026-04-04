@@ -30,6 +30,7 @@ import { HostTypeSelectScreen } from '../screens/host/onboarding/HostTypeSelectS
 import { HostCompanySetupScreen } from '../screens/host/onboarding/HostCompanySetupScreen';
 import { HostAgentSetupScreen } from '../screens/host/onboarding/HostAgentSetupScreen';
 import ApartmentPreferencesScreen from '../screens/shared/ApartmentPreferencesScreen';
+import { TeamManagementScreen } from '../screens/host/TeamManagementScreen';
 import { AffiliateApplyScreen } from '../screens/shared/AffiliateApplyScreen';
 import { AffiliateDashboardScreen } from '../screens/shared/AffiliateDashboardScreen';
 import MoveInCheckinScreen from '../screens/renter/MoveInCheckinScreen';
@@ -65,6 +66,7 @@ export type ProfileStackParamList = {
   MatchesList: undefined;
   WhoLikedMe: undefined;
   ApartmentPreferences: undefined;
+  TeamManagement: undefined;
   AffiliateApply: undefined;
   AffiliateDashboard: undefined;
   MoveInCheckin: { bookingId: string };
@@ -341,6 +343,11 @@ export const ProfileStackNavigator = () => {
       <Stack.Screen
         name="ApartmentPreferences"
         component={ApartmentPreferencesScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="TeamManagement"
+        component={TeamManagementScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen

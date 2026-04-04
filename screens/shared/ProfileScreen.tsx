@@ -562,6 +562,17 @@ export const ProfileScreen = () => {
               subtitle="Name, bio, photos, preferences"
               onPress={() => navigation.navigate('ProfileQuestionnaire')}
             />
+            {isHost && user?.hostType === 'company' ? (
+              <SettingsItem
+                iconName="users"
+                iconColor="#22C55E"
+                iconBgColor="rgba(34, 197, 94, 0.1)"
+                iconBorderColor="rgba(34, 197, 94, 0.2)"
+                title="Manage Team"
+                subtitle="Invite agents, manage roles and permissions"
+                onPress={() => navigation.navigate('TeamManagement')}
+              />
+            ) : null}
             {user?.role === 'renter' ? (
               <SettingsItem
                 iconName="target"

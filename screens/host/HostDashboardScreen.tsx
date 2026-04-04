@@ -397,7 +397,7 @@ export const HostDashboardScreen = () => {
     }
     if (tabName === 'Team' && isCompany) {
       const parent = navigation.getParent();
-      if (parent) parent.navigate('Team');
+      if (parent) parent.navigate('Profile', { screen: 'TeamManagement' });
       return;
     }
     const parent = navigation.getParent();
