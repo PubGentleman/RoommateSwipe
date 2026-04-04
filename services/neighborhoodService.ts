@@ -1,4 +1,8 @@
-const OVERPASS_URL = 'https://overpass-api.de/api/interpreter';
+const OVERPASS_URLS = [
+  'https://overpass-api.de/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
+];
+const OVERPASS_URL = OVERPASS_URLS[0];
 
 export interface NearbyAmenity {
   name: string;
@@ -49,10 +53,14 @@ function categorizeElement(tags: Record<string, string>): NearbyAmenity['categor
   if (
     amenity === 'subway_entrance' ||
     amenity === 'bus_stop' ||
+    amenity === 'bus_station' ||
+    amenity === 'ferry_terminal' ||
     railway === 'subway_entrance' ||
     railway === 'station' ||
     railway === 'halt' ||
+    railway === 'tram_stop' ||
     highway === 'bus_stop' ||
+    publicTransport === 'station' ||
     (publicTransport === 'stop_position' && railway)
   ) return 'transit';
 
@@ -65,8 +73,19 @@ function categorizeElement(tags: Record<string, string>): NearbyAmenity['categor
 
 function getTypeName(tags: Record<string, string>): string {
   if (tags.amenity === 'subway_entrance' || tags.railway === 'subway_entrance') return 'Subway';
-  if (tags.railway === 'station' || tags.railway === 'halt') return 'Train Station';
+  if (tags.railway === 'station' || tags.railway === 'halt') {
+    if (tags.station === 'subway') return 'Subway';
+    return 'Train Station';
+  }
+  if (tags.railway === 'tram_stop') return 'Tram Stop';
+  if (tags.public_transport === 'station') {
+    if (tags.subway === 'yes' || tags.station === 'subway') return 'Subway';
+    if (tags.train === 'yes') return 'Train Station';
+    return 'Transit Station';
+  }
   if (tags.amenity === 'bus_stop' || tags.highway === 'bus_stop') return 'Bus Stop';
+  if (tags.amenity === 'bus_station') return 'Bus Station';
+  if (tags.amenity === 'ferry_terminal') return 'Ferry Terminal';
   if (tags.amenity === 'restaurant') return 'Restaurant';
   if (tags.amenity === 'cafe') return 'Cafe';
   if (tags.amenity === 'supermarket' || tags.shop === 'supermarket') return 'Supermarket';
@@ -86,13 +105,17 @@ export async function fetchAreaInfo(lat: number, lng: number): Promise<AreaInfo 
   const lngStr = lng.toFixed(6);
 
   const query = `[out:json][timeout:15];(
-  node["amenity"="subway_entrance"](around:600,${latStr},${lngStr});
-  node["railway"="subway_entrance"](around:600,${latStr},${lngStr});
-  node["railway"="station"](around:600,${latStr},${lngStr});
-  node["railway"="halt"](around:600,${latStr},${lngStr});
-  node["public_transport"="stop_position"]["railway"](around:600,${latStr},${lngStr});
-  node["amenity"="bus_stop"](around:600,${latStr},${lngStr});
-  node["highway"="bus_stop"](around:600,${latStr},${lngStr});
+  node["amenity"="subway_entrance"](around:1000,${latStr},${lngStr});
+  node["railway"="subway_entrance"](around:1000,${latStr},${lngStr});
+  node["railway"="station"](around:1000,${latStr},${lngStr});
+  node["railway"="halt"](around:1000,${latStr},${lngStr});
+  node["railway"="tram_stop"](around:1000,${latStr},${lngStr});
+  node["public_transport"="station"](around:1000,${latStr},${lngStr});
+  node["public_transport"="stop_position"]["railway"](around:1000,${latStr},${lngStr});
+  node["amenity"="bus_stop"](around:800,${latStr},${lngStr});
+  node["highway"="bus_stop"](around:800,${latStr},${lngStr});
+  node["amenity"="bus_station"](around:1000,${latStr},${lngStr});
+  node["amenity"="ferry_terminal"](around:1000,${latStr},${lngStr});
   node["amenity"="restaurant"](around:500,${latStr},${lngStr});
   node["amenity"="cafe"](around:500,${latStr},${lngStr});
   node["amenity"="supermarket"](around:500,${latStr},${lngStr});
@@ -103,22 +126,30 @@ export async function fetchAreaInfo(lat: number, lng: number): Promise<AreaInfo 
 );out body;`;
 
   try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
-
-    const response = await fetch(OVERPASS_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Accept': 'application/json',
-      },
-      body: `data=${encodeURIComponent(query)}`,
-      signal: controller.signal,
-    });
-
-    clearTimeout(timeoutId);
-
-    if (!response.ok) return null;
+    let response: Response | null = null;
+    for (const url of OVERPASS_URLS) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 12000);
+        response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Accept': 'application/json',
+          },
+          body: `data=${encodeURIComponent(query)}`,
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+        if (response.ok) break;
+        console.warn(`Overpass ${url} returned ${response.status}, trying next...`);
+        response = null;
+      } catch (e) {
+        console.warn(`Overpass ${url} failed:`, e);
+        response = null;
+      }
+    }
+    if (!response || !response.ok) return null;
 
     let data: any;
     try {

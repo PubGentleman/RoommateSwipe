@@ -90,7 +90,7 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
       city = addr.city || addr.town || addr.village || addr.hamlet || addr.county || '';
     }
     const state = addr.state || '';
-    const neighborhood = addr.neighbourhood || (addr.suburb && addr.suburb !== city ? addr.suburb : '') || addr.quarter || '';
+    const neighborhood = addr.quarter || addr.neighbourhood || (addr.suburb && addr.suburb !== city ? addr.suburb : '') || '';
 
     onStateChange(state);
     onCityChange(city || result.display_name.split(',')[0]);

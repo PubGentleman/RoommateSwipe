@@ -91,7 +91,9 @@ export const CreateEditListingScreen = () => {
   const fetchTransitForLocation = useCallback(async (lat: number, lng: number) => {
     setTransitLoading(true);
     try {
+      console.log('Fetching transit for:', lat, lng);
       const areaInfo = await fetchAreaInfo(lat, lng);
+      console.log('Transit results:', areaInfo?.transit?.length ?? 0, 'stops found');
       if (areaInfo && areaInfo.transit && areaInfo.transit.length > 0) {
         const summary = areaInfo.transit
           .slice(0, 6)
@@ -161,12 +163,12 @@ export const CreateEditListingScreen = () => {
     }
 
     let neighborhoodName = '';
-    if (addr.neighbourhood) {
+    if (addr.quarter) {
+      neighborhoodName = addr.quarter;
+    } else if (addr.neighbourhood) {
       neighborhoodName = addr.neighbourhood;
     } else if (addr.suburb && addr.suburb !== cityName) {
       neighborhoodName = addr.suburb;
-    } else if (addr.quarter) {
-      neighborhoodName = addr.quarter;
     } else {
       const candidate = displayParts[1] || '';
       if (candidate && candidate !== cityName && !candidate.includes('County')) {
