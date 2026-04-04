@@ -140,7 +140,7 @@ const PLACE_SEEKER_FIELDS: ProfileField[] = [
     icon: 'camera',
     tip: 'with a photo',
     boostText: '3x more responses',
-    weight: 20,
+    weight: 35,
     check: (u) => !!(u.photos?.length || u.profilePicture),
   },
   {
@@ -149,7 +149,7 @@ const PLACE_SEEKER_FIELDS: ProfileField[] = [
     icon: 'edit-2',
     tip: 'Tell others about yourself',
     boostText: 'Stand out',
-    weight: 25,
+    weight: 35,
     check: (u) => !!(u.profileData?.bio && u.profileData.bio.trim().length >= 20),
   },
   {
@@ -158,20 +158,8 @@ const PLACE_SEEKER_FIELDS: ProfileField[] = [
     icon: 'calendar',
     tip: 'auto-updates from your birthday',
     boostText: 'Age verification',
-    weight: 15,
+    weight: 30,
     check: (u) => !!u.birthday,
-  },
-  {
-    key: 'interests',
-    label: 'Add Interests',
-    icon: 'heart',
-    tip: 'show your personality',
-    boostText: 'Find your vibe',
-    weight: 25,
-    check: (u) => {
-      const interests = u.profileData?.interests;
-      return Array.isArray(interests) && interests.length >= 3;
-    },
   },
 ];
 
@@ -215,7 +203,6 @@ function getFieldToStep(searchType?: string | null): Record<string, string> {
       photo: 'photos',
       bio: 'basicInfo',
       birthday: 'basicInfo',
-      interests: 'interests',
     };
   }
 

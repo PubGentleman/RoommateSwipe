@@ -304,8 +304,6 @@ const ONBOARDING_STEPS_LITE: StepId[] = [
 const PLACE_SEEKER_STEPS: StepId[] = [
   'photos',
   'basicInfo',
-  'interests',
-  'profileNote',
 ];
 
 const STEP_TITLES: Record<StepId, string> = {
@@ -406,6 +404,12 @@ export const ProfileQuestionnaireScreen = () => {
       case 'lifestyle':
         if (isPlaceSeekerUser) return true;
         return !!(prefs.workLocation && prefs.guestPolicy && prefs.noiseTolerance);
+      case 'interests':
+        if (isPlaceSeekerUser) return true;
+        return false;
+      case 'profileNote':
+        if (isPlaceSeekerUser) return true;
+        return false;
       default:
         return false;
     }
