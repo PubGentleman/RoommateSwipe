@@ -472,7 +472,7 @@ export interface CompanyPlanLimits {
 }
 
 export const COMPANY_PI_LIMITS: Record<CompanyPlan, CompanyPlanLimits> = {
-  starter: { plan: 'starter', label: 'Company Starter', maxListings: 25, piCallsPerMonth: 200, freeAutoClaimsPerMonth: 10, extraClaimPriceCents: 2000, maxTeamMembers: 3, shortlistLimit: 100, hasCompatibilityMatrix: false, compatibilityMatrixLimit: 0 },
+  starter: { plan: 'starter', label: 'Company Starter', maxListings: 25, piCallsPerMonth: 200, freeAutoClaimsPerMonth: 10, extraClaimPriceCents: 2000, maxTeamMembers: 3, shortlistLimit: 100, hasCompatibilityMatrix: true, compatibilityMatrixLimit: 5 },
   pro: { plan: 'pro', label: 'Company Pro', maxListings: 100, piCallsPerMonth: 500, freeAutoClaimsPerMonth: 30, extraClaimPriceCents: 1000, maxTeamMembers: 10, shortlistLimit: -1, hasCompatibilityMatrix: true, compatibilityMatrixLimit: -1 },
   enterprise: { plan: 'enterprise', label: 'Company Enterprise', maxListings: -1, piCallsPerMonth: -1, freeAutoClaimsPerMonth: -1, extraClaimPriceCents: 0, maxTeamMembers: -1, shortlistLimit: -1, hasCompatibilityMatrix: true, compatibilityMatrixLimit: -1 },
 };
