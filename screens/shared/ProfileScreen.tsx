@@ -475,11 +475,8 @@ export const ProfileScreen = () => {
               <Text style={styles.subLabel}>Current Plan</Text>
               <Text style={styles.subPlan}>
                 {isHost
-                  ? (() => {
-                      const info = hostPlanInfo;
-                      return info.isFree ? info.label : `${info.label} · ${info.price}`;
-                    })()
-                  : (user?.subscription?.plan === 'basic' ? 'Basic · Free' : user?.subscription?.plan === 'plus' ? 'Plus' : user?.subscription?.plan === 'elite' ? 'Elite' : 'Basic · Free')
+                  ? hostPlanInfo.label
+                  : (user?.subscription?.plan === 'basic' ? 'Basic' : user?.subscription?.plan === 'plus' ? 'Plus' : user?.subscription?.plan === 'elite' ? 'Elite' : 'Basic')
                 }
               </Text>
               <Text style={styles.subDesc}>
