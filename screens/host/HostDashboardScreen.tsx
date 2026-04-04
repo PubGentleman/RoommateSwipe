@@ -152,7 +152,7 @@ export const HostDashboardScreen = () => {
   const isOnFreeTier = isAgent
     ? (!agentPlan || agentPlan === 'pay_per_use' || agentPlan === 'free' || agentPlanBase === 'pay_per_use' || agentPlanBase === 'free')
     : isCompany
-    ? (!subPlan || isFreePlan(subPlan.replace(/^company_/, '') as any))
+    ? (!hostSub?.plan || isFreePlan(hostSub.plan.replace(/^company_/, '') as any))
     : (hostSub && isFreePlan(hostSub.plan));
   useEffect(() => {
     if (isOnFreeTier) {
