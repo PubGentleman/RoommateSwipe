@@ -962,6 +962,7 @@ export interface GroupJoinRequest {
   id: string;
   pi_auto_group_id?: string;
   preformed_group_id?: string;
+  agent_group_id?: string;
   requester_id: string;
   status: 'pending' | 'approved' | 'declined' | 'expired' | 'withdrawn';
   compatibility_score?: number;
@@ -978,7 +979,7 @@ export interface GroupJoinRequest {
 
 export interface OpenGroupListing {
   id: string;
-  groupType: 'pi_auto' | 'preformed';
+  groupType: 'pi_auto' | 'preformed' | 'agent';
   groupName?: string;
   members: Array<{
     user_id: string;
@@ -998,4 +999,5 @@ export interface OpenGroupListing {
   desiredBedrooms?: number;
   createdAt: string;
   needsReplacement?: boolean;
+  agentId?: string;
 }

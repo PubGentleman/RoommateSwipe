@@ -12,8 +12,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
-import { getOpenGroups } from '../../services/groupJoinService';
+import { getOpenGroups, getMyAgentGroupRequests, requestToJoinAgentGroup } from '../../services/groupJoinService';
 import { OpenGroupListing } from '../../types/models';
+import { supabase } from '../../lib/supabase';
 import { Image } from 'expo-image';
 import { Spacing } from '../../constants/theme';
 import { needsRoommates } from '../../utils/renterIntentUtils';
@@ -32,6 +33,7 @@ export default function OpenGroupsScreen() {
   const [loading, setLoading] = useState(true);
   const [showGroupReport, setShowGroupReport] = useState(false);
   const [reportGroupTarget, setReportGroupTarget] = useState<{ id: string; name: string } | null>(null);
+  const [myAgentRequests, setMyAgentRequests] = useState<Record<string, string>>({});
 
   const [error, setError] = useState<string | null>(null);
 
@@ -46,10 +48,13 @@ export default function OpenGroupsScreen() {
       const blockedIds = new Set(user?.blockedUsers || []);
       const filtered = blockedIds.size > 0
         ? data.filter((g: OpenGroupListing) =>
-            !(g.members || []).some(m => blockedIds.has(m.user_id))
+            !(g.members || []).some(m => blockedIds.has(m.user_id)) &&
+            !(g.agentId && blockedIds.has(g.agentId))
           )
         : data;
       setGroups(filtered);
+      const agentRequestMap = await getMyAgentGroupRequests(user.id);
+      setMyAgentRequests(agentRequestMap);
     } catch (err) {
       console.error('[OpenGroupsScreen] Failed to load open groups:', err);
       setError('Failed to load groups. Pull down to retry.');
@@ -67,16 +72,21 @@ export default function OpenGroupsScreen() {
   const renderGroupCard = ({ item }: { item: OpenGroupListing }) => {
     const typeBadge = item.groupType === 'pi_auto'
       ? { label: 'Pi Matched', color: '#8B5CF6' }
+      : item.groupType === 'agent'
+      ? { label: 'Agent Matched', color: '#7B5EA7' }
       : { label: 'Friends', color: '#22C55E' };
+
+    const agentRequestStatus = item.groupType === 'agent' ? myAgentRequests[item.id] : undefined;
 
     return (
       <Pressable
         style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}
-        onPress={() =>
+        onPress={() => {
+          if (item.groupType === 'agent' && agentRequestStatus) return;
           navigation.navigate('GroupRequest' as never, {
             group: item,
-          } as never)
-        }
+          } as never);
+        }}
       >
         <View style={styles.cardHeader}>
           <View style={styles.badgeRow}>
@@ -166,16 +176,30 @@ export default function OpenGroupsScreen() {
           ) : null}
         </View>
 
-        <Pressable
-          style={[styles.requestBtn, { backgroundColor: theme.primary }]}
-          onPress={() =>
-            navigation.navigate('GroupRequest' as never, {
-              group: item,
-            } as never)
-          }
-        >
-          <Text style={styles.requestBtnText}>View & Request to Join</Text>
-        </Pressable>
+        {item.groupType === 'agent' && agentRequestStatus === 'pending' ? (
+          <View style={[styles.requestBtn, { backgroundColor: '#333' }]}>
+            <Text style={[styles.requestBtnText, { color: '#fbbf24' }]}>Request Pending</Text>
+          </View>
+        ) : item.groupType === 'agent' && agentRequestStatus === 'declined' ? (
+          <View style={[styles.requestBtn, { backgroundColor: '#333' }]}>
+            <Text style={[styles.requestBtnText, { color: '#888' }]}>Request Declined</Text>
+          </View>
+        ) : item.groupType === 'agent' && agentRequestStatus === 'approved' ? (
+          <View style={[styles.requestBtn, { backgroundColor: 'rgba(34,197,94,0.12)' }]}>
+            <Text style={[styles.requestBtnText, { color: '#22c55e' }]}>Accepted!</Text>
+          </View>
+        ) : (
+          <Pressable
+            style={[styles.requestBtn, { backgroundColor: item.groupType === 'agent' ? '#7B5EA7' : theme.primary }]}
+            onPress={() =>
+              navigation.navigate('GroupRequest' as never, {
+                group: item,
+              } as never)
+            }
+          >
+            <Text style={styles.requestBtnText}>View & Request to Join</Text>
+          </Pressable>
+        )}
       </Pressable>
     );
   };

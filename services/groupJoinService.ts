@@ -105,6 +105,66 @@ export async function getOpenGroups(
     }
   }
 
+  // 3. Discoverable agent-assembled groups
+  let agentQuery = supabase
+    .from('groups')
+    .select(`
+      id,
+      name,
+      city,
+      max_members,
+      budget_min,
+      budget_max,
+      move_in_date,
+      created_by_agent,
+      target_listing_id,
+      group_status,
+      created_at,
+      group_members(
+        user_id,
+        role,
+        user:users!user_id(id, full_name, avatar_url, age, occupation)
+      )
+    `)
+    .eq('agent_assembled', true)
+    .eq('is_discoverable', true)
+    .in('group_status', ['assembling', 'active']);
+
+  if (userCity) agentQuery = agentQuery.eq('city', userCity);
+
+  const { data: agentGroups } = await agentQuery;
+
+  if (agentGroups) {
+    for (const g of agentGroups) {
+      const members = g.group_members || [];
+      const spotsOpen = (g.max_members || 4) - members.length;
+      if (spotsOpen <= 0) continue;
+
+      const memberIds = members.map((m: any) => m.user_id);
+      if (memberIds.includes(userId)) continue;
+
+      results.push({
+        id: g.id,
+        groupType: 'agent',
+        groupName: g.name,
+        members: members.map((m: any) => ({
+          user_id: m.user_id,
+          name: m.user?.full_name || 'Member',
+          age: m.user?.age,
+          photo: m.user?.avatar_url,
+          occupation: m.user?.occupation,
+        })),
+        spotsOpen,
+        maxSize: g.max_members || 4,
+        city: g.city,
+        budgetMin: g.budget_min,
+        budgetMax: g.budget_max,
+        createdAt: g.created_at,
+        agentId: g.created_by_agent,
+      });
+    }
+  }
+
   if (filters?.maxBudget) {
     return results.filter(
       g => !g.budgetMax || g.budgetMax <= filters.maxBudget!
@@ -414,4 +474,153 @@ export async function toggleOpenToRequests(
 ): Promise<void> {
   const table = groupType === 'pi_auto' ? 'pi_auto_groups' : 'preformed_groups';
   await supabase.from(table).update({ open_to_requests: open }).eq('id', groupId);
+}
+
+export async function requestToJoinAgentGroup(
+  userId: string,
+  groupId: string,
+  message?: string
+): Promise<GroupJoinRequest | null> {
+  const { data: existing } = await supabase
+    .from('group_join_requests')
+    .select('id, status')
+    .eq('agent_group_id', groupId)
+    .eq('requester_id', userId)
+    .in('status', ['pending'])
+    .limit(1);
+
+  if (existing && existing.length > 0) {
+    throw new Error('You already have a pending request for this group.');
+  }
+
+  const { data, error } = await supabase
+    .from('group_join_requests')
+    .insert({
+      agent_group_id: groupId,
+      requester_id: userId,
+      status: 'pending',
+      expires_at: expiresAt(),
+      requester_message: message?.trim() || null,
+    })
+    .select()
+    .single();
+
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function getAgentGroupJoinRequests(
+  agentId: string,
+  groupIds: string[]
+): Promise<Record<string, GroupJoinRequest[]>> {
+  if (groupIds.length === 0) return {};
+
+  const { data } = await supabase
+    .from('group_join_requests')
+    .select('*')
+    .in('agent_group_id', groupIds)
+    .eq('status', 'pending')
+    .order('created_at', { ascending: true });
+
+  if (!data || data.length === 0) return {};
+
+  const requesterIds = [...new Set(data.map(r => r.requester_id))];
+  const { data: users } = await supabase
+    .from('users')
+    .select('id, full_name, avatar_url, age, gender')
+    .in('id', requesterIds);
+
+  const userMap = new Map((users || []).map(u => [u.id, u]));
+
+  const byGroup: Record<string, GroupJoinRequest[]> = {};
+  for (const req of data) {
+    const gid = req.agent_group_id;
+    if (!gid) continue;
+    if (!byGroup[gid]) byGroup[gid] = [];
+    byGroup[gid].push({
+      ...req,
+      requester: userMap.get(req.requester_id) as any,
+    });
+  }
+  return byGroup;
+}
+
+export async function approveAgentGroupRequest(
+  agentId: string,
+  requestId: string,
+  groupId: string,
+  userId: string
+): Promise<void> {
+  await supabase
+    .from('group_join_requests')
+    .update({
+      status: 'approved',
+      decided_by: agentId,
+      decided_at: new Date().toISOString(),
+    })
+    .eq('id', requestId);
+
+  await supabase
+    .from('group_members')
+    .insert({
+      group_id: groupId,
+      user_id: userId,
+      role: 'member',
+      joined_at: new Date().toISOString(),
+    });
+
+  const { count } = await supabase
+    .from('group_members')
+    .select('id', { count: 'exact', head: true })
+    .eq('group_id', groupId);
+
+  const { data: groupData } = await supabase
+    .from('groups')
+    .select('max_members')
+    .eq('id', groupId)
+    .single();
+
+  if ((count ?? 0) >= (groupData?.max_members || 4)) {
+    await supabase
+      .from('groups')
+      .update({ is_discoverable: false })
+      .eq('id', groupId);
+
+    await supabase
+      .from('group_join_requests')
+      .update({ status: 'declined', decided_at: new Date().toISOString() })
+      .eq('agent_group_id', groupId)
+      .eq('status', 'pending')
+      .neq('id', requestId);
+  }
+}
+
+export async function declineAgentGroupRequest(
+  agentId: string,
+  requestId: string
+): Promise<void> {
+  await supabase
+    .from('group_join_requests')
+    .update({
+      status: 'declined',
+      decided_by: agentId,
+      decided_at: new Date().toISOString(),
+    })
+    .eq('id', requestId);
+}
+
+export async function getMyAgentGroupRequests(
+  userId: string
+): Promise<Record<string, string>> {
+  const { data } = await supabase
+    .from('group_join_requests')
+    .select('agent_group_id, status')
+    .eq('requester_id', userId)
+    .not('agent_group_id', 'is', null);
+
+  const map: Record<string, string> = {};
+  (data || []).forEach((r: any) => {
+    if (r.agent_group_id) map[r.agent_group_id] = r.status;
+  });
+  return map;
 }

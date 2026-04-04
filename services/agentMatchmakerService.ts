@@ -62,6 +62,7 @@ export interface AgentGroup {
   invites: AgentGroupInvite[];
   createdAt: string;
   agentMessage?: string;
+  isDiscoverable?: boolean;
 }
 
 export async function getShortlistedRenterIds(agentId: string): Promise<string[]> {
@@ -161,6 +162,7 @@ export async function getAgentGroups(agentId: string): Promise<AgentGroupsResult
         created_by_agent,
         target_listing_id,
         group_status,
+        is_discoverable,
         created_at,
         group_members(
           user_id,
@@ -245,6 +247,7 @@ export async function getAgentGroups(agentId: string): Promise<AgentGroupsResult
         coversRent: listingPrice > 0 ? combinedBudgetMax >= listingPrice : false,
         invites: [],
         createdAt: g.created_at,
+        isDiscoverable: (g as any).is_discoverable ?? false,
       };
     });
     return { groups: mapped, isStale: false };

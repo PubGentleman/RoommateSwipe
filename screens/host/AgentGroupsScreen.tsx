@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import {
-  View, Text, FlatList, StyleSheet, Pressable, Image, ActivityIndicator, ScrollView,
+  View, Text, FlatList, StyleSheet, Pressable, Image, ActivityIndicator, ScrollView, Switch,
 } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -25,6 +25,12 @@ import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { shouldLoadMockData } from '../../utils/dataUtils';
 import { InvitePreviewSheet } from '../../components/InvitePreviewSheet';
 import { AgentRenter } from '../../services/agentMatchmakerService';
+import {
+  getAgentGroupJoinRequests,
+  approveAgentGroupRequest,
+  declineAgentGroupRequest,
+} from '../../services/groupJoinService';
+import { GroupJoinRequest } from '../../types/models';
 
 const BG = '#0d0d0d';
 const CARD_BG = '#151515';
@@ -76,6 +82,7 @@ export const AgentGroupsScreen = () => {
   const [actionStates, setActionStates] = useState<Record<string, string>>({});
   const [inviteSheetVisible, setInviteSheetVisible] = useState(false);
   const [inviteSheetGroup, setInviteSheetGroup] = useState<AgentGroup | null>(null);
+  const [pendingRequests, setPendingRequests] = useState<Record<string, GroupJoinRequest[]>>({});
 
   const agentPlan = resolveEffectiveAgentPlan(user) as AgentPlan;
   const planLimits = getAgentPlanLimits(agentPlan);
@@ -95,9 +102,32 @@ export const AgentGroupsScreen = () => {
         schema: 'public',
         table: 'agent_group_invites',
       }, () => { loadGroups(); })
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'group_join_requests',
+      }, () => { fetchPendingRequests(); })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [user?.id]);
+
+  const fetchPendingRequests = useCallback(async () => {
+    if (!user || groups.length === 0) return;
+    const discoverableIds = groups
+      .filter(g => g.isDiscoverable && (g.groupStatus === 'assembling' || g.groupStatus === 'active'))
+      .map(g => g.id);
+    if (discoverableIds.length === 0) { setPendingRequests({}); return; }
+    try {
+      const result = await getAgentGroupJoinRequests(user.id, discoverableIds);
+      setPendingRequests(result);
+    } catch (e) {
+      console.warn('[AgentGroups] Failed to fetch join requests:', e);
+    }
+  }, [user?.id, groups]);
+
+  useEffect(() => {
+    fetchPendingRequests();
+  }, [fetchPendingRequests]);
 
   const loadGroups = async () => {
     if (!user) return;
@@ -217,6 +247,44 @@ export const AgentGroupsScreen = () => {
       loadGroups();
     } catch (e) {
       showAlert({ title: 'Error', message: 'Failed to recreate group.' });
+    }
+  };
+
+  const handleToggleDiscoverable = async (groupId: string, discoverable: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('groups')
+        .update({ is_discoverable: discoverable })
+        .eq('id', groupId)
+        .eq('created_by_agent', user?.id);
+      if (error) throw error;
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      loadGroups();
+    } catch (err) {
+      showAlert({ title: 'Error', message: 'Failed to update group visibility. Please try again.' });
+    }
+  };
+
+  const handleApproveRequest = async (requestId: string, groupId: string, userId: string) => {
+    if (!user) return;
+    try {
+      await approveAgentGroupRequest(user.id, requestId, groupId, userId);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      loadGroups();
+      fetchPendingRequests();
+    } catch (err) {
+      showAlert({ title: 'Error', message: 'Failed to approve request.' });
+    }
+  };
+
+  const handleDeclineRequest = async (requestId: string) => {
+    if (!user) return;
+    try {
+      await declineAgentGroupRequest(user.id, requestId);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      fetchPendingRequests();
+    } catch (err) {
+      showAlert({ title: 'Error', message: 'Failed to decline request.' });
     }
   };
 
@@ -379,6 +447,73 @@ export const AgentGroupsScreen = () => {
               {inviteStats.pending > 0 ? <Text style={{ fontSize: 12, color: ACCENT }}>{inviteStats.pending} pending</Text> : null}
               {inviteStats.declined > 0 ? <Text style={{ fontSize: 12, color: RED }}>{inviteStats.declined} declined</Text> : null}
             </View>
+          </View>
+        ) : null}
+
+        {(item.groupStatus === 'assembling' || item.groupStatus === 'active') ? (
+          <View style={st.discoverableRow}>
+            <View style={{ flex: 1, marginRight: 12 }}>
+              <Text style={{ color: '#fff', fontSize: 14, fontWeight: '600' }}>Open to Renters</Text>
+              <Text style={{ color: '#888', fontSize: 12, marginTop: 2 }}>Show in renter group browser</Text>
+            </View>
+            <Switch
+              value={item.isDiscoverable ?? false}
+              onValueChange={(value) => handleToggleDiscoverable(item.id, value)}
+              trackColor={{ false: '#333', true: '#7B5EA7' }}
+              thumbColor={item.isDiscoverable ? '#fff' : '#666'}
+            />
+          </View>
+        ) : null}
+
+        {item.isDiscoverable && pendingRequests[item.id]?.length > 0 ? (
+          <View style={{ marginHorizontal: 16, marginBottom: 14 }}>
+            <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700', marginBottom: 8 }}>
+              Join Requests ({pendingRequests[item.id].length})
+            </Text>
+            {pendingRequests[item.id].map((request: GroupJoinRequest) => (
+              <View key={request.id} style={st.joinRequestCard}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                  {(request.requester as any)?.avatar_url ? (
+                    <Image
+                      source={{ uri: (request.requester as any).avatar_url }}
+                      style={{ width: 36, height: 36, borderRadius: 18, marginRight: 10 }}
+                    />
+                  ) : (
+                    <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#2a2a2a', alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
+                      <Feather name="user" size={14} color="#666" />
+                    </View>
+                  )}
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: '#fff', fontSize: 14, fontWeight: '600' }}>
+                      {(request.requester as any)?.full_name || 'Renter'}
+                    </Text>
+                    <Text style={{ color: '#888', fontSize: 12 }}>
+                      {(request.requester as any)?.age ? `${(request.requester as any).age}` : ''}
+                      {(request.requester as any)?.gender ? ` · ${(request.requester as any).gender}` : ''}
+                    </Text>
+                  </View>
+                </View>
+                {request.requester_message ? (
+                  <Text style={{ color: '#aaa', fontSize: 12, marginTop: 6, fontStyle: 'italic' }} numberOfLines={2}>
+                    "{request.requester_message}"
+                  </Text>
+                ) : null}
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+                  <Pressable
+                    onPress={() => handleApproveRequest(request.id, request.agent_group_id!, request.requester_id)}
+                    style={{ backgroundColor: '#7B5EA7', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 6, flex: 1, alignItems: 'center' }}
+                  >
+                    <Text style={{ color: '#fff', fontSize: 13, fontWeight: '600' }}>Accept</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => handleDeclineRequest(request.id)}
+                    style={{ backgroundColor: '#333', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 6, flex: 1, alignItems: 'center' }}
+                  >
+                    <Text style={{ color: '#888', fontSize: 13, fontWeight: '600' }}>Decline</Text>
+                  </Pressable>
+                </View>
+              </View>
+            ))}
           </View>
         ) : null}
 
@@ -740,6 +875,9 @@ const st = StyleSheet.create({
   placementBanner: { marginHorizontal: 16, marginBottom: 14, padding: 8, paddingHorizontal: 12, borderRadius: 10, backgroundColor: 'rgba(168,85,247,0.1)', borderWidth: 1, borderColor: 'rgba(168,85,247,0.2)', flexDirection: 'row', alignItems: 'center', gap: 8 },
   dissolvedBanner: { marginHorizontal: 16, marginBottom: 14, padding: 8, paddingHorizontal: 12, borderRadius: 10, backgroundColor: 'rgba(239,68,68,0.06)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.15)', flexDirection: 'row', alignItems: 'center', gap: 8 },
   inviteStatusBanner: { marginHorizontal: 16, marginBottom: 14, padding: 8, paddingHorizontal: 12, borderRadius: 10, backgroundColor: 'rgba(59,130,246,0.08)', borderWidth: 1, borderColor: 'rgba(59,130,246,0.15)' },
+
+  discoverableRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginHorizontal: 16, marginBottom: 14, paddingVertical: 10, paddingHorizontal: 14, backgroundColor: '#1E1E1E', borderRadius: 12 },
+  joinRequestCard: { backgroundColor: '#1E1E1E', borderRadius: 10, padding: 12, marginBottom: 6 },
 
   actionRow: { paddingHorizontal: 16, paddingBottom: 14, flexDirection: 'row', gap: 8 },
   primaryBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 11, borderRadius: 10 },
