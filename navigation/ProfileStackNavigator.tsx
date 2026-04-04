@@ -16,6 +16,8 @@ import TermsOfServiceScreen from '../screens/shared/TermsOfServiceScreen';
 import AboutScreen from '../screens/shared/AboutScreen';
 import { DownloadDataScreen } from '../screens/shared/DownloadDataScreen';
 import { BlockedUsersScreen } from '../screens/shared/BlockedUsersScreen';
+import { MyReportsScreen } from '../screens/shared/MyReportsScreen';
+import { ModerationQueueScreen } from '../screens/admin/ModerationQueueScreen';
 import { NotificationPreferencesScreen } from '../screens/shared/NotificationPreferencesScreen';
 import { VerificationScreen } from '../screens/shared/VerificationScreen';
 import { BackgroundCheckScreen } from '../screens/shared/BackgroundCheckScreen';
@@ -61,6 +63,8 @@ export type ProfileStackParamList = {
   About: undefined;
   DownloadData: undefined;
   BlockedUsers: undefined;
+  MyReports: undefined;
+  ModerationQueue: undefined;
   NotificationPreferences: undefined;
   Verification: { fromHostPurchase?: boolean } | undefined;
   BackgroundCheck: undefined;
@@ -292,6 +296,36 @@ export const ProfileStackNavigator = () => {
           headerShown: true,
           ...darkHeaderOptions,
           headerTitle: 'Blocked Users',
+          headerBackVisible: false,
+          headerLeft: () => (
+            <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
+              <Feather name="chevron-left" size={28} color="#FFFFFF" />
+            </Pressable>
+          ),
+        })}
+      />
+      <Stack.Screen 
+        name="MyReports" 
+        component={MyReportsScreen}
+        options={({ navigation }) => ({
+          headerShown: true,
+          ...darkHeaderOptions,
+          headerTitle: 'My Reports',
+          headerBackVisible: false,
+          headerLeft: () => (
+            <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
+              <Feather name="chevron-left" size={28} color="#FFFFFF" />
+            </Pressable>
+          ),
+        })}
+      />
+      <Stack.Screen 
+        name="ModerationQueue" 
+        component={ModerationQueueScreen}
+        options={({ navigation }) => ({
+          headerShown: true,
+          ...darkHeaderOptions,
+          headerTitle: 'Moderation Queue',
           headerBackVisible: false,
           headerLeft: () => (
             <Pressable onPress={() => navigation.goBack()} hitSlop={8}>

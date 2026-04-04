@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, Modal, Pressable } from 'react-native';
+import { View, StyleSheet, Modal, Pressable, Image, ScrollView } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { Feather } from './VectorIcons';
 import { ThemedText } from './ThemedText';
 import { useTheme } from '../hooks/useTheme';
@@ -8,33 +9,44 @@ import { useConfirm } from '../contexts/ConfirmContext';
 
 type ReportType = 'user' | 'listing' | 'group';
 
-const USER_REPORT_REASONS = [
-  'Inappropriate content',
-  'Fake profile',
-  'Harassment',
-  'Spam',
-  'Other',
+interface ReportReason {
+  id: string;
+  label: string;
+  icon: string;
+}
+
+const LISTING_REPORT_REASONS: ReportReason[] = [
+  { id: 'fake_listing', label: 'Fake or misleading listing', icon: 'alert-circle' },
+  { id: 'scam_fraud', label: 'Scam or fraud attempt', icon: 'alert-triangle' },
+  { id: 'fake_photos', label: "Photos don't match reality", icon: 'camera-off' },
+  { id: 'stolen_photos', label: 'Stolen photos from another listing', icon: 'copy' },
+  { id: 'wrong_info', label: 'Incorrect price, address, or details', icon: 'info' },
+  { id: 'already_rented', label: 'Already rented / not available', icon: 'x-circle' },
+  { id: 'discriminatory', label: 'Discriminatory content', icon: 'slash' },
+  { id: 'inappropriate_photos', label: 'Inappropriate photos', icon: 'eye-off' },
+  { id: 'other', label: 'Other', icon: 'more-horizontal' },
 ];
 
-const LISTING_REPORT_REASONS = [
-  'Fake or misleading listing',
-  'Scam or fraud',
-  'Incorrect information',
-  'Inappropriate photos',
-  'Already rented / unavailable',
-  'Discriminatory content',
-  'Other',
+const USER_REPORT_REASONS: ReportReason[] = [
+  { id: 'fake_profile', label: 'Fake profile', icon: 'user-x' },
+  { id: 'harassment', label: 'Harassment or threats', icon: 'alert-triangle' },
+  { id: 'scam', label: 'Scam or fraud', icon: 'alert-circle' },
+  { id: 'inappropriate', label: 'Inappropriate content', icon: 'flag' },
+  { id: 'underage', label: 'May be underage', icon: 'alert-octagon' },
+  { id: 'impersonation', label: 'Impersonating someone', icon: 'users' },
+  { id: 'spam', label: 'Spam or commercial solicitation', icon: 'mail' },
+  { id: 'other', label: 'Other', icon: 'more-horizontal' },
 ];
 
-const GROUP_REPORT_REASONS = [
-  'Inappropriate group name',
-  'Spam group',
-  'Suspicious activity',
-  'Harassment',
-  'Other',
+const GROUP_REPORT_REASONS: ReportReason[] = [
+  { id: 'inappropriate_name', label: 'Inappropriate group name', icon: 'flag' },
+  { id: 'spam_group', label: 'Spam group', icon: 'mail' },
+  { id: 'suspicious', label: 'Suspicious activity', icon: 'alert-triangle' },
+  { id: 'harassment', label: 'Harassment', icon: 'alert-circle' },
+  { id: 'other', label: 'Other', icon: 'more-horizontal' },
 ];
 
-function getReasonsForType(type: ReportType): string[] {
+function getReasonsForType(type: ReportType): ReportReason[] {
   switch (type) {
     case 'listing': return LISTING_REPORT_REASONS;
     case 'group': return GROUP_REPORT_REASONS;
@@ -99,7 +111,7 @@ interface ReportBlockModalProps {
   visible: boolean;
   onClose: () => void;
   userName: string;
-  onReport: (reason: string) => void;
+  onReport: (reason: string, evidenceUris?: string[]) => void;
   onBlock?: () => void;
   type?: ReportType;
 }
@@ -109,18 +121,35 @@ export const ReportBlockModal = ({ visible, onClose, userName, onReport, onBlock
   const { confirm, alert: showAlert } = useConfirm();
   const [selectedReason, setSelectedReason] = useState<string | null>(null);
   const [showReportSection, setShowReportSection] = useState(false);
+  const [evidencePhotos, setEvidencePhotos] = useState<string[]>([]);
 
   const reasons = getReasonsForType(type);
   const labels = getLabelsForType(type, userName);
+
+  const addEvidence = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsMultipleSelection: true,
+        selectionLimit: 3 - evidencePhotos.length,
+        quality: 0.7,
+      });
+
+      if (!result.canceled) {
+        setEvidencePhotos(prev => [...prev, ...result.assets.map(a => a.uri)].slice(0, 3));
+      }
+    } catch {}
+  };
 
   const handleReport = async () => {
     if (!selectedReason) {
       await showAlert({ title: 'Select a Reason', message: 'Please select a reason for your report.', variant: 'warning' });
       return;
     }
-    onReport(selectedReason);
+    onReport(selectedReason, evidencePhotos.length > 0 ? evidencePhotos : undefined);
     setSelectedReason(null);
     setShowReportSection(false);
+    setEvidencePhotos([]);
     onClose();
     await showAlert({ title: 'Report Submitted', message: labels.successMsg, variant: 'success' });
   };
@@ -137,6 +166,7 @@ export const ReportBlockModal = ({ visible, onClose, userName, onReport, onBlock
       onBlock();
       setSelectedReason(null);
       setShowReportSection(false);
+      setEvidencePhotos([]);
       onClose();
       await showAlert({ title: 'Blocked', message: labels.blockSuccessMsg, variant: 'success' });
     }
@@ -145,6 +175,7 @@ export const ReportBlockModal = ({ visible, onClose, userName, onReport, onBlock
   const handleClose = () => {
     setSelectedReason(null);
     setShowReportSection(false);
+    setEvidencePhotos([]);
     onClose();
   };
 
@@ -206,41 +237,64 @@ export const ReportBlockModal = ({ visible, onClose, userName, onReport, onBlock
               ) : null}
             </View>
           ) : (
-            <View style={styles.content}>
+            <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
               <ThemedText style={[Typography.body, { color: theme.textSecondary, marginBottom: Spacing.lg }]}>
                 {labels.reportPrompt}
               </ThemedText>
 
               {reasons.map((reason) => (
                 <Pressable
-                  key={reason}
+                  key={reason.id}
                   style={[
                     styles.reasonOption,
                     {
-                      backgroundColor: selectedReason === reason ? theme.primary + '15' : theme.backgroundDefault,
-                      borderColor: selectedReason === reason ? theme.primary : theme.border,
+                      backgroundColor: selectedReason === reason.id ? theme.primary + '15' : theme.backgroundDefault,
+                      borderColor: selectedReason === reason.id ? theme.primary : theme.border,
                     },
                   ]}
-                  onPress={() => setSelectedReason(reason)}
+                  onPress={() => setSelectedReason(reason.id)}
                 >
-                  <View style={[
-                    styles.radioOuter,
-                    { borderColor: selectedReason === reason ? theme.primary : theme.textSecondary },
-                  ]}>
-                    {selectedReason === reason ? (
-                      <View style={[styles.radioInner, { backgroundColor: theme.primary }]} />
-                    ) : null}
-                  </View>
-                  <ThemedText style={[Typography.body, { marginLeft: Spacing.md }]}>
-                    {reason}
+                  <Feather name={reason.icon as any} size={18} color={selectedReason === reason.id ? theme.primary : theme.textSecondary} />
+                  <ThemedText style={[Typography.body, { marginLeft: Spacing.md, flex: 1 }]}>
+                    {reason.label}
                   </ThemedText>
+                  {selectedReason === reason.id ? (
+                    <Feather name="check-circle" size={18} color={theme.primary} />
+                  ) : null}
                 </Pressable>
               ))}
+
+              <View style={styles.evidenceSection}>
+                <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginBottom: Spacing.sm }]}>
+                  Add evidence (optional, up to 3 photos)
+                </ThemedText>
+                <View style={styles.evidenceRow}>
+                  {evidencePhotos.map((uri, i) => (
+                    <View key={i} style={styles.evidenceThumbnail}>
+                      <Image source={{ uri }} style={styles.evidenceImage} />
+                      <Pressable
+                        style={styles.removeEvidence}
+                        onPress={() => setEvidencePhotos(prev => prev.filter((_, j) => j !== i))}
+                      >
+                        <Feather name="x-circle" size={18} color="#ef4444" />
+                      </Pressable>
+                    </View>
+                  ))}
+                  {evidencePhotos.length < 3 ? (
+                    <Pressable
+                      style={[styles.addEvidenceButton, { borderColor: theme.border }]}
+                      onPress={addEvidence}
+                    >
+                      <Feather name="plus" size={24} color="#6C5CE7" />
+                    </Pressable>
+                  ) : null}
+                </View>
+              </View>
 
               <View style={styles.reportActions}>
                 <Pressable
                   style={[styles.backButton, { borderColor: theme.border }]}
-                  onPress={() => { setShowReportSection(false); setSelectedReason(null); }}
+                  onPress={() => { setShowReportSection(false); setSelectedReason(null); setEvidencePhotos([]); }}
                 >
                   <ThemedText style={[Typography.body, { color: theme.textSecondary }]}>
                     Back
@@ -259,7 +313,7 @@ export const ReportBlockModal = ({ visible, onClose, userName, onReport, onBlock
                   </ThemedText>
                 </Pressable>
               </View>
-            </View>
+            </ScrollView>
           )}
         </View>
       </View>
@@ -277,7 +331,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: BorderRadius.large,
     borderTopRightRadius: BorderRadius.large,
     paddingBottom: Spacing.xxl,
-    maxHeight: '80%',
+    maxHeight: '85%',
   },
   header: {
     flexDirection: 'row',
@@ -314,23 +368,43 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginBottom: Spacing.sm,
   },
-  radioOuter: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 2,
+  evidenceSection: {
+    marginTop: Spacing.lg,
+  },
+  evidenceRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    flexWrap: 'wrap',
+  },
+  evidenceThumbnail: {
+    width: 72,
+    height: 72,
+    borderRadius: BorderRadius.small,
+    overflow: 'hidden',
+  },
+  evidenceImage: {
+    width: '100%',
+    height: '100%',
+  },
+  removeEvidence: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+  },
+  addEvidenceButton: {
+    width: 72,
+    height: 72,
+    borderRadius: BorderRadius.small,
+    borderWidth: 1,
+    borderStyle: 'dashed',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  radioInner: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
   },
   reportActions: {
     flexDirection: 'row',
     gap: Spacing.md,
     marginTop: Spacing.lg,
+    marginBottom: Spacing.xl,
   },
   backButton: {
     flex: 1,

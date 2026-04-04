@@ -377,6 +377,20 @@ export const PrivacySecurityScreen = () => {
           label="Blocked Users"
           onPress={() => navigation.navigate('BlockedUsers' as any)}
         />
+
+        <MenuItem
+          icon="flag"
+          label="My Reports"
+          onPress={() => navigation.navigate('MyReports' as any)}
+        />
+
+        {user?.role === 'admin' ? (
+          <MenuItem
+            icon="shield"
+            label="Moderation Queue"
+            onPress={() => navigation.navigate('ModerationQueue' as any)}
+          />
+        ) : null}
       </View>
 
       <View style={styles.section}>

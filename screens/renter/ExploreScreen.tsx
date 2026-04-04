@@ -52,7 +52,7 @@ import { getReviewSummary, submitReview, checkReviewEligibility, ReviewSummary }
 import { ReportBlockModal } from '../../components/ReportBlockModal';
 import { InquiryModal } from '../../components/InquiryModal';
 import { VisitRequestModal } from '../../components/VisitRequestModal';
-import { reportListing, reportUser, blockUser as blockUserRemote } from '../../services/moderationService';
+import { submitDetailedReport, blockUser as blockUserRemote } from '../../services/moderationService';
 
 import { useNotificationContext } from '../../contexts/NotificationContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
@@ -3262,8 +3262,8 @@ export const ExploreScreen = () => {
         onClose={() => setShowListingReport(false)}
         userName={selectedProperty?.hostName || 'Host'}
         type="listing"
-        onReport={async (reason) => {
-          try { if (selectedProperty) await reportListing(user!.id, selectedProperty.id, reason); } catch {}
+        onReport={async (reason, evidenceUris) => {
+          try { if (selectedProperty) await submitDetailedReport({ reporterId: user!.id, reportedId: selectedProperty.id, reportedType: 'listing', reason, evidenceUris }); } catch {}
         }}
         onBlock={async () => {
           try {
@@ -3282,9 +3282,9 @@ export const ExploreScreen = () => {
         onClose={() => setShowHostReport(false)}
         userName={selectedProperty?.hostName || 'Host'}
         type="user"
-        onReport={async (reason) => {
+        onReport={async (reason, evidenceUris) => {
           try {
-            if (selectedProperty?.hostProfileId) await reportUser(user!.id, selectedProperty.hostProfileId, reason);
+            if (selectedProperty?.hostProfileId) await submitDetailedReport({ reporterId: user!.id, reportedId: selectedProperty.hostProfileId, reportedType: 'user', reason, evidenceUris });
           } catch {}
         }}
         onBlock={async () => {
