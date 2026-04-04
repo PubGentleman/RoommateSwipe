@@ -170,8 +170,11 @@ export interface Property {
   transitInfo?: {
     stops: Array<{
       name: string;
-      type: 'subway' | 'bus' | 'train' | 'tram' | 'ferry' | 'other';
-      distanceMiles: number;
+      type: 'subway' | 'bus' | 'train' | 'tram' | 'ferry' | 'other' | 'Subway' | 'Bus Stop' | 'Train Station';
+      distanceMiles?: number;
+      distanceMi?: number;
+      walkMinutes?: number;
+      lines?: string[];
     }>;
     noTransitNearby?: boolean;
     manualOverride?: string;

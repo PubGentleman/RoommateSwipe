@@ -15,6 +15,8 @@ import { getReceivedInterestCards } from '../../services/discoverService';
 import { RhomeAISheet } from '../../components/RhomeAISheet';
 import { AIFloatingButton } from '../../components/AIFloatingButton';
 import { AppHeader, HeaderActionButton } from '../../components/AppHeader';
+import SubwayLineBadge from '../../components/SubwayLineBadge';
+import { getLinesForStop } from '../../utils/transitHelpers';
 import { isListingBoosted } from '../../utils/hostPricing';
 import { canUseBoosts, hasVerifiedBadge as planHasVerifiedBadge } from '../../utils/planGates';
 import { type HostPlan, getAgentPlanLimits, type AgentPlan } from '../../constants/planLimits';
@@ -398,6 +400,29 @@ export const MyListingsScreen = () => {
                 {listing.bedrooms || listing.bathrooms ? ` · ${listing.bedrooms} bd ${listing.bathrooms} ba${listing.rooms_available && listing.rooms_available < listing.bedrooms ? ` (${listing.rooms_available} open)` : ''}` : ''}
               </Text>
             </View>
+            {listing.transitInfo?.stops && listing.transitInfo.stops.length > 0 ? (() => {
+              const allLines: string[] = [];
+              listing.transitInfo.stops.forEach((stop: any) => {
+                const lines = getLinesForStop(stop);
+                lines.forEach((line: string) => {
+                  if (!allLines.includes(line)) allLines.push(line);
+                });
+              });
+              if (allLines.length === 0) return null;
+              return (
+                <View style={styles.transitBadgeRow}>
+                  <Feather name="navigation" size={10} color="rgba(255,255,255,0.35)" />
+                  <View style={styles.transitBadges}>
+                    {allLines.slice(0, 8).map((line) => (
+                      <SubwayLineBadge key={line} line={line} size="sm" />
+                    ))}
+                    {allLines.length > 8 ? (
+                      <Text style={styles.transitBadgeMore}>+{allLines.length - 8}</Text>
+                    ) : null}
+                  </View>
+                </View>
+              );
+            })() : null}
           </Pressable>
 
           {user?.hostType === 'company' ? (
@@ -1082,12 +1107,30 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    marginBottom: 10,
+    marginBottom: 4,
   },
   cardLocationText: {
     fontSize: 12,
     color: 'rgba(255,255,255,0.35)',
     flex: 1,
+  },
+  transitBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 2,
+    marginBottom: 6,
+  },
+  transitBadges: {
+    flexDirection: 'row',
+    gap: 3,
+    flexWrap: 'wrap',
+  },
+  transitBadgeMore: {
+    color: 'rgba(255,255,255,0.35)',
+    fontSize: 10,
+    alignSelf: 'center',
+    marginLeft: 2,
   },
 
   inquiryRow: {

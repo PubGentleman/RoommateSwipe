@@ -14,6 +14,8 @@ import { Property } from '../../types/models';
 import { StorageService } from '../../utils/storage';
 import { getListing, mapListingToProperty, updateListing } from '../../services/listingService';
 import { SUBWAY_LINE_COLORS } from '../../constants/transitData';
+import SubwayLineBadge from '../../components/SubwayLineBadge';
+import { getLinesForStop } from '../../utils/transitHelpers';
 import * as Haptics from 'expo-haptics';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -269,40 +271,55 @@ export function HostListingDetailScreen() {
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: theme.text }]}>Nearby Transit</Text>
             {transitStops.length > 0 ? (
-              <View style={{ gap: 8 }}>
+              <View style={{ gap: 10 }}>
                 {transitStops.slice(0, 6).map((stop: any, i: number) => {
-                  const walkMin = stop.walkMinutes || Math.max(1, Math.round((stop.distanceMi || 0) * 20));
-                  const lines: string[] = stop.lines || [];
+                  const lines = getLinesForStop(stop);
+                  const walkMin = stop.walkMinutes || Math.max(1, Math.round((stop.distanceMiles || stop.distanceMi || 0) * 20));
+                  const distanceVal = stop.distanceMiles || stop.distanceMi || 0;
+                  const cleanName = stop.name
+                    .replace(/\s*subway\s*station\s*/i, '')
+                    .replace(/\s*station\s*/i, ' ')
+                    .replace(/\s*\([^)]*\)\s*/g, '')
+                    .replace(/\s+line$/i, '')
+                    .replace(/\s+/g, ' ')
+                    .trim();
+                  const isSubway = stop.type === 'subway' || stop.type === 'Subway';
+                  const isBus = stop.type === 'bus' || stop.type === 'Bus Stop';
+                  const isTrain = stop.type === 'train' || stop.type === 'Train Station';
                   return (
-                    <View key={i} style={[styles.transitCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-                      <Feather
-                        name={stop.type === 'Subway' ? 'navigation' : stop.type === 'Bus Stop' ? 'truck' : 'map-pin'}
-                        size={14}
-                        color={stop.type === 'Subway' ? '#5b8cff' : stop.type === 'Bus Stop' ? '#FF6319' : '#00933C'}
-                      />
-                      <View style={{ flex: 1 }}>
-                        <Text style={[styles.transitName, { color: theme.text }]}>{stop.name}</Text>
-                        <Text style={[styles.transitMeta, { color: theme.textSecondary }]}>{walkMin} min walk</Text>
+                    <View key={`transit-${i}`} style={styles.transitCard}>
+                      <View style={[styles.transitIcon, {
+                        backgroundColor: isSubway ? 'rgba(0,57,166,0.08)' : isBus ? 'rgba(255,99,25,0.08)' : isTrain ? 'rgba(0,147,60,0.08)' : 'rgba(128,129,131,0.08)',
+                      }]}>
+                        <Feather
+                          name={isSubway ? 'navigation' : isBus ? 'truck' : isTrain ? 'navigation' : 'map-pin'}
+                          size={14}
+                          color={isSubway ? '#5b8cff' : isBus ? '#FF6319' : isTrain ? '#00933C' : '#808183'}
+                        />
+                      </View>
+                      <View style={{ flex: 1, gap: 2 }}>
+                        <Text style={styles.transitName} numberOfLines={1}>{cleanName || stop.name}</Text>
+                        <Text style={styles.transitMeta}>
+                          {walkMin} min walk{distanceVal > 0 ? ` · ${distanceVal.toFixed(2)} mi` : ''}
+                        </Text>
                       </View>
                       {lines.length > 0 ? (
-                        <View style={{ flexDirection: 'row', gap: 3 }}>
-                          {lines.slice(0, 5).map((line: string) => {
-                            const color = SUBWAY_LINE_COLORS[line] || '#808183';
-                            const isLight = ['N', 'Q', 'R', 'W'].includes(line);
-                            return (
-                              <View key={line} style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: color, alignItems: 'center', justifyContent: 'center' }}>
-                                <Text style={{ fontSize: 12, fontWeight: '800', color: isLight ? '#000' : '#fff' }}>{line}</Text>
-                              </View>
-                            );
-                          })}
+                        <View style={styles.transitLines}>
+                          {lines.slice(0, 6).map((line: string) => (
+                            <SubwayLineBadge key={line} line={line} size="md" />
+                          ))}
+                          {lines.length > 6 ? (
+                            <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, alignSelf: 'center' }}>+{lines.length - 6}</Text>
+                          ) : null}
                         </View>
                       ) : null}
                     </View>
                   );
                 })}
               </View>
-            ) : transitOverride ? (
-              <Text style={[styles.descriptionText, { color: theme.textSecondary }]}>{transitOverride}</Text>
+            ) : null}
+            {transitOverride ? (
+              <Text style={[styles.descriptionText, { color: theme.textSecondary, marginTop: transitStops.length > 0 ? 8 : 0, lineHeight: 18 }]}>{transitOverride}</Text>
             ) : null}
           </View>
         ) : null}
@@ -453,11 +470,31 @@ const styles = StyleSheet.create({
   amenityText: { fontSize: 12, fontWeight: '500' },
 
   transitCard: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    padding: 10, borderRadius: 10, borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+    gap: 10,
   },
-  transitName: { fontSize: 13, fontWeight: '600' },
-  transitMeta: { fontSize: 11 },
+  transitIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  transitName: { fontSize: 14, fontWeight: '600', color: '#fff' },
+  transitMeta: { fontSize: 12, color: 'rgba(255,255,255,0.45)' },
+  transitLines: {
+    flexDirection: 'row',
+    gap: 3,
+    flexWrap: 'wrap',
+    maxWidth: 130,
+    justifyContent: 'flex-end',
+  },
 
   bottomBar: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
