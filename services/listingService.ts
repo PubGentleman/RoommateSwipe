@@ -325,7 +325,7 @@ export async function reassignListingAgent(listingId: string, newAgentId: string
 
     const { error } = await supabase
       .from('listings')
-      .update({ assigned_agent_id: newAgentId })
+      .update({ assigned_agent_id: newAgentId || null })
       .eq('id', listingId);
 
     return !error;

@@ -206,6 +206,22 @@ export function TeamManagementScreen() {
               </Pressable>
             ) : null}
 
+            {isAgent && item.status === 'active' && item.memberUserId ? (
+              <Pressable
+                style={styles.menuItem}
+                onPress={() => {
+                  setMenuMemberId(null);
+                  navigation.navigate('AssignListings', {
+                    agentId: item.memberUserId,
+                    agentName: item.fullName || item.email,
+                  });
+                }}
+              >
+                <Feather name="home" size={14} color={theme.text} />
+                <Text style={[styles.menuItemText, { color: theme.text }]}>Assign Listings</Text>
+              </Pressable>
+            ) : null}
+
             {isPending ? (
               <Pressable
                 style={styles.menuItem}

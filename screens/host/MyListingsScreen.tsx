@@ -10,7 +10,7 @@ import { useConfirm } from '../../contexts/ConfirmContext';
 import { PaywallSheet } from '../../components/PaywallSheet';
 import { StorageService } from '../../utils/storage';
 import { Property, InterestCard, HostSubscriptionData } from '../../types/models';
-import { getMyListings, mapListingToProperty, updateListing, deleteListing as deleteListingSupa } from '../../services/listingService';
+import { getMyListings, mapListingToProperty, updateListing, deleteListing as deleteListingSupa, getCompanyAgents, reassignListingAgent } from '../../services/listingService';
 import { getReceivedInterestCards } from '../../services/discoverService';
 import { RhomeAISheet } from '../../components/RhomeAISheet';
 import { AIFloatingButton } from '../../components/AIFloatingButton';
@@ -98,6 +98,8 @@ export const MyListingsScreen = () => {
   const [overageMessage, setOverageMessage] = useState('');
   const [reviewsListingId, setReviewsListingId] = useState<string | null>(null);
   const [reviewsListingTitle, setReviewsListingTitle] = useState('');
+  const [companyAgents, setCompanyAgents] = useState<{ id: string; full_name: string; avatar_url?: string }[]>([]);
+  const [agentPickerListingId, setAgentPickerListingId] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     if (!user) return;
@@ -141,6 +143,13 @@ export const MyListingsScreen = () => {
     } catch {
       const cards = await StorageService.getInterestCardsForHost(user.id);
       setInquiries(cards);
+    }
+
+    if (user?.hostType === 'company') {
+      try {
+        const agents = await getCompanyAgents(user.id);
+        setCompanyAgents(agents);
+      } catch {}
     }
 
     const sub = await StorageService.getHostSubscription(user.id);
@@ -389,6 +398,46 @@ export const MyListingsScreen = () => {
               </Text>
             </View>
           </Pressable>
+
+          {user?.hostType === 'company' ? (
+            <Pressable
+              style={styles.agentBadgeRow}
+              onPress={() => setAgentPickerListingId(listing.id)}
+            >
+              {listing.assigned_agent_id ? (
+                (() => {
+                  const agent = companyAgents.find(a => a.id === listing.assigned_agent_id);
+                  return (
+                    <>
+                      <View style={styles.agentMiniAv}>
+                        {agent?.avatar_url ? (
+                          <Image source={{ uri: agent.avatar_url }} style={styles.agentMiniAvImg} />
+                        ) : (
+                          <Text style={styles.agentMiniAvText}>
+                            {(agent?.full_name || 'A').charAt(0).toUpperCase()}
+                          </Text>
+                        )}
+                      </View>
+                      <Text style={styles.agentBadgeText} numberOfLines={1}>
+                        {agent?.full_name || 'Assigned Agent'}
+                      </Text>
+                      <Feather name="chevron-down" size={12} color="rgba(255,255,255,0.4)" />
+                    </>
+                  );
+                })()
+              ) : (
+                <>
+                  <View style={[styles.agentMiniAv, styles.agentMiniAvEmpty]}>
+                    <Feather name="user-plus" size={10} color="rgba(255,255,255,0.4)" />
+                  </View>
+                  <Text style={[styles.agentBadgeText, { color: 'rgba(255,255,255,0.35)' }]}>
+                    Assign an agent
+                  </Text>
+                  <Feather name="chevron-down" size={12} color="rgba(255,255,255,0.25)" />
+                </>
+              )}
+            </Pressable>
+          ) : null}
 
           {listingInquiries.length > 0 ? (
             <Pressable
@@ -721,6 +770,109 @@ export const MyListingsScreen = () => {
           />
         </Modal>
       ) : null}
+
+      <Modal
+        visible={!!agentPickerListingId}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setAgentPickerListingId(null)}
+      >
+        <Pressable
+          style={styles.agentPickerOverlay}
+          onPress={() => setAgentPickerListingId(null)}
+        >
+          <Pressable style={styles.agentPickerSheet} onPress={() => {}}>
+            <View style={styles.agentPickerHandle} />
+            <Text style={styles.agentPickerTitle}>Assign Agent</Text>
+            <Text style={styles.agentPickerSubtitle}>
+              Choose which agent handles this listing's inquiries and communication with renters.
+            </Text>
+
+            <Pressable
+              style={[
+                styles.agentPickerItem,
+                !listings.find(l => l.id === agentPickerListingId)?.assigned_agent_id
+                  ? styles.agentPickerItemSelected
+                  : null,
+              ]}
+              onPress={async () => {
+                if (!agentPickerListingId) return;
+                try {
+                  await reassignListingAgent(agentPickerListingId, '', user?.id);
+                  setListings(prev =>
+                    prev.map(l =>
+                      l.id === agentPickerListingId
+                        ? { ...l, assigned_agent_id: undefined }
+                        : l
+                    )
+                  );
+                } catch {}
+                setAgentPickerListingId(null);
+              }}
+            >
+              <View style={[styles.agentPickerAv, { backgroundColor: 'rgba(255,255,255,0.05)' }]}>
+                <Feather name="x" size={16} color="rgba(255,255,255,0.4)" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.agentPickerName}>No Agent (Company handles)</Text>
+              </View>
+              {!listings.find(l => l.id === agentPickerListingId)?.assigned_agent_id ? (
+                <Feather name="check-circle" size={18} color="#22C55E" />
+              ) : null}
+            </Pressable>
+
+            {companyAgents.map((agent) => {
+              const isSelected = listings.find(l => l.id === agentPickerListingId)?.assigned_agent_id === agent.id;
+              return (
+                <Pressable
+                  key={agent.id}
+                  style={[
+                    styles.agentPickerItem,
+                    isSelected ? styles.agentPickerItemSelected : null,
+                  ]}
+                  onPress={async () => {
+                    if (!agentPickerListingId) return;
+                    try {
+                      await reassignListingAgent(agentPickerListingId, agent.id, user?.id);
+                      setListings(prev =>
+                        prev.map(l =>
+                          l.id === agentPickerListingId
+                            ? { ...l, assigned_agent_id: agent.id }
+                            : l
+                        )
+                      );
+                    } catch {}
+                    setAgentPickerListingId(null);
+                  }}
+                >
+                  <View style={styles.agentPickerAv}>
+                    {agent.avatar_url ? (
+                      <Image source={{ uri: agent.avatar_url }} style={styles.agentPickerAvImg} />
+                    ) : (
+                      <Text style={styles.agentPickerAvText}>
+                        {agent.full_name.charAt(0).toUpperCase()}
+                      </Text>
+                    )}
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.agentPickerName}>{agent.full_name}</Text>
+                  </View>
+                  {isSelected ? <Feather name="check-circle" size={18} color="#22C55E" /> : null}
+                </Pressable>
+              );
+            })}
+
+            {companyAgents.length === 0 ? (
+              <View style={styles.agentPickerEmpty}>
+                <Feather name="users" size={24} color="rgba(255,255,255,0.2)" />
+                <Text style={styles.agentPickerEmptyText}>
+                  No agents on your team yet. Invite agents from your Team page.
+                </Text>
+              </View>
+            ) : null}
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 };
@@ -1202,5 +1354,125 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: 'rgba(255,255,255,0.6)',
     fontWeight: '500',
+  },
+
+  agentBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 2,
+  },
+  agentMiniAv: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#34C75920',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  agentMiniAvImg: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+  },
+  agentMiniAvText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#34C759',
+  },
+  agentMiniAvEmpty: {
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  agentBadgeText: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.6)',
+    fontWeight: '500',
+    flex: 1,
+  },
+
+  agentPickerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'flex-end',
+  },
+  agentPickerSheet: {
+    backgroundColor: '#1a1a1a',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 20,
+    paddingBottom: 40,
+    maxHeight: '70%',
+  },
+  agentPickerHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignSelf: 'center',
+    marginBottom: 16,
+  },
+  agentPickerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#fff',
+    marginBottom: 4,
+  },
+  agentPickerSubtitle: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.5)',
+    marginBottom: 20,
+    lineHeight: 18,
+  },
+  agentPickerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    marginBottom: 4,
+  },
+  agentPickerItemSelected: {
+    backgroundColor: 'rgba(34, 197, 94, 0.08)',
+  },
+  agentPickerAv: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#34C75920',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  agentPickerAvImg: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+  },
+  agentPickerAvText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#34C759',
+  },
+  agentPickerName: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  agentPickerEmpty: {
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 30,
+  },
+  agentPickerEmptyText: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.4)',
+    textAlign: 'center',
+    maxWidth: 220,
+    lineHeight: 18,
   },
 });

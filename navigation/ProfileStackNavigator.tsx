@@ -38,6 +38,7 @@ import MoveInSuccessScreen from '../screens/renter/MoveInSuccessScreen';
 import { PiAutoMatchSettingsScreen } from '../screens/renter/PiAutoMatchSettingsScreen';
 import WhatAreYouLookingForScreen from '../screens/renter/WhatAreYouLookingForScreen';
 import { HostPublicProfileScreen } from '../screens/renter/HostPublicProfileScreen';
+import { AssignListingsScreen } from '../screens/host/AssignListingsScreen';
 
 export type ProfileStackParamList = {
   ProfileMain: undefined;
@@ -69,6 +70,7 @@ export type ProfileStackParamList = {
   ApartmentPreferences: undefined;
   TeamManagement: undefined;
   HostPublicProfile: { hostId: string };
+  AssignListings: { agentId: string; agentName: string };
   AffiliateApply: undefined;
   AffiliateDashboard: undefined;
   MoveInCheckin: { bookingId: string };
@@ -355,6 +357,11 @@ export const ProfileStackNavigator = () => {
       <Stack.Screen
         name="HostPublicProfile"
         component={HostPublicProfileScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="AssignListings"
+        component={AssignListingsScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen
