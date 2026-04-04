@@ -17,7 +17,6 @@ import { createListing as createListingSupa, updateListing as updateListingSupa,
 import { DatePickerModal } from '../../components/DatePickerModal';
 import { formatDate } from '../../utils/dateUtils';
 import { geocodeAddress, fetchNearbyTransit } from '../../utils/transitService';
-import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
 import * as ImagePicker from 'expo-image-picker';
 
 type RouteParams = {
@@ -30,6 +29,18 @@ import {
   AmenityCategory,
   normalizeLegacyAmenity,
 } from '../../constants/amenities';
+
+const LazyGooglePlacesAutocomplete = React.forwardRef((props: any, ref: any) => {
+  const [Comp, setComp] = React.useState<any>(null);
+  React.useEffect(() => {
+    try {
+      const mod = require('react-native-google-places-autocomplete');
+      setComp(() => mod.GooglePlacesAutocomplete);
+    } catch {}
+  }, []);
+  if (!Comp) return null;
+  return <Comp ref={ref} {...props} />;
+});
 
 const BEDROOM_OPTIONS = [1, 2, 3, 4, 5, 6];
 const BATHROOM_OPTIONS = [1, 2, 3, 4];
@@ -918,7 +929,7 @@ export const CreateEditListingScreen = () => {
         <View style={[styles.fieldContainer, { zIndex: 1000 }]}>
           <ThemedText style={styles.label}>Address</ThemedText>
           {process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY ? (
-            <GooglePlacesAutocomplete
+            <LazyGooglePlacesAutocomplete
               placeholder="Start typing your address..."
               fetchDetails={true}
               onPress={(data: any, details: any = null) => {
