@@ -310,3 +310,46 @@ export async function getHostConversations(hostId: string): Promise<any[]> {
     return [];
   }
 }
+
+export function joinChatPresence(
+  matchId: string,
+  userId: string,
+  onTypingChange: (isTyping: boolean, typingUserId: string) => void
+) {
+  const channel = supabase.channel(`chat-presence-${matchId}`, {
+    config: { presence: { key: userId } },
+  });
+
+  channel
+    .on('presence', { event: 'sync' }, () => {
+      const state = channel.presenceState();
+      let otherTyping = false;
+      let typingUid = '';
+      for (const [uid, presences] of Object.entries(state)) {
+        if (uid !== userId) {
+          const latest = (presences as any[])?.[0];
+          if (latest?.typing) {
+            otherTyping = true;
+            typingUid = uid;
+            break;
+          }
+        }
+      }
+      onTypingChange(otherTyping, typingUid);
+    })
+    .subscribe(async (status) => {
+      if (status === 'SUBSCRIBED') {
+        await channel.track({ typing: false });
+      }
+    });
+
+  return {
+    setTyping: async (isTyping: boolean) => {
+      await channel.track({ typing: isTyping });
+    },
+    unsubscribe: () => {
+      channel.untrack();
+      supabase.removeChannel(channel);
+    },
+  };
+}

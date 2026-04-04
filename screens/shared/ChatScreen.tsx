@@ -16,7 +16,7 @@ import { PaywallSheet } from '../../components/PaywallSheet';
 import { RhomeAISheet, ScreenContext } from '../../components/RhomeAISheet';
 import { AIFloatingButton } from '../../components/AIFloatingButton';
 import { useNotificationContext } from '../../contexts/NotificationContext';
-import { getMessages as getSupabaseMessages, sendMessage as sendSupabaseMessage, markMessagesAsRead as markSupabaseMessagesAsRead, subscribeToMessages } from '../../services/messageService';
+import { getMessages as getSupabaseMessages, sendMessage as sendSupabaseMessage, markMessagesAsRead as markSupabaseMessagesAsRead, subscribeToMessages, joinChatPresence } from '../../services/messageService';
 import { recordMessageActivity } from '../../utils/aiMemory';
 import { acceptInquiry, declineInquiry, linkListingToGroup, leaveGroup, removeMember, getGroupMessages, sendGroupMessage, subscribeToGroupMessages } from '../../services/groupService';
 import { supabase } from '../../lib/supabase';
@@ -49,6 +49,37 @@ import {
   getMessagingUpgradePlan,
 } from '../../utils/messagingAccess';
 
+const TypingDot = ({ delay }: { delay: number }) => {
+  const opacity = useSharedValue(0.3);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      opacity.value = withSequence(
+        withTiming(1, { duration: 300 }),
+        withTiming(0.3, { duration: 300 })
+      );
+    }, delay);
+
+    const interval = setInterval(() => {
+      opacity.value = withSequence(
+        withTiming(1, { duration: 300 }),
+        withTiming(0.3, { duration: 300 })
+      );
+    }, 900);
+
+    return () => {
+      clearInterval(interval);
+      clearTimeout(timeout);
+    };
+  }, []);
+
+  const animStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+  }));
+
+  return <Animated.View style={[styles.typingDotStyle, animStyle]} />;
+};
+
 type ChatScreenProps = {
   route: {
     params: {
@@ -70,6 +101,9 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   const { refreshUnreadCount } = useNotificationContext();
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
+  const [otherUserTyping, setOtherUserTyping] = useState(false);
+  const typingPresenceRef = useRef<{ setTyping: (v: boolean) => Promise<void>; unsubscribe: () => void } | null>(null);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showGroupOption, setShowGroupOption] = useState(true);
   const [isOnline, setIsOnline] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
@@ -430,6 +464,36 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
     });
     return () => { isMounted = false; unsubscribe(); };
   }, [matchIdFromConversation, user?.id]);
+
+  useEffect(() => {
+    if (!user?.id || isInquiryChat) return;
+    const matchIdForPresence = conversationId || routeMatchId;
+    if (!matchIdForPresence) return;
+    typingPresenceRef.current = joinChatPresence(
+      matchIdForPresence,
+      user.id,
+      (isTyping) => { setOtherUserTyping(isTyping); }
+    );
+    return () => {
+      typingPresenceRef.current?.unsubscribe();
+      typingPresenceRef.current = null;
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    };
+  }, [conversationId, routeMatchId, user?.id, isInquiryChat]);
+
+  const handleTextChange = (text: string) => {
+    setInputText(text);
+    if (text.length > 0 && typingPresenceRef.current) {
+      typingPresenceRef.current.setTyping(true);
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = setTimeout(() => {
+        typingPresenceRef.current?.setTyping(false);
+      }, 2000);
+    } else if (text.length === 0 && typingPresenceRef.current) {
+      typingPresenceRef.current.setTyping(false);
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    }
+  };
 
   const loadMeetupSuggestion = async () => {
     if (isInquiryChat || conversationId.startsWith('group-')) return;
@@ -898,6 +962,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
 
     setMessages(prev => [...prev, newMessage]);
     setInputText('');
+    typingPresenceRef.current?.setTyping(false);
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
 
     analyzeIntentAfterMessage().catch(() => {});
@@ -1884,6 +1950,20 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
           </Pressable>
         </View>
       ) : null}
+      {otherUserTyping && !isInquiryChat ? (
+        <View style={styles.typingIndicator}>
+          <View style={styles.typingBubble}>
+            <View style={styles.typingDots}>
+              <TypingDot delay={0} />
+              <TypingDot delay={150} />
+              <TypingDot delay={300} />
+            </View>
+          </View>
+          <Text style={styles.typingText}>
+            {otherUser?.name?.split(' ')[0] || 'Someone'} is typing
+          </Text>
+        </View>
+      ) : null}
       <View style={[styles.inputContainer, { backgroundColor: theme.backgroundRoot, paddingBottom: TAB_BAR_HEIGHT }]}>
         {messagingLocked ? (
           <View style={styles.lockedInputRow}>
@@ -1911,7 +1991,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
               placeholder={inquiryGroup?.isArchived ? 'This inquiry is archived' : 'Type a message...'}
               placeholderTextColor={theme.textSecondary}
               value={inputText}
-              onChangeText={setInputText}
+              onChangeText={handleTextChange}
               onSubmitEditing={sendMessage}
               blurOnSubmit={false}
               returnKeyType="send"
@@ -2678,5 +2758,34 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#888',
     fontWeight: '500' as const,
+  },
+  typingIndicator: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    gap: 8,
+  },
+  typingBubble: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  typingDots: {
+    flexDirection: 'row' as const,
+    gap: 4,
+    alignItems: 'center' as const,
+  },
+  typingDotStyle: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255,255,255,0.5)',
+  },
+  typingText: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.35)',
+    fontStyle: 'italic' as const,
   },
 });
