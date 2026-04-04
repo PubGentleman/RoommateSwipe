@@ -14,7 +14,7 @@ import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '../../components/VectorIcons';
-import { supabase } from '../../utils/supabase';
+import { supabase } from '../../lib/supabase';
 import { Property, User } from '../../types/models';
 import { mapListingToProperty } from '../../services/listingService';
 import { getHostReviewSummary, getHostReviews, HostReview, ReviewSummary } from '../../services/reviewService';

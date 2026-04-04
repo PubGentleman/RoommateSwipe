@@ -1,9 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, TextInput, StyleSheet, Pressable, Image, ScrollView, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { View, Text, TextInput, StyleSheet, Pressable, Image, ScrollView, ActivityIndicator, Animated, Dimensions, Platform, KeyboardAvoidingView } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
 import { SinglePricePicker, RENT_OPTIONS, DEPOSIT_OPTIONS, formatPriceDisplay, normalizeToOption } from '../../components/PricePicker';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
-import { ScreenKeyboardAwareScrollView } from '../../components/ScreenKeyboardAwareScrollView';
 import { ThemedText } from '../../components/ThemedText';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../contexts/AuthContext';
@@ -18,6 +17,7 @@ import { DatePickerModal } from '../../components/DatePickerModal';
 import { formatDate } from '../../utils/dateUtils';
 import { geocodeAddress, fetchNearbyTransit } from '../../utils/transitService';
 import * as ImagePicker from 'expo-image-picker';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type RouteParams = {
   CreateEditListing: { propertyId?: string };
@@ -75,13 +75,9 @@ const LazyGooglePlacesAutocomplete = React.forwardRef((props: any, ref: any) => 
   if (!ready) {
     return (
       <View style={{
-        height: 50,
-        backgroundColor: '#141414',
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.1)',
-        borderRadius: 12,
-        justifyContent: 'center',
-        paddingHorizontal: 16,
+        height: 50, backgroundColor: '#141414', borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)', borderRadius: 12,
+        justifyContent: 'center', paddingHorizontal: 16,
       }}>
         <Text style={{ color: '#666', fontSize: 15 }}>Loading address search...</Text>
       </View>
@@ -92,14 +88,9 @@ const LazyGooglePlacesAutocomplete = React.forwardRef((props: any, ref: any) => 
     return (
       <TextInput
         style={{
-          height: 50,
-          backgroundColor: '#141414',
-          borderWidth: 1,
-          borderColor: 'rgba(255,255,255,0.1)',
-          borderRadius: 12,
-          paddingHorizontal: 16,
-          fontSize: 15,
-          color: '#fff',
+          height: 50, backgroundColor: '#141414', borderWidth: 1,
+          borderColor: 'rgba(255,255,255,0.1)', borderRadius: 12,
+          paddingHorizontal: 16, fontSize: 15, color: '#fff',
         }}
         value={props.textInputProps?.value || ''}
         onChangeText={props.textInputProps?.onChangeText}
@@ -114,14 +105,9 @@ const LazyGooglePlacesAutocomplete = React.forwardRef((props: any, ref: any) => 
       fallback={
         <TextInput
           style={{
-            height: 50,
-            backgroundColor: '#141414',
-            borderWidth: 1,
-            borderColor: 'rgba(255,255,255,0.1)',
-            borderRadius: 12,
-            paddingHorizontal: 16,
-            fontSize: 15,
-            color: '#fff',
+            height: 50, backgroundColor: '#141414', borderWidth: 1,
+            borderColor: 'rgba(255,255,255,0.1)', borderRadius: 12,
+            paddingHorizontal: 16, fontSize: 15, color: '#fff',
           }}
           value={props.textInputProps?.value || ''}
           onChangeText={props.textInputProps?.onChangeText}
@@ -137,21 +123,13 @@ const LazyGooglePlacesAutocomplete = React.forwardRef((props: any, ref: any) => 
 
 const BEDROOM_OPTIONS = [1, 2, 3, 4, 5, 6];
 const BATHROOM_OPTIONS = [1, 2, 3, 4];
-
 const POPULAR_CITIES = [
   'New York', 'Los Angeles', 'Chicago', 'Miami', 'San Francisco',
   'Austin', 'Seattle', 'Denver', 'Boston', 'Houston',
 ];
-
-const SECTION_ICONS: Record<string, string> = {
-  'Basic Info': 'file-text',
-  'Type': 'home',
-  'Location': 'map-pin',
-  'Amenities': 'star',
-  'House Rules': 'shield',
-  'Lease Terms & Rules': 'shield',
-  'Photos': 'camera',
-};
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const PHOTO_GRID_WIDTH = SCREEN_WIDTH - 40;
+const PHOTO_COL_WIDTH = (PHOTO_GRID_WIDTH - 10) / 2;
 
 export const CreateEditListingScreen = () => {
   const navigation = useNavigation();
@@ -159,6 +137,9 @@ export const CreateEditListingScreen = () => {
   const { theme } = useTheme();
   const { user, getHostPlan, canAddListing } = useAuth();
   const { confirm, alert: showAlert } = useConfirm();
+  const insets = useSafeAreaInsets();
+  const scrollRef = useRef<ScrollView>(null);
+  const slideAnim = useRef(new Animated.Value(0)).current;
 
   const propertyId = route.params?.propertyId;
   const isEditing = !!propertyId;
@@ -183,7 +164,9 @@ export const CreateEditListingScreen = () => {
   const [availableDate, setAvailableDate] = useState('');
   const [showAvailableDatePicker, setShowAvailableDatePicker] = useState(false);
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
-  const [expandedHostCategories, setExpandedHostCategories] = useState<Set<AmenityCategory>>(new Set(['unit_features']));
+  const [expandedHostCategories, setExpandedHostCategories] = useState<Set<AmenityCategory>>(
+    new Set(AMENITY_CATEGORIES.map(c => c.key))
+  );
   const [houseRules, setHouseRules] = useState('');
   const [photos, setPhotos] = useState<string[]>([]);
   const [transitOverride, setTransitOverride] = useState('');
@@ -197,6 +180,7 @@ export const CreateEditListingScreen = () => {
       setAddressFromAutocomplete(false);
     }
   }, [addressFromAutocomplete]);
+
   const [hostLivesIn, setHostLivesIn] = useState(false);
   const [existingRoommatesCount, setExistingRoommatesCount] = useState(0);
   const [requiresBackgroundCheck, setRequiresBackgroundCheck] = useState(false);
@@ -219,6 +203,44 @@ export const CreateEditListingScreen = () => {
   const [overageMessage, setOverageMessage] = useState('');
   const [overageResolve, setOverageResolve] = useState<((v: boolean) => void) | null>(null);
 
+  const [currentStep, setCurrentStep] = useState(0);
+
+  const steps = useMemo(() => {
+    const base: { key: string; title: string; subtitle: string }[] = [
+      { key: 'type', title: 'What type of listing is this?', subtitle: 'Tell us about the property type' },
+      { key: 'location', title: 'Where is your property?', subtitle: 'This helps match you with nearby renters' },
+      {
+        key: 'details',
+        title: 'Describe your place',
+        subtitle: isProfessionalHost
+          ? (isAgent ? 'Provide property details for prospective tenants' : 'Add property details to your portfolio listing')
+          : 'Help renters understand what makes your place special',
+      },
+      { key: 'pricing', title: 'Set your price', subtitle: 'Price competitively to attract renters faster' },
+    ];
+
+    if (!isProfessionalHost) {
+      base.push({ key: 'living', title: 'Who lives here?', subtitle: 'This helps renters know about the living arrangement' });
+    }
+
+    base.push(
+      { key: 'photos', title: 'Add photos', subtitle: 'Great photos get 3x more interest. First photo is your cover.' },
+      {
+        key: 'amenities',
+        title: 'Amenities & house rules',
+        subtitle: isProfessionalHost ? 'Select property amenities and set policies' : 'Select what your place offers',
+      },
+    );
+
+    if (isCompanyHost) {
+      base.push({ key: 'agent', title: 'Assign an agent', subtitle: 'Select a team member to manage this listing' });
+    }
+
+    base.push({ key: 'review', title: 'Review your listing', subtitle: 'Make sure everything looks good before publishing' });
+
+    return base;
+  }, [isProfessionalHost, isCompanyHost, isAgent]);
+
   useEffect(() => {
     if (isEditing) {
       loadProperty();
@@ -237,6 +259,10 @@ export const CreateEditListingScreen = () => {
       setExistingRoommatesCount(0);
     }
   }, [isProfessionalHost, isEditing]);
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ y: 0, animated: false });
+  }, [currentStep]);
 
   const loadProperty = async () => {
     if (!propertyId) return;
@@ -358,6 +384,16 @@ export const CreateEditListingScreen = () => {
 
   const handleRemovePhoto = (index: number) => {
     setPhotos(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSetCover = (index: number) => {
+    if (index === 0) return;
+    setPhotos(prev => {
+      const next = [...prev];
+      const [moved] = next.splice(index, 1);
+      next.unshift(moved);
+      return next;
+    });
   };
 
   const handleSave = async () => {
@@ -583,30 +619,134 @@ export const CreateEditListingScreen = () => {
     }
   };
 
-  const completionFields = [
-    title.trim(),
-    description.trim(),
-    price > 0 ? String(price) : '',
-    city.trim(),
-    address.trim(),
-    availableDate,
-    selectedAmenities.length > 0 ? 'yes' : '',
-    photos.length > 0 ? 'yes' : '',
-  ];
-  const completionCount = completionFields.filter(Boolean).length;
-  const completionPct = completionCount / completionFields.length;
+  const goToStep = (stepKey: string) => {
+    const idx = steps.findIndex(s => s.key === stepKey);
+    if (idx !== -1) animateStep(idx);
+  };
 
-  const renderSectionTitle = (sectionName: string, subtitle?: string) => (
-    <View style={styles.sectionTitleRow}>
-      <View style={styles.sectionIconWrap}>
-        <Feather name={(SECTION_ICONS[sectionName] || 'info') as any} size={15} color="#ff6b5b" />
-      </View>
-      <View style={{ flex: 1 }}>
-        <Text style={styles.sectionTitle}>{sectionName}</Text>
-        {subtitle ? <Text style={styles.sectionSubtitle}>{subtitle}</Text> : null}
-      </View>
-    </View>
-  );
+  const animateStep = (nextStep: number) => {
+    const dir = nextStep > currentStep ? 1 : -1;
+    slideAnim.setValue(dir * SCREEN_WIDTH * 0.25);
+    setCurrentStep(nextStep);
+    Animated.timing(slideAnim, {
+      toValue: 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const validateStep = async (stepKey: string): Promise<boolean> => {
+    switch (stepKey) {
+      case 'type':
+        return true;
+      case 'location':
+        if (!city.trim()) {
+          await showAlert({ title: 'Required', message: 'Please enter a city', variant: 'warning' });
+          return false;
+        }
+        if (!address.trim()) {
+          await showAlert({ title: 'Required', message: 'Please enter an address', variant: 'warning' });
+          return false;
+        }
+        return true;
+      case 'details':
+        if (!title.trim()) {
+          await showAlert({ title: 'Required', message: 'Please enter a listing title', variant: 'warning' });
+          return false;
+        }
+        return true;
+      case 'pricing': {
+        if (!price || price <= 0) {
+          await showAlert({ title: 'Required', message: 'Please set a valid rent price', variant: 'warning' });
+          return false;
+        }
+        if (isProfessionalHost && roomType === 'room') {
+          const ra = bedrooms - existingRoommatesCount;
+          if (ra < 1) {
+            await showAlert({ title: 'Invalid', message: 'Must have at least 1 room available', variant: 'warning' });
+            return false;
+          }
+        }
+        return true;
+      }
+      case 'living': {
+        const ra = bedrooms - (hostLivesIn ? 1 : 0) - existingRoommatesCount;
+        if (ra < 1) {
+          await showAlert({ title: 'Invalid', message: 'Must have at least 1 room available for renters', variant: 'warning' });
+          return false;
+        }
+        return true;
+      }
+      case 'agent':
+        if (!assignedAgentId) {
+          await showAlert({ title: 'Agent Required', message: 'Please select a team member to manage this listing', variant: 'warning' });
+          return false;
+        }
+        return true;
+      default:
+        return true;
+    }
+  };
+
+  const handleNext = async () => {
+    const stepData = steps[currentStep];
+    if (!stepData) return;
+
+    if (stepData.key === 'review') {
+      const result = validateAllForPublish();
+      if (result.failedStep) {
+        await showAlert({ title: 'Missing Info', message: result.message || 'Please complete all required fields', variant: 'warning' });
+        goToStep(result.failedStep);
+        return;
+      }
+      if (result.showLimit) return;
+      handleSave();
+      return;
+    }
+
+    const valid = await validateStep(stepData.key);
+    if (!valid) return;
+
+    if (stepData.key === 'photos' && photos.length === 0) {
+      const wantToAdd = await confirm({
+        title: 'No Photos Added',
+        message: 'Listings with photos get 5x more views. Add at least one?',
+        confirmText: 'Add Photos',
+      });
+      if (wantToAdd) return;
+    }
+
+    if (currentStep < steps.length - 1) {
+      animateStep(currentStep + 1);
+    }
+  };
+
+  const handleBack = () => {
+    if (currentStep === 0) {
+      navigation.goBack();
+    } else {
+      animateStep(currentStep - 1);
+    }
+  };
+
+  const validateAllForPublish = (): { failedStep?: string; message?: string; showLimit?: boolean } => {
+    if (!title.trim()) return { failedStep: 'details', message: 'Please enter a listing title' };
+    if (!price || price <= 0) return { failedStep: 'pricing', message: 'Please set a valid rent price' };
+    if (!city.trim()) return { failedStep: 'location', message: 'Please enter a city' };
+    if (isCompanyHost && !assignedAgentId) return { failedStep: 'agent', message: 'Please assign an agent' };
+    const roomsAvail = bedrooms - (hostLivesIn ? 1 : 0) - existingRoommatesCount;
+    if (roomsAvail < 1) return { failedStep: isProfessionalHost ? 'pricing' : 'living', message: 'Must have at least 1 room available' };
+    if (!isEditing) {
+      if (!hostSub) return { failedStep: undefined, message: 'Unable to verify plan. Please try again.' };
+      const capResult = canAddListing(hostSub.activeListingCount || 0);
+      if (!capResult.allowed) {
+        setLimitMessage(capResult.reason || 'You have reached your listing limit.');
+        setShowLimitModal(true);
+        return { showLimit: true };
+      }
+    }
+    return {};
+  };
 
   const renderNumberSelector = (
     label: string,
@@ -639,163 +779,329 @@ export const CreateEditListingScreen = () => {
     </View>
   );
 
-  const renderToggle = (
+  const renderSelectionCard = (
+    icon: string,
     label: string,
-    optionA: { label: string; value: string; icon: string },
-    optionB: { label: string; value: string; icon: string },
-    currentValue: string,
-    onChange: (v: any) => void,
+    description: string,
+    selected: boolean,
+    onPress: () => void,
+  ) => (
+    <Pressable
+      style={[wiz.selectionCard, selected && wiz.selectionCardSelected]}
+      onPress={onPress}
+    >
+      <View style={wiz.selectionCardIconWrap}>
+        <Feather name={icon as any} size={24} color={selected ? '#ff6b5b' : 'rgba(255,255,255,0.5)'} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={[wiz.selectionCardLabel, selected && { color: '#fff' }]}>{label}</Text>
+        <Text style={wiz.selectionCardDesc}>{description}</Text>
+      </View>
+      {selected ? <Feather name="check-circle" size={20} color="#ff6b5b" /> : null}
+    </Pressable>
+  );
+
+  const renderStepper = (
+    label: string,
+    hint: string,
+    value: number,
+    onDecrement: () => void,
+    onIncrement: () => void,
   ) => (
     <View style={styles.fieldContainer}>
       <Text style={styles.label}>{label}</Text>
-      <View style={styles.toggleRow}>
-        {[optionA, optionB].map(opt => {
-          const selected = opt.value === currentValue;
-          return (
-            <Pressable
-              key={opt.value}
-              style={[
-                styles.toggleButton,
-                { backgroundColor: selected ? '#ff6b5b' : 'transparent' },
-              ]}
-              onPress={() => onChange(opt.value)}
-            >
-              <Feather
-                name={opt.icon as any}
-                size={14}
-                color={selected ? '#fff' : 'rgba(255,255,255,0.35)'}
-                style={{ marginRight: 5 }}
-              />
-              <Text style={[styles.toggleText, { color: selected ? '#fff' : 'rgba(255,255,255,0.45)', fontWeight: selected ? '700' : '500' }]}>
-                {opt.label}
-              </Text>
-            </Pressable>
-          );
-        })}
+      <Text style={wiz.hintText}>{hint}</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 20, marginTop: 8 }}>
+        <Pressable
+          style={[styles.chip, styles.chipUnselected, { width: 44, height: 44 }]}
+          onPress={onDecrement}
+        >
+          <Text style={[styles.chipText, { color: 'rgba(255,255,255,0.45)' }]}>-</Text>
+        </Pressable>
+        <Text style={{ fontSize: 22, fontWeight: '700', color: '#fff', minWidth: 30, textAlign: 'center' }}>
+          {value}
+        </Text>
+        <Pressable
+          style={[styles.chip, styles.chipUnselected, { width: 44, height: 44 }]}
+          onPress={onIncrement}
+        >
+          <Text style={[styles.chipText, { color: 'rgba(255,255,255,0.45)' }]}>+</Text>
+        </Pressable>
       </View>
     </View>
   );
 
-  return (
-    <ScreenKeyboardAwareScrollView style={{ backgroundColor: '#0d0d0d' }}>
-      <View style={styles.header}>
-        <Pressable onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Feather name="arrow-left" size={22} color="rgba(255,255,255,0.8)" />
-        </Pressable>
-        <View style={{ alignItems: 'center' }}>
-          <Text style={styles.headerTitle}>
-            {isEditing
-              ? 'Edit Listing'
-              : isProfessionalHost
-                ? 'New Property Listing'
-                : 'New Listing'
-            }
-          </Text>
-          {!isEditing ? (
-            <Text style={styles.headerSubtitle}>
-              {isProfessionalHost
-                ? 'Add a property to your portfolio'
-                : 'Fill in your listing details'
-              }
-            </Text>
-          ) : null}
-        </View>
-        <View style={{ width: 40 }} />
+  const renderRoomsAvailableIndicator = () => {
+    const roomsAvailable = bedrooms - (hostLivesIn ? 1 : 0) - existingRoommatesCount;
+    return (
+      <View style={wiz.roomsAvailPill}>
+        <Feather name="key" size={16} color="#ff6b5b" />
+        <Text style={wiz.roomsAvailText}>
+          {roomsAvailable} room{roomsAvailable !== 1 ? 's' : ''} available to fill
+        </Text>
       </View>
+    );
+  };
 
-      <View style={styles.progressContainer}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
-          <Text style={styles.progressLabel}>Progress</Text>
-          <Text style={[styles.progressLabel, { color: '#ff6b5b', fontWeight: '600' }]}>
-            {Math.round(completionPct * 100)}%
-          </Text>
-        </View>
-        <View style={styles.progressBar}>
-          <View style={[styles.progressFill, { width: `${completionPct * 100}%` }]} />
-        </View>
-      </View>
+  const renderTypeStep = () => (
+    <View>
+      <Text style={wiz.stepLabel}>Listing Type</Text>
+      {renderSelectionCard('file-text', 'Lease', 'A standard lease agreement', propertyType === 'lease', () => setPropertyType('lease'))}
+      {renderSelectionCard('clock', 'Sublet', 'Temporary sublease of an existing lease', propertyType === 'sublet', () => setPropertyType('sublet'))}
 
-      <View style={styles.card}>
-        {renderSectionTitle('Basic Info')}
+      <Text style={[wiz.stepLabel, { marginTop: 28 }]}>Room Type</Text>
+      {renderSelectionCard('home', 'Entire Place', 'Renters get the whole apartment/house', roomType === 'entire', () => {
+        setRoomType('entire');
+        setPreferredTenantGender('any');
+        if (isProfessionalHost) setExistingRoommatesCount(0);
+      })}
+      {renderSelectionCard('user', 'Private Room', 'Renters get a private room in a shared space', roomType === 'room', () => setRoomType('room'))}
+    </View>
+  );
 
-        <View style={styles.fieldContainer}>
-          <ThemedText style={styles.label}>Title</ThemedText>
+  const renderLocationStep = () => (
+    <View>
+      <View style={[styles.fieldContainer, { zIndex: 1000 }]}>
+        <Text style={styles.label}>Address</Text>
+        {process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY ? (
+          <LazyGooglePlacesAutocomplete
+            placeholder="Start typing your address..."
+            fetchDetails={true}
+            onPress={(data: any, details: any = null) => {
+              if (!details) return;
+              const components = details.address_components;
+              const getComponent = (type: string) =>
+                components.find((c: any) => c.types.includes(type));
+              const streetNumber = getComponent('street_number')?.long_name || '';
+              const streetName = getComponent('route')?.long_name || '';
+              const cityName =
+                getComponent('locality')?.long_name ||
+                getComponent('sublocality')?.long_name ||
+                getComponent('administrative_area_level_2')?.long_name || '';
+              const stateName =
+                getComponent('administrative_area_level_1')?.short_name || '';
+              const neighborhoodName =
+                getComponent('neighborhood')?.long_name ||
+                getComponent('sublocality_level_1')?.long_name || '';
+              const zip = getComponent('postal_code')?.long_name || '';
+              setAddress(`${streetNumber} ${streetName}`.trim());
+              setCity(cityName);
+              setState(stateName);
+              if (neighborhoodName) setNeighborhood(neighborhoodName);
+              if (zip) setZipCode(zip);
+              const loc = details.geometry.location;
+              setCoordinates({ lat: loc.lat, lng: loc.lng });
+              setAddressFromAutocomplete(true);
+            }}
+            query={{
+              key: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
+              language: 'en',
+              types: 'address',
+            }}
+            textInputProps={{
+              value: address,
+              onChangeText: handleManualAddressChange,
+              placeholderTextColor: '#666',
+            }}
+            styles={{
+              container: { flex: 0 },
+              textInput: {
+                height: 50, backgroundColor: '#141414', borderWidth: 1,
+                borderColor: 'rgba(255,255,255,0.1)', borderRadius: 12,
+                paddingHorizontal: 16, fontSize: 15, color: '#fff',
+              },
+              listView: {
+                backgroundColor: '#1a1a1a', borderWidth: 1,
+                borderColor: 'rgba(255,255,255,0.1)', borderRadius: 12,
+                marginTop: 4, zIndex: 1000,
+              },
+              row: { paddingHorizontal: 12, paddingVertical: 10, backgroundColor: '#1a1a1a' },
+              description: { fontSize: 14, color: '#ccc' },
+              separator: { height: 1, backgroundColor: '#333' },
+            }}
+            enablePoweredByContainer={false}
+            minLength={3}
+            debounce={300}
+            keyboardShouldPersistTaps="handled"
+            onFail={(error: any) => console.warn('Places autocomplete error:', error)}
+            onNotFound={() => {}}
+          />
+        ) : (
           <TextInput
             style={styles.input}
-            value={title}
-            onChangeText={setTitle}
-            placeholder="e.g. Sunny 2BR in Williamsburg"
+            value={address}
+            onChangeText={handleManualAddressChange}
+            placeholder="Enter your address"
             placeholderTextColor="#666"
           />
+        )}
+      </View>
+
+      <View style={styles.fieldContainer}>
+        <Text style={styles.label}>City</Text>
+        <TextInput
+          style={styles.input}
+          value={city}
+          onChangeText={setCity}
+          placeholder="Type a city..."
+          placeholderTextColor="#666"
+        />
+        <Text style={[styles.label, { marginTop: 12 }]}>Popular Cities</Text>
+        <View style={styles.chipRow}>
+          {POPULAR_CITIES.map(c => {
+            const selected = c === city;
+            return (
+              <Pressable
+                key={c}
+                style={[styles.cityChip, selected ? styles.cityChipSelected : styles.cityChipUnselected]}
+                onPress={() => setCity(c)}
+              >
+                <Text style={[styles.cityChipText, { color: selected ? '#fff' : '#aaa' }]}>{c}</Text>
+              </Pressable>
+            );
+          })}
         </View>
+      </View>
 
-        <View style={styles.fieldContainer}>
-          <ThemedText style={styles.label}>Description</ThemedText>
-          <TextInput
-            style={[styles.input, styles.multilineInput]}
-            value={description}
-            onChangeText={setDescription}
-            placeholder={isProfessionalHost
-              ? "Describe this property — highlights, recent renovations, nearby attractions..."
-              : "Describe your listing..."
-            }
-            placeholderTextColor="#666"
-            multiline
-            numberOfLines={4}
-            textAlignVertical="top"
-            maxLength={500}
-          />
-          <ThemedText style={styles.charCount}>{description.length} / 500</ThemedText>
-        </View>
+      <View style={styles.fieldContainer}>
+        <Text style={styles.label}>State</Text>
+        <TextInput
+          style={styles.input}
+          value={state}
+          onChangeText={setState}
+          placeholder="NY"
+          placeholderTextColor="#666"
+        />
+      </View>
 
-        <View style={styles.row}>
-          <View style={[styles.fieldContainer, { flex: 1, marginRight: Spacing.sm }]}>
-            <ThemedText style={styles.label}>Price/month</ThemedText>
-            <ThemedText style={styles.priceDisplay}>{formatPriceDisplay(price)}</ThemedText>
-            <SinglePricePicker
-              value={price}
-              onChange={setPrice}
-              options={RENT_OPTIONS}
-              height={130}
-            />
-          </View>
-          <View style={[styles.fieldContainer, { flex: 1, marginLeft: Spacing.sm }]}>
-            <ThemedText style={styles.label}>Security Deposit</ThemedText>
-            <ThemedText style={styles.priceDisplay}>{securityDeposit === 0 ? 'None' : formatPriceDisplay(securityDeposit)}</ThemedText>
-            <SinglePricePicker
-              value={securityDeposit}
-              onChange={setSecurityDeposit}
-              options={DEPOSIT_OPTIONS}
-              height={130}
-            />
-          </View>
-        </View>
+      <View style={styles.fieldContainer}>
+        <Text style={styles.label}>Neighborhood</Text>
+        <TextInput
+          style={styles.input}
+          value={neighborhood}
+          onChangeText={setNeighborhood}
+          placeholder="e.g. Williamsburg"
+          placeholderTextColor="#666"
+        />
+      </View>
 
-        {renderNumberSelector('Bedrooms', BEDROOM_OPTIONS, bedrooms, (n) => {
-          setBedrooms(n);
-          const maxExisting = n - (hostLivesIn ? 1 : 0) - 1;
-          if (existingRoommatesCount > maxExisting) setExistingRoommatesCount(Math.max(0, maxExisting));
-        })}
-        {renderNumberSelector('Bathrooms', BATHROOM_OPTIONS, bathrooms, setBathrooms)}
+      <View style={styles.fieldContainer}>
+        <Text style={styles.label}>Zip Code</Text>
+        <TextInput
+          style={styles.input}
+          value={zipCode}
+          onChangeText={(t) => setZipCode(t.replace(/[^0-9]/g, '').slice(0, 5))}
+          placeholder="10001"
+          placeholderTextColor="#666"
+          keyboardType="numeric"
+          maxLength={5}
+        />
+      </View>
 
-        {!isProfessionalHost && (
+      <View style={styles.fieldContainer}>
+        <Text style={styles.label}>Transportation (optional)</Text>
+        <Text style={wiz.hintText}>
+          We auto-detect nearby transit from your address. Override below if needed.
+        </Text>
+        <TextInput
+          style={[styles.input, styles.multilineInput, { minHeight: 60 }]}
+          placeholder="e.g. Near Metro Line 2, Bus Route 40, 5 min walk to station"
+          placeholderTextColor="#666"
+          value={transitOverride}
+          onChangeText={setTransitOverride}
+          multiline
+          numberOfLines={2}
+          textAlignVertical="top"
+        />
+      </View>
+    </View>
+  );
+
+  const renderDetailsStep = () => (
+    <View>
+      <View style={styles.fieldContainer}>
+        <Text style={styles.label}>Title</Text>
+        <TextInput
+          style={styles.input}
+          value={title}
+          onChangeText={setTitle}
+          placeholder={isProfessionalHost
+            ? "e.g. Luxury 2BR at The Meridian, Unit 4B"
+            : "e.g. Sunny 2BR in Williamsburg"
+          }
+          placeholderTextColor="#666"
+        />
+      </View>
+
+      <View style={styles.fieldContainer}>
+        <Text style={styles.label}>Description</Text>
+        <TextInput
+          style={[styles.input, styles.multilineInput]}
+          value={description}
+          onChangeText={setDescription}
+          placeholder={isProfessionalHost
+            ? "Property highlights, building amenities, recent upgrades, neighborhood features..."
+            : "Describe your listing..."
+          }
+          placeholderTextColor="#666"
+          multiline
+          numberOfLines={4}
+          textAlignVertical="top"
+          maxLength={500}
+        />
+        <Text style={styles.charCount}>{description.length} / 500</Text>
+      </View>
+
+      <View style={styles.fieldContainer}>
+        <Text style={styles.label}>Available Date</Text>
+        <Pressable style={styles.datePickerButton} onPress={() => setShowAvailableDatePicker(true)}>
+          <Feather name="calendar" size={18} color="#666" style={{ marginRight: 10 }} />
+          <Text style={{ color: availableDate ? '#fff' : '#666', fontSize: 15, flex: 1 }}>
+            {availableDate ? formatDate(availableDate) : 'Select available date'}
+          </Text>
+          <Feather name="chevron-right" size={16} color="#555" />
+        </Pressable>
+        <DatePickerModal
+          visible={showAvailableDatePicker}
+          onClose={() => setShowAvailableDatePicker(false)}
+          onConfirm={(date) => setAvailableDate(date)}
+          mode="availability"
+          title="Select Available Date"
+          showFlexible
+          initialDate={availableDate || undefined}
+        />
+      </View>
+
+      {isProfessionalHost ? (
+        <>
           <View style={styles.fieldContainer}>
-            <Text style={styles.label}>Do you live in this unit?</Text>
-            <View style={styles.toggleRow}>
-              {[{ label: 'Yes', value: true, icon: 'check' }, { label: 'No', value: false, icon: 'x' }].map(opt => {
-                const selected = opt.value === hostLivesIn;
+            <Text style={styles.label}>Unit / Suite #</Text>
+            <TextInput
+              style={styles.input}
+              value={unitNumber}
+              onChangeText={setUnitNumber}
+              placeholder="e.g. Apt 4B, Suite 201"
+              placeholderTextColor="#666"
+            />
+          </View>
+
+          <View style={styles.fieldContainer}>
+            <Text style={styles.label}>Lease Term</Text>
+            <View style={styles.chipRow}>
+              {([
+                { label: 'Month-to-Month', value: 'month_to_month' },
+                { label: '6 Months', value: '6_months' },
+                { label: '12 Months', value: '12_months' },
+                { label: '24 Months', value: '24_months' },
+              ] as const).map(opt => {
+                const selected = leaseTerm === opt.value;
                 return (
                   <Pressable
-                    key={String(opt.value)}
-                    style={[styles.toggleButton, { backgroundColor: selected ? '#ff6b5b' : 'transparent' }]}
-                    onPress={() => {
-                      setHostLivesIn(opt.value);
-                      const maxExisting = bedrooms - (opt.value ? 1 : 0) - 1;
-                      if (existingRoommatesCount > maxExisting) setExistingRoommatesCount(Math.max(0, maxExisting));
-                    }}
+                    key={opt.value}
+                    style={[styles.chip, selected ? styles.chipSelected : styles.chipUnselected, { width: 'auto' as any, paddingHorizontal: 14, height: 38 }]}
+                    onPress={() => setLeaseTerm(opt.value)}
                   >
-                    <Feather name={opt.icon as any} size={14} color={selected ? '#fff' : 'rgba(255,255,255,0.35)'} />
-                    <Text style={[styles.toggleText, { color: selected ? '#fff' : 'rgba(255,255,255,0.45)', fontWeight: selected ? '700' : '500', marginLeft: 5 }]}>
+                    <Text style={[styles.chipText, { color: selected ? '#fff' : '#aaa', fontSize: 13 }]}>
                       {opt.label}
                     </Text>
                   </Pressable>
@@ -803,700 +1109,668 @@ export const CreateEditListingScreen = () => {
               })}
             </View>
           </View>
-        )}
 
-        {(!isProfessionalHost || roomType === 'room') && (
-          <View style={styles.fieldContainer}>
-            <Text style={styles.label}>
-              {isProfessionalHost ? 'Current Occupants' : 'Existing Roommates'}
-            </Text>
-            <Text style={styles.sectionSubtitle}>
-              {isProfessionalHost
-                ? 'How many tenants currently occupy this unit?'
-                : 'How many people already live here (not counting yourself)?'
-              }
-            </Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 20, marginTop: 8 }}>
-              <Pressable
-                style={[styles.chip, styles.chipUnselected, { width: 44, height: 44 }]}
-                onPress={() => setExistingRoommatesCount(Math.max(0, existingRoommatesCount - 1))}
-              >
-                <Text style={[styles.chipText, { color: 'rgba(255,255,255,0.45)' }]}>-</Text>
-              </Pressable>
-              <Text style={{ fontSize: 22, fontWeight: '700', color: '#fff', minWidth: 30, textAlign: 'center' }}>
-                {existingRoommatesCount}
-              </Text>
-              <Pressable
-                style={[styles.chip, styles.chipUnselected, { width: 44, height: 44 }]}
-                onPress={() => {
-                  const maxExisting = bedrooms - (hostLivesIn ? 1 : 0) - 1;
-                  setExistingRoommatesCount(Math.min(maxExisting, existingRoommatesCount + 1));
-                }}
-              >
-                <Text style={[styles.chipText, { color: 'rgba(255,255,255,0.45)' }]}>+</Text>
-              </Pressable>
-            </View>
-          </View>
-        )}
-
-        {(!isProfessionalHost || roomType === 'room') && (() => {
-          const roomsAvailable = bedrooms - (hostLivesIn ? 1 : 0) - existingRoommatesCount;
-          return (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,107,91,0.08)', padding: 10, borderRadius: 8, marginTop: 4 }}>
-              <Feather name="key" size={16} color="#ff6b5b" />
-              <Text style={{ fontSize: 13, color: '#ff6b5b', fontWeight: '600' }}>
-                {isProfessionalHost
-                  ? `${roomsAvailable} room${roomsAvailable !== 1 ? 's' : ''} to fill`
-                  : `${roomsAvailable} room${roomsAvailable !== 1 ? 's' : ''} available to fill`
-                }
-              </Text>
-            </View>
-          );
-        })()}
-
-        <View style={styles.fieldContainer}>
-          <Text style={styles.label}>Require Background Check</Text>
-          <Text style={[styles.sectionSubtitle, { marginBottom: 8 }]}>
-            Only renters with a verified background check can apply
-          </Text>
-          <View style={styles.toggleRow}>
-            {[{ label: 'Yes', value: true, icon: 'shield' }, { label: 'No', value: false, icon: 'x' }].map(opt => {
-              const selected = opt.value === requiresBackgroundCheck;
-              return (
-                <Pressable
-                  key={String(opt.value)}
-                  style={[styles.toggleButton, { backgroundColor: selected ? '#22c55e' : 'transparent' }]}
-                  onPress={() => setRequiresBackgroundCheck(opt.value)}
-                >
-                  <Feather name={opt.icon as any} size={14} color={selected ? '#fff' : 'rgba(255,255,255,0.35)'} />
-                  <Text style={[styles.toggleText, { color: selected ? '#fff' : 'rgba(255,255,255,0.45)', fontWeight: selected ? '700' : '500', marginLeft: 5 }]}>
-                    {opt.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </View>
-
-        <View style={styles.fieldContainer}>
-          <ThemedText style={styles.label}>Square Feet</ThemedText>
-          <TextInput
-            style={styles.input}
-            value={sqft}
-            onChangeText={setSqft}
-            placeholder="800"
-            placeholderTextColor="#666"
-            keyboardType="numeric"
-          />
-        </View>
-
-        {isProfessionalHost && (
-          <>
+          {isAgent ? (
             <View style={styles.fieldContainer}>
-              <ThemedText style={styles.label}>Unit / Suite #</ThemedText>
+              <Text style={styles.label}>MLS / Reference #</Text>
+              <Text style={wiz.hintText}>Optional — for your internal tracking</Text>
               <TextInput
                 style={styles.input}
-                value={unitNumber}
-                onChangeText={setUnitNumber}
-                placeholder="e.g. 4B, Suite 201"
+                value={mlsNumber}
+                onChangeText={setMlsNumber}
+                placeholder="e.g. MLS-2024-12345"
                 placeholderTextColor="#666"
               />
             </View>
-
-            <View style={styles.fieldContainer}>
-              <ThemedText style={styles.label}>Lease Term</ThemedText>
-              <View style={styles.chipRow}>
-                {([
-                  { label: 'Month-to-Month', value: 'month_to_month' },
-                  { label: '6 Months', value: '6_months' },
-                  { label: '12 Months', value: '12_months' },
-                  { label: '24 Months', value: '24_months' },
-                ] as const).map(opt => {
-                  const selected = leaseTerm === opt.value;
-                  return (
-                    <Pressable
-                      key={opt.value}
-                      style={[
-                        styles.chip,
-                        selected ? styles.chipSelected : styles.chipUnselected,
-                      ]}
-                      onPress={() => setLeaseTerm(opt.value)}
-                    >
-                      <Text style={[styles.chipText, { color: selected ? '#fff' : '#aaa' }]}>
-                        {opt.label}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </View>
-
-            <View style={styles.fieldContainer}>
-              <ThemedText style={styles.label}>Pet Policy</ThemedText>
-              <View style={styles.chipRow}>
-                {([
-                  { label: 'No Pets', value: 'no_pets', icon: 'x' },
-                  { label: 'Cats Only', value: 'cats_only', icon: 'heart' },
-                  { label: 'Dogs Only', value: 'dogs_only', icon: 'heart' },
-                  { label: 'Cats & Dogs', value: 'cats_and_dogs', icon: 'check' },
-                  { label: 'All Pets', value: 'all_pets', icon: 'check-circle' },
-                ] as const).map(opt => {
-                  const selected = petPolicy === opt.value;
-                  return (
-                    <Pressable
-                      key={opt.value}
-                      style={[
-                        styles.chip,
-                        selected ? styles.chipSelected : styles.chipUnselected,
-                      ]}
-                      onPress={() => setPetPolicy(opt.value)}
-                    >
-                      <Feather name={opt.icon as any} size={12} color={selected ? '#fff' : '#666'} style={{ marginRight: 4 }} />
-                      <Text style={[styles.chipText, { color: selected ? '#fff' : '#aaa' }]}>
-                        {opt.label}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </View>
-
-            <View style={styles.fieldContainer}>
-              <ThemedText style={styles.label}>Parking</ThemedText>
-              <View style={styles.chipRow}>
-                {([
-                  { label: 'None', value: 'none' },
-                  { label: 'Street', value: 'street' },
-                  { label: 'Lot', value: 'lot' },
-                  { label: 'Garage', value: 'garage' },
-                  { label: 'Covered', value: 'covered' },
-                ] as const).map(opt => {
-                  const selected = parkingType === opt.value;
-                  return (
-                    <Pressable
-                      key={opt.value}
-                      style={[
-                        styles.chip,
-                        selected ? styles.chipSelected : styles.chipUnselected,
-                      ]}
-                      onPress={() => setParkingType(opt.value)}
-                    >
-                      <Text style={[styles.chipText, { color: selected ? '#fff' : '#aaa' }]}>
-                        {opt.label}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </View>
-
-            {isAgent && (
-              <View style={styles.fieldContainer}>
-                <ThemedText style={styles.label}>MLS / Reference #</ThemedText>
-                <ThemedText style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, marginBottom: 6 }}>
-                  Optional — for your internal tracking
-                </ThemedText>
-                <TextInput
-                  style={styles.input}
-                  value={mlsNumber}
-                  onChangeText={setMlsNumber}
-                  placeholder="e.g. MLS-2024-12345"
-                  placeholderTextColor="#666"
-                />
-              </View>
-            )}
-          </>
-        )}
-
-        {isCompanyHost ? (
-          <View style={styles.fieldContainer}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Text style={styles.label}>Assign Agent</Text>
-              <Text style={{ color: '#ef4444', fontSize: 12, fontWeight: '600' }}>Required</Text>
-            </View>
-            <Text style={[styles.sectionSubtitle, { marginBottom: 8 }]}>
-              Select an agent from your team to manage this listing
-            </Text>
-            {companyAgents.length === 0 ? (
-              <View style={{ backgroundColor: 'rgba(245,158,11,0.1)', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(245,158,11,0.2)' }}>
-                <Text style={{ color: '#F59E0B', fontSize: 13 }}>
-                  No team members found. Add agents in Team Management first.
-                </Text>
-              </View>
-            ) : (
-              <View style={{ gap: 6 }}>
-                {companyAgents.map(agent => {
-                  const selected = assignedAgentId === agent.id;
-                  return (
-                    <Pressable
-                      key={agent.id}
-                      style={{
-                        flexDirection: 'row', alignItems: 'center', gap: 10,
-                        padding: 12, borderRadius: 10,
-                        backgroundColor: selected ? 'rgba(59,130,246,0.15)' : 'rgba(255,255,255,0.05)',
-                        borderWidth: 1, borderColor: selected ? 'rgba(59,130,246,0.4)' : 'rgba(255,255,255,0.08)',
-                      }}
-                      onPress={() => setAssignedAgentId(selected ? '' : agent.id)}
-                    >
-                      <View style={{
-                        width: 32, height: 32, borderRadius: 16,
-                        backgroundColor: selected ? '#3b82f6' : 'rgba(255,255,255,0.1)',
-                        alignItems: 'center', justifyContent: 'center',
-                      }}>
-                        <Feather name={selected ? 'check' : 'user'} size={14} color={selected ? '#fff' : 'rgba(255,255,255,0.5)'} />
-                      </View>
-                      <Text style={{ color: selected ? '#3b82f6' : 'rgba(255,255,255,0.7)', fontSize: 14, fontWeight: selected ? '600' : '400', flex: 1 }}>
-                        {agent.full_name}
-                      </Text>
-                      {selected ? <Feather name="check-circle" size={16} color="#3b82f6" /> : null}
-                    </Pressable>
-                  );
-                })}
-              </View>
-            )}
-          </View>
-        ) : null}
-      </View>
-
-      <View style={styles.card}>
-        {renderSectionTitle('Type')}
-
-        {renderToggle(
-          'Property Type',
-          { label: 'Lease', value: 'lease', icon: 'file-text' },
-          { label: 'Sublet', value: 'sublet', icon: 'clock' },
-          propertyType,
-          setPropertyType,
-        )}
-
-        {renderToggle(
-          'Room Type',
-          { label: 'Entire Place', value: 'entire', icon: 'home' },
-          { label: 'Private Room', value: 'room', icon: 'user' },
-          roomType,
-          (val: 'room' | 'entire') => {
-            setRoomType(val);
-            if (val === 'entire') {
-              setPreferredTenantGender('any');
-              if (isProfessionalHost) {
-                setExistingRoommatesCount(0);
-              }
-            }
-          },
-        )}
-
-        {roomType === 'room' && !isCompanyHost && user?.hostType !== 'agent' ? (
-          <View style={{ marginTop: 16 }}>
-            <ThemedText style={styles.label}>Tenant Gender Preference</ThemedText>
-            <ThemedText style={{ color: 'rgba(255,255,255,0.45)', fontSize: 12, marginBottom: 10 }}>
-              Shared living spaces can specify a preference
-            </ThemedText>
-            {([
-              { key: 'any', label: 'Any gender', sub: 'Open to everyone', icon: 'users' },
-              { key: 'female_only', label: 'Women only', sub: 'Female tenants only', icon: 'user' },
-              { key: 'male_only', label: 'Men only', sub: 'Male tenants only', icon: 'user' },
-            ] as const).map(opt => {
-              const sel = preferredTenantGender === opt.key;
-              return (
-                <Pressable
-                  key={opt.key}
-                  onPress={() => setPreferredTenantGender(opt.key)}
-                  style={{
-                    flexDirection: 'row', alignItems: 'center', gap: 12,
-                    padding: 14, borderRadius: 10, marginBottom: 8,
-                    backgroundColor: sel ? 'rgba(255,107,91,0.15)' : 'rgba(255,255,255,0.06)',
-                    borderWidth: 1, borderColor: sel ? '#ff6b5b' : 'rgba(255,255,255,0.08)',
-                  }}
-                >
-                  <Feather name={opt.icon as any} size={18} color={sel ? '#ff6b5b' : 'rgba(255,255,255,0.4)'} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ color: sel ? '#fff' : 'rgba(255,255,255,0.7)', fontSize: 15, fontWeight: sel ? '600' : '400' }}>
-                      {opt.label}
-                    </Text>
-                    <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, marginTop: 2 }}>
-                      {opt.sub}
-                    </Text>
-                  </View>
-                  {sel ? <Feather name="check-circle" size={18} color="#ff6b5b" /> : null}
-                </Pressable>
-              );
-            })}
-            <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 11, marginTop: 4, lineHeight: 15 }}>
-              Gender preferences are permitted for shared living spaces under the Fair Housing Act's roommate exemption.
-            </Text>
-          </View>
-        ) : null}
-      </View>
-
-      <View style={styles.card}>
-        {renderSectionTitle('Location', 'Used to match nearby renters')}
-
-        <View style={styles.fieldContainer}>
-          <ThemedText style={styles.label}>City</ThemedText>
-          <TextInput
-            style={styles.input}
-            value={city}
-            onChangeText={setCity}
-            placeholder="Type a city..."
-            placeholderTextColor="#666"
-          />
-          <ThemedText style={[styles.label, { marginTop: 12 }]}>Popular Cities</ThemedText>
-          <View style={styles.chipRow}>
-            {POPULAR_CITIES.map(c => {
-              const selected = c === city;
-              return (
-                <Pressable
-                  key={c}
-                  style={[
-                    styles.cityChip,
-                    selected ? styles.cityChipSelected : styles.cityChipUnselected,
-                  ]}
-                  onPress={() => setCity(c)}
-                >
-                  <ThemedText style={[styles.cityChipText, { color: selected ? '#fff' : '#aaa' }]}>
-                    {c}
-                  </ThemedText>
-                </Pressable>
-              );
-            })}
-          </View>
-        </View>
-
-        <View style={styles.fieldContainer}>
-          <ThemedText style={styles.label}>State</ThemedText>
-          <TextInput
-            style={styles.input}
-            value={state}
-            onChangeText={setState}
-            placeholder="NY"
-            placeholderTextColor="#666"
-          />
-        </View>
-
-        <View style={styles.fieldContainer}>
-          <ThemedText style={styles.label}>Neighborhood</ThemedText>
-          <TextInput
-            style={styles.input}
-            value={neighborhood}
-            onChangeText={setNeighborhood}
-            placeholder="e.g. Williamsburg"
-            placeholderTextColor="#666"
-          />
-        </View>
-
-        <View style={styles.fieldContainer}>
-          <ThemedText style={styles.label}>Zip Code</ThemedText>
-          <TextInput
-            style={styles.input}
-            value={zipCode}
-            onChangeText={(t) => setZipCode(t.replace(/[^0-9]/g, '').slice(0, 5))}
-            placeholder="10001"
-            placeholderTextColor="#666"
-            keyboardType="numeric"
-            maxLength={5}
-          />
-        </View>
-
-        <View style={[styles.fieldContainer, { zIndex: 1000 }]}>
-          <ThemedText style={styles.label}>Address</ThemedText>
-          {process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY ? (
-            <LazyGooglePlacesAutocomplete
-              placeholder="Start typing your address..."
-              fetchDetails={true}
-              onPress={(data: any, details: any = null) => {
-                if (!details) return;
-                const components = details.address_components;
-                const getComponent = (type: string) =>
-                  components.find((c: any) => c.types.includes(type));
-                const streetNumber = getComponent('street_number')?.long_name || '';
-                const streetName = getComponent('route')?.long_name || '';
-                const cityName =
-                  getComponent('locality')?.long_name ||
-                  getComponent('sublocality')?.long_name ||
-                  getComponent('administrative_area_level_2')?.long_name || '';
-                const stateName =
-                  getComponent('administrative_area_level_1')?.short_name || '';
-                const neighborhoodName =
-                  getComponent('neighborhood')?.long_name ||
-                  getComponent('sublocality_level_1')?.long_name || '';
-                setAddress(`${streetNumber} ${streetName}`.trim());
-                setCity(cityName);
-                setState(stateName);
-                if (neighborhoodName) setNeighborhood(neighborhoodName);
-                const loc = details.geometry.location;
-                setCoordinates({ lat: loc.lat, lng: loc.lng });
-                setAddressFromAutocomplete(true);
-              }}
-              query={{
-                key: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
-                language: 'en',
-                types: 'address',
-              }}
-              textInputProps={{
-                value: address,
-                onChangeText: handleManualAddressChange,
-                placeholderTextColor: '#666',
-              }}
-              styles={{
-                container: { flex: 0 },
-                textInput: {
-                  height: 50,
-                  backgroundColor: '#141414',
-                  borderWidth: 1,
-                  borderColor: 'rgba(255,255,255,0.1)',
-                  borderRadius: 12,
-                  paddingHorizontal: 16,
-                  fontSize: 15,
-                  color: '#fff',
-                },
-                listView: {
-                  backgroundColor: '#1a1a1a',
-                  borderWidth: 1,
-                  borderColor: 'rgba(255,255,255,0.1)',
-                  borderRadius: 12,
-                  marginTop: 4,
-                  zIndex: 1000,
-                },
-                row: {
-                  paddingHorizontal: 12,
-                  paddingVertical: 10,
-                  backgroundColor: '#1a1a1a',
-                },
-                description: {
-                  fontSize: 14,
-                  color: '#ccc',
-                },
-                separator: {
-                  height: 1,
-                  backgroundColor: '#333',
-                },
-              }}
-              enablePoweredByContainer={false}
-              minLength={3}
-              debounce={300}
-              keyboardShouldPersistTaps="handled"
-              onFail={(error: any) => console.warn('Places autocomplete error:', error)}
-              onNotFound={() => {}}
-            />
-          ) : (
-            <TextInput
-              style={styles.input}
-              value={address}
-              onChangeText={handleManualAddressChange}
-              placeholder="Enter your address"
-              placeholderTextColor="#666"
-            />
-          )}
-        </View>
-
-        <View style={styles.fieldContainer}>
-          <ThemedText style={styles.label}>Transportation (optional)</ThemedText>
-          <ThemedText style={styles.labelHint}>
-            We auto-detect nearby transit from your address. Override below if needed.
-          </ThemedText>
-          <TextInput
-            style={[styles.input, styles.multilineInput, { minHeight: 60 }]}
-            placeholder="e.g. Near Metro Line 2, Bus Route 40, 5 min walk to station"
-            placeholderTextColor="#666"
-            value={transitOverride}
-            onChangeText={setTransitOverride}
-            multiline
-            numberOfLines={2}
-            textAlignVertical="top"
-          />
-        </View>
-
-        <View style={styles.fieldContainer}>
-          <ThemedText style={styles.label}>Available Date</ThemedText>
-          <Pressable style={styles.datePickerButton} onPress={() => setShowAvailableDatePicker(true)}>
-            <Feather name="calendar" size={18} color="#666" style={{ marginRight: 10 }} />
-            <ThemedText style={{ color: availableDate ? '#fff' : '#666', fontSize: 15, flex: 1 }}>
-              {availableDate ? formatDate(availableDate) : 'Select available date'}
-            </ThemedText>
-            <Feather name="chevron-right" size={16} color="#555" />
-          </Pressable>
-          <DatePickerModal
-            visible={showAvailableDatePicker}
-            onClose={() => setShowAvailableDatePicker(false)}
-            onConfirm={(date) => setAvailableDate(date)}
-            mode="availability"
-            title="Select Available Date"
-            showFlexible
-            initialDate={availableDate || undefined}
-          />
-        </View>
-      </View>
-
-      <View style={styles.card}>
-        {renderSectionTitle('Amenities')}
-
-        {AMENITY_CATEGORIES.map(category => {
-          const categoryAmenities = getHostAmenities().filter(a => a.category === category.key);
-          if (categoryAmenities.length === 0) return null;
-          const selectedCount = categoryAmenities.filter(a => selectedAmenities.includes(a.id)).length;
-          const isExpanded = expandedHostCategories.has(category.key);
-
-          return (
-            <View key={category.key} style={{ marginBottom: 8 }}>
-              <Pressable
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  paddingVertical: 10,
-                  paddingHorizontal: 4,
-                }}
-                onPress={() => {
-                  setExpandedHostCategories(prev => {
-                    const next = new Set(prev);
-                    if (next.has(category.key)) next.delete(category.key);
-                    else next.add(category.key);
-                    return next;
-                  });
-                }}
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Feather name={category.icon} size={16} color="#888" />
-                  <ThemedText style={{ fontSize: 14, fontWeight: '600' }}>
-                    {category.label}
-                  </ThemedText>
-                  {selectedCount > 0 ? (
-                    <View style={{
-                      backgroundColor: '#ff6b5b',
-                      borderRadius: 10,
-                      minWidth: 20,
-                      height: 20,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      paddingHorizontal: 6,
-                    }}>
-                      <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>{selectedCount}</Text>
-                    </View>
-                  ) : null}
-                </View>
-                <Feather name={isExpanded ? 'chevron-up' : 'chevron-down'} size={16} color="#888" />
-              </Pressable>
-
-              {isExpanded ? (
-                <View style={styles.chipRow}>
-                  {categoryAmenities.map(amenity => {
-                    const selected = selectedAmenities.includes(amenity.id);
-                    return (
-                      <Pressable
-                        key={amenity.id}
-                        style={[
-                          styles.amenityChip,
-                          selected ? styles.amenityChipSelected : styles.amenityChipUnselected,
-                        ]}
-                        onPress={() => toggleAmenity(amenity.id)}
-                      >
-                        <Feather
-                          name={amenity.icon}
-                          size={14}
-                          color={selected ? '#fff' : '#888'}
-                          style={{ marginRight: 4 }}
-                        />
-                        <ThemedText style={[styles.amenityChipText, { color: selected ? '#fff' : '#aaa' }]}>
-                          {amenity.label}
-                        </ThemedText>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              ) : null}
-            </View>
-          );
-        })}
-      </View>
-
-      <View style={styles.card}>
-        {renderSectionTitle(
-          isProfessionalHost ? 'Lease Terms & Rules' : 'House Rules',
-          isProfessionalHost ? 'Terms tenants should know' : 'Optional — helps set renter expectations',
-        )}
-
-        <View style={styles.fieldContainer}>
-          <ThemedText style={styles.hintText}>
-            {isProfessionalHost
-              ? 'e.g. No smoking on premises. Quiet hours 10pm-8am. Tenant responsible for utilities.'
-              : 'e.g. No smoking indoors, quiet hours after 10pm, guests allowed with notice'
-            }
-          </ThemedText>
-          <TextInput
-            style={[styles.input, styles.multilineInput]}
-            value={houseRules}
-            onChangeText={setHouseRules}
-            placeholder={isProfessionalHost
-              ? "e.g. No smoking on premises. Quiet hours 10pm-8am. Tenant responsible for utilities."
-              : "e.g. No smoking, quiet hours after 10pm..."
-            }
-            placeholderTextColor="#666"
-            multiline
-            numberOfLines={3}
-            textAlignVertical="top"
-          />
-        </View>
-      </View>
-
-      <View style={styles.card}>
-        {renderSectionTitle('Photos', 'First photo becomes your cover image')}
-
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photosRow}>
-          {photos.map((photo, index) => (
-            <View key={index} style={styles.photoContainer}>
-              <Image source={{ uri: photo }} style={styles.photoThumb} />
-              <Pressable
-                style={styles.removePhotoBtn}
-                onPress={() => handleRemovePhoto(index)}
-              >
-                <Feather name="x" size={14} color="#fff" />
-              </Pressable>
-              {index === 0 ? (
-                <View style={styles.coverBadge}>
-                  <ThemedText style={styles.coverBadgeText}>Cover</ThemedText>
-                </View>
-              ) : null}
-            </View>
-          ))}
-          {photos.length < 8 ? (
-            <Pressable
-              style={[styles.addPhotoButton, { opacity: uploadingPhoto ? 0.6 : 1 }]}
-              onPress={handleAddPhoto}
-              disabled={uploadingPhoto}
-            >
-              {uploadingPhoto ? (
-                <ActivityIndicator size="small" color={theme.primary} />
-              ) : (
-                <>
-                  <Feather name="camera" size={24} color="#555" />
-                  <ThemedText style={styles.addPhotoText}>Add Photo</ThemedText>
-                </>
-              )}
-            </Pressable>
           ) : null}
-        </ScrollView>
-        <ThemedText style={styles.photoHint}>Add up to 8 photos. First photo is your cover image.</ThemedText>
+        </>
+      ) : null}
+    </View>
+  );
+
+  const renderPricingStep = () => (
+    <View>
+      <View style={[styles.fieldContainer, { alignItems: 'center' }]}>
+        <Text style={styles.label}>Monthly Rent</Text>
+        <Text style={wiz.heroPrice}>{formatPriceDisplay(price)}</Text>
+        <Text style={wiz.heroPriceSub}>per month</Text>
+        <SinglePricePicker
+          value={price}
+          onChange={setPrice}
+          options={RENT_OPTIONS}
+          height={140}
+        />
       </View>
 
-      <Pressable
-        style={[styles.saveButton, { opacity: saving ? 0.6 : 1 }]}
-        onPress={handleSave}
-        disabled={saving}
-      >
-        <Feather name="check" size={20} color="#fff" />
-        <ThemedText style={styles.saveButtonText}>
-          {saving ? 'Saving...' : isEditing ? 'Update Listing' : 'Create Listing'}
-        </ThemedText>
-      </Pressable>
+      <View style={styles.fieldContainer}>
+        <Text style={styles.label}>Security Deposit</Text>
+        <Text style={[styles.priceDisplay, { textAlign: 'center' }]}>
+          {securityDeposit === 0 ? 'None' : formatPriceDisplay(securityDeposit)}
+        </Text>
+        <SinglePricePicker
+          value={securityDeposit}
+          onChange={setSecurityDeposit}
+          options={DEPOSIT_OPTIONS}
+          height={120}
+        />
+      </View>
 
-      {isEditing ? (
-        <Pressable style={styles.deleteButton} onPress={handleDelete}>
-          <Feather name="trash-2" size={14} color="rgba(255,255,255,0.25)" />
-          <Text style={styles.deleteButtonText}>Delete listing</Text>
-        </Pressable>
+      <View style={styles.fieldContainer}>
+        <Text style={styles.label}>Square Feet</Text>
+        <TextInput
+          style={styles.input}
+          value={sqft}
+          onChangeText={setSqft}
+          placeholder="800"
+          placeholderTextColor="#666"
+          keyboardType="numeric"
+        />
+      </View>
+
+      {renderNumberSelector('Bedrooms', BEDROOM_OPTIONS, bedrooms, (n) => {
+        setBedrooms(n);
+        const maxExisting = n - (hostLivesIn ? 1 : 0) - 1;
+        if (existingRoommatesCount > maxExisting) setExistingRoommatesCount(Math.max(0, maxExisting));
+      })}
+      {renderNumberSelector('Bathrooms', BATHROOM_OPTIONS, bathrooms, setBathrooms)}
+
+      {isProfessionalHost && roomType === 'room' ? (
+        <>
+          <View style={wiz.divider}>
+            <View style={wiz.dividerLine} />
+            <Text style={wiz.dividerLabel}>Room Configuration</Text>
+            <View style={wiz.dividerLine} />
+          </View>
+          {renderStepper(
+            'Current Occupants',
+            'How many people currently live in this unit?',
+            existingRoommatesCount,
+            () => setExistingRoommatesCount(Math.max(0, existingRoommatesCount - 1)),
+            () => {
+              const max = bedrooms - 1;
+              setExistingRoommatesCount(Math.min(max, existingRoommatesCount + 1));
+            },
+          )}
+          {renderRoomsAvailableIndicator()}
+        </>
       ) : null}
+    </View>
+  );
 
-      <View style={{ height: Spacing.xxl }} />
+  const renderLivingStep = () => (
+    <View>
+      <Text style={wiz.stepLabel}>Do you live in this unit?</Text>
+      {renderSelectionCard('check', 'Yes, I live here', 'I currently live in this space', hostLivesIn, () => {
+        setHostLivesIn(true);
+        const maxExisting = bedrooms - 2;
+        if (existingRoommatesCount > maxExisting) setExistingRoommatesCount(Math.max(0, maxExisting));
+      })}
+      {renderSelectionCard('x', 'No, I don\'t live here', 'I don\'t live in this property', !hostLivesIn, () => {
+        setHostLivesIn(false);
+        const maxExisting = bedrooms - 1;
+        if (existingRoommatesCount > maxExisting) setExistingRoommatesCount(Math.max(0, maxExisting));
+      })}
+
+      <View style={{ height: 24 }} />
+      {renderStepper(
+        'Existing Roommates',
+        'How many people already live here (not counting yourself)?',
+        existingRoommatesCount,
+        () => setExistingRoommatesCount(Math.max(0, existingRoommatesCount - 1)),
+        () => {
+          const maxExisting = bedrooms - (hostLivesIn ? 1 : 0) - 1;
+          setExistingRoommatesCount(Math.min(maxExisting, existingRoommatesCount + 1));
+        },
+      )}
+      {renderRoomsAvailableIndicator()}
+
+      {roomType === 'room' ? (
+        <View style={{ marginTop: 24 }}>
+          <Text style={styles.label}>Tenant Gender Preference</Text>
+          <Text style={wiz.hintText}>Shared living spaces can specify a preference</Text>
+          {([
+            { key: 'any' as const, label: 'Any gender', sub: 'Open to everyone', icon: 'users' },
+            { key: 'female_only' as const, label: 'Women only', sub: 'Female tenants only', icon: 'user' },
+            { key: 'male_only' as const, label: 'Men only', sub: 'Male tenants only', icon: 'user' },
+          ]).map(opt => {
+            const sel = preferredTenantGender === opt.key;
+            return (
+              <Pressable
+                key={opt.key}
+                onPress={() => setPreferredTenantGender(opt.key)}
+                style={{
+                  flexDirection: 'row', alignItems: 'center', gap: 12,
+                  padding: 14, borderRadius: 10, marginBottom: 8,
+                  backgroundColor: sel ? 'rgba(255,107,91,0.15)' : 'rgba(255,255,255,0.06)',
+                  borderWidth: 1, borderColor: sel ? '#ff6b5b' : 'rgba(255,255,255,0.08)',
+                }}
+              >
+                <Feather name={opt.icon as any} size={18} color={sel ? '#ff6b5b' : 'rgba(255,255,255,0.4)'} />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: sel ? '#fff' : 'rgba(255,255,255,0.7)', fontSize: 15, fontWeight: sel ? '600' : '400' }}>
+                    {opt.label}
+                  </Text>
+                  <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, marginTop: 2 }}>{opt.sub}</Text>
+                </View>
+                {sel ? <Feather name="check-circle" size={18} color="#ff6b5b" /> : null}
+              </Pressable>
+            );
+          })}
+          <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 11, marginTop: 4, lineHeight: 15 }}>
+            Gender preferences are permitted for shared living spaces under the Fair Housing Act's roommate exemption.
+          </Text>
+        </View>
+      ) : null}
+    </View>
+  );
+
+  const renderPhotosStep = () => (
+    <View>
+      {photos.length > 0 ? (
+        <View>
+          <Pressable onPress={handleAddPhoto} disabled={uploadingPhoto || photos.length >= 8} style={{ marginBottom: 12 }}>
+            <Image source={{ uri: photos[0] }} style={wiz.coverPhoto} />
+            <View style={wiz.coverBadge}>
+              <Text style={wiz.coverBadgeText}>Cover Photo</Text>
+            </View>
+            <Pressable
+              style={wiz.photoRemoveBtn}
+              onPress={() => handleRemovePhoto(0)}
+            >
+              <Feather name="x" size={14} color="#fff" />
+            </Pressable>
+          </Pressable>
+
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+            {photos.slice(1).map((photo, idx) => {
+              const actualIdx = idx + 1;
+              return (
+                <Pressable
+                  key={actualIdx}
+                  style={wiz.gridPhotoWrap}
+                  onLongPress={() => handleSetCover(actualIdx)}
+                >
+                  <Image source={{ uri: photo }} style={wiz.gridPhoto} />
+                  <Pressable
+                    style={wiz.photoRemoveBtn}
+                    onPress={() => handleRemovePhoto(actualIdx)}
+                  >
+                    <Feather name="x" size={14} color="#fff" />
+                  </Pressable>
+                </Pressable>
+              );
+            })}
+            {photos.length < 8 ? (
+              <Pressable
+                style={[wiz.gridPhotoAdd, { opacity: uploadingPhoto ? 0.6 : 1 }]}
+                onPress={handleAddPhoto}
+                disabled={uploadingPhoto}
+              >
+                {uploadingPhoto ? (
+                  <ActivityIndicator size="small" color="#ff6b5b" />
+                ) : (
+                  <>
+                    <Feather name="camera" size={24} color="#555" />
+                    <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 12, marginTop: 4 }}>Add Photo</Text>
+                  </>
+                )}
+              </Pressable>
+            ) : null}
+          </View>
+        </View>
+      ) : (
+        <Pressable
+          style={[wiz.emptyPhotoArea, { opacity: uploadingPhoto ? 0.6 : 1 }]}
+          onPress={handleAddPhoto}
+          disabled={uploadingPhoto}
+        >
+          {uploadingPhoto ? (
+            <ActivityIndicator size="large" color="#ff6b5b" />
+          ) : (
+            <>
+              <Feather name="camera" size={40} color="#555" />
+              <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 16, fontWeight: '600', marginTop: 12 }}>
+                Add your first photo
+              </Text>
+              <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 13, marginTop: 4 }}>
+                Tap to browse your photo library
+              </Text>
+            </>
+          )}
+        </Pressable>
+      )}
+      <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 12, marginTop: 12, textAlign: 'center' }}>
+        Add up to 8 photos. Long-press a photo to set it as cover.
+      </Text>
+    </View>
+  );
+
+  const renderAmenitiesStep = () => (
+    <View>
+      {AMENITY_CATEGORIES.map(category => {
+        const categoryAmenities = getHostAmenities().filter(a => a.category === category.key);
+        if (categoryAmenities.length === 0) return null;
+        const selectedCount = categoryAmenities.filter(a => selectedAmenities.includes(a.id)).length;
+        const isExpanded = expandedHostCategories.has(category.key);
+
+        return (
+          <View key={category.key} style={{ marginBottom: 8 }}>
+            <Pressable
+              style={{
+                flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+                paddingVertical: 10, paddingHorizontal: 4,
+              }}
+              onPress={() => {
+                setExpandedHostCategories(prev => {
+                  const next = new Set(prev);
+                  if (next.has(category.key)) next.delete(category.key);
+                  else next.add(category.key);
+                  return next;
+                });
+              }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Feather name={category.icon} size={16} color="#888" />
+                <Text style={{ fontSize: 14, fontWeight: '600', color: '#fff' }}>{category.label}</Text>
+                {selectedCount > 0 ? (
+                  <View style={wiz.amenityBadge}>
+                    <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>{selectedCount}</Text>
+                  </View>
+                ) : null}
+              </View>
+              <Feather name={isExpanded ? 'chevron-up' : 'chevron-down'} size={16} color="#888" />
+            </Pressable>
+
+            {isExpanded ? (
+              <View style={styles.chipRow}>
+                {categoryAmenities.map(amenity => {
+                  const selected = selectedAmenities.includes(amenity.id);
+                  return (
+                    <Pressable
+                      key={amenity.id}
+                      style={[styles.amenityChip, selected ? styles.amenityChipSelected : styles.amenityChipUnselected]}
+                      onPress={() => toggleAmenity(amenity.id)}
+                    >
+                      <Feather name={amenity.icon} size={14} color={selected ? '#fff' : '#888'} style={{ marginRight: 4 }} />
+                      <Text style={[styles.amenityChipText, { color: selected ? '#fff' : '#aaa' }]}>{amenity.label}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ) : null}
+          </View>
+        );
+      })}
+
+      <View style={wiz.divider}>
+        <View style={wiz.dividerLine} />
+        <Text style={wiz.dividerLabel}>House Rules</Text>
+        <View style={wiz.dividerLine} />
+      </View>
+
+      <View style={styles.fieldContainer}>
+        <TextInput
+          style={[styles.input, styles.multilineInput]}
+          value={houseRules}
+          onChangeText={setHouseRules}
+          placeholder={isProfessionalHost
+            ? "e.g. Building quiet hours 10pm-8am, no subletting, move-in deposit required..."
+            : "e.g. No smoking, quiet hours after 10pm..."
+          }
+          placeholderTextColor="#666"
+          multiline
+          numberOfLines={3}
+          textAlignVertical="top"
+        />
+      </View>
+
+      <View style={styles.fieldContainer}>
+        <Text style={styles.label}>Require Background Check</Text>
+        <Text style={[wiz.hintText, { marginBottom: 8 }]}>
+          Only renters with a verified background check can apply
+        </Text>
+        <View style={styles.toggleRow}>
+          {[{ label: 'Yes', value: true, icon: 'shield' }, { label: 'No', value: false, icon: 'x' }].map(opt => {
+            const selected = opt.value === requiresBackgroundCheck;
+            return (
+              <Pressable
+                key={String(opt.value)}
+                style={[styles.toggleButton, { backgroundColor: selected ? '#22c55e' : 'transparent' }]}
+                onPress={() => setRequiresBackgroundCheck(opt.value)}
+              >
+                <Feather name={opt.icon as any} size={14} color={selected ? '#fff' : 'rgba(255,255,255,0.35)'} />
+                <Text style={[styles.toggleText, { color: selected ? '#fff' : 'rgba(255,255,255,0.45)', fontWeight: selected ? '700' : '500', marginLeft: 5 }]}>
+                  {opt.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+
+      {isProfessionalHost ? (
+        <>
+          <View style={styles.fieldContainer}>
+            <Text style={styles.label}>Pet Policy</Text>
+            <View style={styles.chipRow}>
+              {([
+                { label: 'No Pets', value: 'no_pets', icon: 'x' },
+                { label: 'Cats Only', value: 'cats_only', icon: 'heart' },
+                { label: 'Dogs Only', value: 'dogs_only', icon: 'heart' },
+                { label: 'Cats & Dogs', value: 'cats_and_dogs', icon: 'check' },
+                { label: 'All Pets', value: 'all_pets', icon: 'check-circle' },
+              ] as const).map(opt => {
+                const selected = petPolicy === opt.value;
+                return (
+                  <Pressable
+                    key={opt.value}
+                    style={[styles.chip, selected ? styles.chipSelected : styles.chipUnselected, { width: 'auto' as any, paddingHorizontal: 14, height: 38 }]}
+                    onPress={() => setPetPolicy(opt.value)}
+                  >
+                    <Feather name={opt.icon as any} size={12} color={selected ? '#fff' : '#666'} style={{ marginRight: 4 }} />
+                    <Text style={[styles.chipText, { color: selected ? '#fff' : '#aaa', fontSize: 13 }]}>{opt.label}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+
+          <View style={styles.fieldContainer}>
+            <Text style={styles.label}>Parking</Text>
+            <View style={styles.chipRow}>
+              {([
+                { label: 'None', value: 'none' },
+                { label: 'Street', value: 'street' },
+                { label: 'Lot', value: 'lot' },
+                { label: 'Garage', value: 'garage' },
+                { label: 'Covered', value: 'covered' },
+              ] as const).map(opt => {
+                const selected = parkingType === opt.value;
+                return (
+                  <Pressable
+                    key={opt.value}
+                    style={[styles.chip, selected ? styles.chipSelected : styles.chipUnselected, { width: 'auto' as any, paddingHorizontal: 14, height: 38 }]}
+                    onPress={() => setParkingType(opt.value)}
+                  >
+                    <Text style={[styles.chipText, { color: selected ? '#fff' : '#aaa', fontSize: 13 }]}>{opt.label}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+        </>
+      ) : null}
+    </View>
+  );
+
+  const renderAgentStep = () => (
+    <View>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 16 }}>
+        <Feather name="users" size={18} color="#ff6b5b" />
+        <Text style={{ color: '#ef4444', fontSize: 12, fontWeight: '600' }}>Required</Text>
+      </View>
+      {companyAgents.length === 0 ? (
+        <View style={{ backgroundColor: 'rgba(245,158,11,0.1)', padding: 16, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(245,158,11,0.2)' }}>
+          <Text style={{ color: '#F59E0B', fontSize: 14, lineHeight: 20 }}>
+            No team members found. Add agents in Team Management first.
+          </Text>
+        </View>
+      ) : (
+        <View style={{ gap: 8 }}>
+          {companyAgents.map(agent => {
+            const selected = assignedAgentId === agent.id;
+            return (
+              <Pressable
+                key={agent.id}
+                style={[wiz.selectionCard, selected && wiz.selectionCardSelected, { height: 'auto' as any, minHeight: 64 }]}
+                onPress={() => setAssignedAgentId(selected ? '' : agent.id)}
+              >
+                <View style={{
+                  width: 40, height: 40, borderRadius: 20,
+                  backgroundColor: selected ? '#3b82f6' : 'rgba(255,255,255,0.1)',
+                  alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <Feather name={selected ? 'check' : 'user'} size={18} color={selected ? '#fff' : 'rgba(255,255,255,0.5)'} />
+                </View>
+                <Text style={{ color: selected ? '#fff' : 'rgba(255,255,255,0.7)', fontSize: 15, fontWeight: selected ? '600' : '400', flex: 1 }}>
+                  {agent.full_name}
+                </Text>
+                {selected ? <Feather name="check-circle" size={20} color="#3b82f6" /> : null}
+              </Pressable>
+            );
+          })}
+        </View>
+      )}
+    </View>
+  );
+
+  const allAmenities = getHostAmenities();
+  const getAmenityLabel = (id: string) => allAmenities.find(a => a.id === id)?.label || id.replace(/_/g, ' ');
+
+  const renderReviewSection = (sectionTitle: string, stepKey: string, lines: string[]) => (
+    <View style={wiz.reviewSection}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+        <Text style={wiz.reviewSectionTitle}>{sectionTitle}</Text>
+        <Pressable onPress={() => goToStep(stepKey)}>
+          <Text style={wiz.reviewEditLink}>Edit</Text>
+        </Pressable>
+      </View>
+      {lines.map((line, i) => (
+        <Text key={i} style={wiz.reviewSectionText}>{line}</Text>
+      ))}
+    </View>
+  );
+
+  const renderReviewStep = () => {
+    const roomsAvailable = bedrooms - (hostLivesIn ? 1 : 0) - existingRoommatesCount;
+    return (
+      <View>
+        <View style={wiz.reviewCard}>
+          {photos.length > 0 ? (
+            <Image source={{ uri: photos[0] }} style={wiz.reviewCoverPhoto} />
+          ) : (
+            <View style={wiz.reviewCoverPlaceholder}>
+              <Feather name="image" size={40} color="#555" />
+              <Text style={{ color: '#555', fontSize: 13, marginTop: 8 }}>No cover photo</Text>
+            </View>
+          )}
+          <View style={{ padding: 16 }}>
+            <Text style={wiz.reviewTitle}>{title || 'Untitled Listing'}</Text>
+            <Text style={wiz.reviewPrice}>{formatPriceDisplay(price)}/mo</Text>
+            <Text style={wiz.reviewLocation}>
+              {[neighborhood, city, state].filter(Boolean).join(', ') || 'No location set'}
+            </Text>
+            <View style={wiz.reviewDetailsRow}>
+              <Text style={wiz.reviewDetail}>{bedrooms} bd</Text>
+              <Text style={wiz.reviewDot}>{'\u00B7'}</Text>
+              <Text style={wiz.reviewDetail}>{bathrooms} ba</Text>
+              {sqft ? (
+                <>
+                  <Text style={wiz.reviewDot}>{'\u00B7'}</Text>
+                  <Text style={wiz.reviewDetail}>{sqft} sqft</Text>
+                </>
+              ) : null}
+              <Text style={wiz.reviewDot}>{'\u00B7'}</Text>
+              <Text style={wiz.reviewDetail}>{roomType === 'entire' ? 'Entire' : 'Room'}</Text>
+            </View>
+            {selectedAmenities.length > 0 ? (
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 12 }}>
+                {selectedAmenities.slice(0, 6).map(a => (
+                  <View key={a} style={wiz.reviewAmenityChip}>
+                    <Text style={wiz.reviewAmenityText}>{getAmenityLabel(a)}</Text>
+                  </View>
+                ))}
+                {selectedAmenities.length > 6 ? (
+                  <View style={wiz.reviewAmenityChip}>
+                    <Text style={wiz.reviewAmenityText}>+{selectedAmenities.length - 6} more</Text>
+                  </View>
+                ) : null}
+              </View>
+            ) : null}
+          </View>
+        </View>
+
+        {renderReviewSection('Property Type', 'type', [
+          `${propertyType === 'lease' ? 'Lease' : 'Sublet'} \u00B7 ${roomType === 'entire' ? 'Entire Place' : 'Private Room'}`,
+        ])}
+        {renderReviewSection('Location', 'location', [
+          address || 'No address',
+          [city, state, zipCode].filter(Boolean).join(', '),
+          neighborhood ? `Neighborhood: ${neighborhood}` : '',
+        ].filter(Boolean))}
+        {renderReviewSection('Details', 'details', [
+          title || 'No title set',
+          description ? (description.length > 80 ? `${description.substring(0, 80)}...` : description) : 'No description',
+          availableDate ? `Available: ${formatDate(availableDate)}` : 'Available: Immediately',
+        ])}
+        {renderReviewSection('Pricing', 'pricing', [
+          `Rent: ${formatPriceDisplay(price)}/mo`,
+          `Deposit: ${securityDeposit ? formatPriceDisplay(securityDeposit) : 'None'}`,
+          `${bedrooms} bed \u00B7 ${bathrooms} bath${sqft ? ` \u00B7 ${sqft} sqft` : ''}`,
+        ])}
+        {!isProfessionalHost ? renderReviewSection('Living Situation', 'living', [
+          `Host lives in: ${hostLivesIn ? 'Yes' : 'No'}`,
+          `Existing roommates: ${existingRoommatesCount}`,
+          `Rooms available: ${roomsAvailable}`,
+        ]) : null}
+        {renderReviewSection('Photos', 'photos', [
+          `${photos.length} photo${photos.length !== 1 ? 's' : ''} uploaded`,
+        ])}
+        {renderReviewSection('Amenities & Rules', 'amenities', [
+          `${selectedAmenities.length} amenities selected`,
+          houseRules ? (houseRules.length > 60 ? `Rules: ${houseRules.substring(0, 60)}...` : `Rules: ${houseRules}`) : 'No house rules set',
+        ])}
+        {isCompanyHost ? renderReviewSection('Assigned Agent', 'agent', [
+          assignedAgentId
+            ? companyAgents.find(a => a.id === assignedAgentId)?.full_name || 'Selected'
+            : 'Not assigned',
+        ]) : null}
+
+        {isEditing ? (
+          <Pressable style={wiz.deleteBtn} onPress={handleDelete}>
+            <Feather name="trash-2" size={14} color="#ef4444" />
+            <Text style={{ color: '#ef4444', fontSize: 13, fontWeight: '500' }}>Delete listing</Text>
+          </Pressable>
+        ) : null}
+      </View>
+    );
+  };
+
+  const renderStepContent = () => {
+    const stepKey = steps[currentStep]?.key;
+    switch (stepKey) {
+      case 'type': return renderTypeStep();
+      case 'location': return renderLocationStep();
+      case 'details': return renderDetailsStep();
+      case 'pricing': return renderPricingStep();
+      case 'living': return renderLivingStep();
+      case 'photos': return renderPhotosStep();
+      case 'amenities': return renderAmenitiesStep();
+      case 'agent': return renderAgentStep();
+      case 'review': return renderReviewStep();
+      default: return null;
+    }
+  };
+
+  const currentStepData = steps[currentStep];
+  const isLastStep = currentStep === steps.length - 1;
+
+  const headerSubtitle = useMemo(() => {
+    if (isEditing) return 'Edit your listing details';
+    if (isAgent) return 'Add a listing for your client';
+    return 'Add a property to your portfolio';
+  }, [isEditing, isAgent]);
+
+  return (
+    <View style={{ flex: 1, backgroundColor: '#0d0d0d' }}>
+      <View style={[wiz.topBar, { paddingTop: insets.top + 8 }]}>
+        <Pressable onPress={handleBack} style={wiz.topBarBackBtn}>
+          <Feather name="arrow-left" size={22} color="rgba(255,255,255,0.8)" />
+        </Pressable>
+        <View style={{ flex: 1, alignItems: 'center' }}>
+          <Text style={wiz.topBarTitle} numberOfLines={1}>
+            {currentStepData?.title || (isEditing ? 'Edit Listing' : 'New Listing')}
+          </Text>
+          <Text style={wiz.topBarStepIndicator}>
+            Step {currentStep + 1} of {steps.length}
+          </Text>
+        </View>
+        <View style={{ width: 40 }} />
+      </View>
+
+      <View style={wiz.progressBar}>
+        {steps.map((step, i) => (
+          <View
+            key={step.key}
+            style={[
+              wiz.progressSegment,
+              {
+                flex: 1,
+                backgroundColor: i <= currentStep ? '#ff6b5b' : '#222',
+                marginRight: i < steps.length - 1 ? 3 : 0,
+              },
+            ]}
+          />
+        ))}
+      </View>
+
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={0}
+      >
+        <ScrollView
+          ref={scrollRef}
+          style={{ flex: 1 }}
+          contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 120 }}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {currentStepData?.subtitle ? (
+            <Text style={wiz.stepSubtitle}>{currentStepData.subtitle}</Text>
+          ) : null}
+          <Animated.View style={{ transform: [{ translateX: slideAnim }] }}>
+            {renderStepContent()}
+          </Animated.View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+
+      <View style={[wiz.bottomBar, { paddingBottom: insets.bottom + 10 }]}>
+        {currentStep > 0 ? (
+          <Pressable onPress={handleBack} style={wiz.backBtn}>
+            <Feather name="arrow-left" size={16} color="#fff" />
+            <Text style={wiz.backBtnText}>Back</Text>
+          </Pressable>
+        ) : (
+          <View style={{ width: 80 }} />
+        )}
+
+        <Pressable
+          style={[
+            wiz.nextBtn,
+            isLastStep && wiz.publishBtn,
+            { opacity: saving ? 0.6 : 1 },
+          ]}
+          onPress={handleNext}
+          disabled={saving}
+        >
+          {saving ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : isLastStep ? (
+            <>
+              <Feather name="check" size={18} color="#fff" />
+              <Text style={wiz.nextBtnText}>
+                {isEditing ? 'Update Listing' : 'Publish Listing'}
+              </Text>
+            </>
+          ) : (
+            <>
+              <Text style={wiz.nextBtnText}>Next</Text>
+              <Feather name="arrow-right" size={16} color="#fff" />
+            </>
+          )}
+        </Pressable>
+      </View>
 
       <ListingLimitModal
         visible={showLimitModal}
@@ -1525,93 +1799,11 @@ export const CreateEditListingScreen = () => {
           if (overageResolve) overageResolve(true);
         }}
       />
-    </ScreenKeyboardAwareScrollView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 18,
-    paddingTop: Spacing.md,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#fff',
-    letterSpacing: -0.2,
-  },
-  headerSubtitle: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.4)',
-    marginTop: 2,
-  },
-  progressContainer: {
-    marginBottom: 18,
-    paddingHorizontal: 2,
-  },
-  progressBar: {
-    height: 6,
-    backgroundColor: '#222',
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#ff6b5b',
-    borderRadius: 3,
-  },
-  progressLabel: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.35)',
-    fontWeight: '500',
-  },
-  card: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.07)',
-    padding: 20,
-    marginBottom: 14,
-  },
-  sectionTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.05)',
-    paddingBottom: 14,
-    marginBottom: 18,
-  },
-  sectionIconWrap: {
-    width: 30,
-    height: 30,
-    borderRadius: 9,
-    backgroundColor: 'rgba(255,107,91,0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,107,91,0.18)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#fff',
-    letterSpacing: -0.1,
-  },
-  sectionSubtitle: {
-    fontSize: 11,
-    color: 'rgba(255,255,255,0.35)',
-    marginTop: 1,
-  },
   fieldContainer: {
     marginBottom: Spacing.lg,
   },
@@ -1649,29 +1841,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 4,
   },
-  inputWithPrefix: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#141414',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 12,
-    height: 50,
-    paddingHorizontal: 16,
-  },
-  inputPrefix: {
-    fontSize: 16,
-    color: '#666',
-    marginRight: 6,
-  },
-  inputInner: {
-    flex: 1,
-    fontSize: 15,
-    color: '#fff',
-  },
-  row: {
-    flexDirection: 'row',
-  },
   chipRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -1684,6 +1853,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    flexDirection: 'row',
   },
   chipSelected: {
     backgroundColor: '#ff6b5b',
@@ -1771,110 +1941,356 @@ const styles = StyleSheet.create({
     height: 50,
     paddingHorizontal: 16,
   },
+});
+
+const wiz = StyleSheet.create({
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    backgroundColor: '#0d0d0d',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.05)',
+  },
+  topBarBackBtn: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  topBarTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#fff',
+    letterSpacing: -0.2,
+  },
+  topBarStepIndicator: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.35)',
+    marginTop: 2,
+  },
+  progressBar: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    gap: 0,
+  },
+  progressSegment: {
+    height: 4,
+    borderRadius: 2,
+  },
+  stepSubtitle: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.45)',
+    marginBottom: 24,
+    lineHeight: 20,
+  },
+  stepLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.6)',
+    marginBottom: 12,
+  },
+  selectionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    backgroundColor: '#1a1a1a',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.07)',
+    borderRadius: 16,
+    padding: 18,
+    height: 80,
+    marginBottom: 10,
+  },
+  selectionCardSelected: {
+    borderColor: '#ff6b5b',
+    borderWidth: 2,
+    shadowColor: '#ff6b5b',
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  selectionCardIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  selectionCardLabel: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.7)',
+  },
+  selectionCardDesc: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.35)',
+    marginTop: 2,
+  },
   hintText: {
     fontSize: 12,
-    color: '#555',
+    color: 'rgba(255,255,255,0.35)',
     marginBottom: 8,
     lineHeight: 18,
   },
-  labelHint: {
-    fontSize: 12,
-    color: '#888',
-    marginBottom: 6,
-    marginTop: -4,
+  heroPrice: {
+    fontSize: 32,
+    fontWeight: '800',
+    color: '#ff6b5b',
+    textAlign: 'center',
+    marginBottom: 2,
   },
-  photosRow: {
+  heroPriceSub: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.35)',
+    textAlign: 'center',
     marginBottom: 8,
   },
-  photoContainer: {
-    marginRight: 10,
-    borderRadius: 14,
-    overflow: 'hidden',
-    position: 'relative' as const,
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginVertical: 20,
   },
-  removePhotoBtn: {
-    position: 'absolute' as const,
-    top: 6,
-    right: 6,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    alignItems: 'center' as const,
-    justifyContent: 'center' as const,
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  dividerLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.4)',
+  },
+  roomsAvailPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(255,107,91,0.08)',
+    padding: 10,
+    borderRadius: 8,
+    marginTop: 4,
+  },
+  roomsAvailText: {
+    fontSize: 13,
+    color: '#ff6b5b',
+    fontWeight: '600',
+  },
+  coverPhoto: {
+    width: '100%',
+    height: 200,
+    borderRadius: 14,
   },
   coverBadge: {
-    position: 'absolute' as const,
-    bottom: 7,
-    left: 7,
+    position: 'absolute',
+    bottom: 10,
+    left: 10,
     backgroundColor: 'rgba(255,107,91,0.85)',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 7,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
   },
   coverBadgeText: {
     color: '#fff',
-    fontSize: 10,
-    fontWeight: '700' as const,
+    fontSize: 11,
+    fontWeight: '700',
   },
-  photoThumb: {
-    width: 120,
-    height: 120,
+  photoRemoveBtn: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 28,
+    height: 28,
     borderRadius: 14,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  addPhotoButton: {
-    width: 120,
-    height: 120,
-    borderRadius: 14,
+  gridPhotoWrap: {
+    width: PHOTO_COL_WIDTH,
+    height: PHOTO_COL_WIDTH,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  gridPhoto: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 12,
+  },
+  gridPhotoAdd: {
+    width: PHOTO_COL_WIDTH,
+    height: PHOTO_COL_WIDTH,
+    borderRadius: 12,
     borderWidth: 1.5,
     borderColor: 'rgba(255,255,255,0.12)',
-    borderStyle: 'dashed' as const,
+    borderStyle: 'dashed',
     backgroundColor: '#141414',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
   },
-  addPhotoText: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.3)',
+  emptyPhotoArea: {
+    width: '100%',
+    height: 200,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.12)',
+    borderStyle: 'dashed',
+    backgroundColor: '#141414',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  amenityBadge: {
+    backgroundColor: '#ff6b5b',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+  },
+  bottomBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    backgroundColor: '#0d0d0d',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.05)',
+  },
+  backBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+  },
+  backBtnText: {
+    color: '#fff',
+    fontSize: 16,
     fontWeight: '500',
   },
-  photoHint: {
-    fontSize: 12,
-    color: '#555',
-    marginTop: 8,
-  },
-  saveButton: {
+  nextBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 6,
     backgroundColor: '#ff6b5b',
-    height: 56,
-    borderRadius: 16,
-    marginTop: 24,
-    gap: 8,
+    height: 48,
+    paddingHorizontal: 28,
+    borderRadius: 12,
+    minWidth: 120,
+  },
+  publishBtn: {
+    flex: 1,
+    marginLeft: 16,
     shadowColor: '#ff6b5b',
     shadowOpacity: 0.45,
     shadowRadius: 14,
     elevation: 8,
   },
-  saveButtonText: {
+  nextBtnText: {
     color: '#fff',
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '700',
-    letterSpacing: -0.2,
   },
-  deleteButton: {
+  deleteBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
     paddingVertical: 16,
-    marginTop: 8,
+    marginTop: 16,
   },
-  deleteButtonText: {
-    color: 'rgba(255,255,255,0.25)',
+  reviewCard: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.07)',
+    overflow: 'hidden',
+    marginBottom: 20,
+  },
+  reviewCoverPhoto: {
+    width: '100%',
+    height: 180,
+  },
+  reviewCoverPlaceholder: {
+    width: '100%',
+    height: 120,
+    backgroundColor: '#141414',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reviewTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#fff',
+    marginBottom: 4,
+  },
+  reviewPrice: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#ff6b5b',
+    marginBottom: 4,
+  },
+  reviewLocation: {
     fontSize: 13,
+    color: 'rgba(255,255,255,0.5)',
+    marginBottom: 8,
+  },
+  reviewDetailsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  reviewDetail: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.6)',
     fontWeight: '500',
+  },
+  reviewDot: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.25)',
+  },
+  reviewAmenityChip: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  reviewAmenityText: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.6)',
+    fontWeight: '500',
+  },
+  reviewSection: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.07)',
+    padding: 16,
+    marginBottom: 10,
+  },
+  reviewSectionTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  reviewEditLink: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#ff6b5b',
+  },
+  reviewSectionText: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.55)',
+    lineHeight: 20,
   },
 });
