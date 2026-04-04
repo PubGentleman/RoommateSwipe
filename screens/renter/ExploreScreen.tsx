@@ -28,6 +28,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
 import { formatMoveInDate, calculateCompatibility, getMatchQualityColor, getGenderSymbol, formatLocation } from '../../utils/matchingAlgorithm';
+import { generateRecommendations, RecommendationSection } from '../../utils/recommendationEngine';
+import RecommendationSectionComponent from '../../components/RecommendationSection';
 import { isGroupGenderCompatible } from '../../utils/groupUtils';
 import { calculateListingMatchScore, ListingMatchInput } from '../../utils/listingMatchScore';
 import { getNeighborhoodsByCity, getAllCities, NEIGHBORHOODS } from '../../utils/locationData';
@@ -140,6 +142,7 @@ export const ExploreScreen = () => {
   const [photoIndex, setPhotoIndex] = useState(0);
   const [showMatchBreakdown, setShowMatchBreakdown] = useState(false);
   const [viewMode, setViewMode] = useState<'all' | 'saved'>('all');
+  const [recommendations, setRecommendations] = useState<RecommendationSection[]>([]);
   const [displayMode, setDisplayMode] = useState<'list' | 'map'>('list');
   const [showLocationSheet, setShowLocationSheet] = useState(false);
   const [selectedNeighborhood, setSelectedNeighborhood] = useState<string | null>(null);
@@ -232,6 +235,14 @@ export const ExploreScreen = () => {
   useEffect(() => {
     applyFilters();
   }, [properties, filters, viewMode, saved, activeCity, activeSubArea, selectedNeighborhood, activeQuickFilters, listingTypeFilter, leaseTypeFilter]);
+
+  useEffect(() => {
+    if (filteredProperties.length > 0 && user) {
+      generateRecommendations(filteredProperties, user).then(setRecommendations);
+    } else {
+      setRecommendations([]);
+    }
+  }, [filteredProperties, user?.id]);
 
   useEffect(() => {
     if (!showPropertyDetail || !selectedProperty) {
@@ -1863,6 +1874,31 @@ export const ExploreScreen = () => {
                         </Pressable>
                       ))}
                     </ScrollView>
+                  </View>
+                ) : null}
+                {viewMode === 'all' && displayMode !== 'map' && recommendations.length > 0 ? (
+                  <View style={{ marginTop: 16 }}>
+                    {recommendations.map((section) => (
+                      <RecommendationSectionComponent
+                        key={section.id}
+                        section={section}
+                        onListingPress={(listing) => {
+                          const viewCheck = canViewListing();
+                          if (!viewCheck.canView) {
+                            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+                            setPaywallFeature('Unlimited Listing Views');
+                            setPaywallPlan('plus');
+                            setShowPaywall(true);
+                            return;
+                          }
+                          useListingView();
+                          setSelectedProperty(listing);
+                          setPhotoIndex(0);
+                          setShowPropertyDetail(true);
+                        }}
+                      />
+                    ))}
+                    <View style={{ height: 1, backgroundColor: 'rgba(255,255,255,0.06)', marginHorizontal: 16, marginBottom: 16 }} />
                   </View>
                 ) : null}
               </View>
