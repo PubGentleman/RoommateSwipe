@@ -149,6 +149,7 @@ const SECTION_ICONS: Record<string, string> = {
   'Location': 'map-pin',
   'Amenities': 'star',
   'House Rules': 'shield',
+  'Lease Terms & Rules': 'shield',
   'Photos': 'camera',
 };
 
@@ -204,7 +205,14 @@ export const CreateEditListingScreen = () => {
   const [saving, setSaving] = useState(false);
   const [assignedAgentId, setAssignedAgentId] = useState<string>('');
   const [companyAgents, setCompanyAgents] = useState<{ id: string; full_name: string }[]>([]);
+  const [unitNumber, setUnitNumber] = useState('');
+  const [leaseTerm, setLeaseTerm] = useState<'month_to_month' | '6_months' | '12_months' | '24_months'>('12_months');
+  const [petPolicy, setPetPolicy] = useState<'no_pets' | 'cats_only' | 'dogs_only' | 'cats_and_dogs' | 'all_pets'>('no_pets');
+  const [parkingType, setParkingType] = useState<'none' | 'street' | 'lot' | 'garage' | 'covered'>('none');
+  const [mlsNumber, setMlsNumber] = useState('');
   const isCompanyHost = user?.hostType === 'company';
+  const isAgent = user?.hostType === 'agent';
+  const isProfessionalHost = isCompanyHost || isAgent;
   const [showLimitModal, setShowLimitModal] = useState(false);
   const [showOverageModal, setShowOverageModal] = useState(false);
   const [limitMessage, setLimitMessage] = useState('');
@@ -222,6 +230,13 @@ export const CreateEditListingScreen = () => {
       }
     }
   }, [propertyId, user]);
+
+  useEffect(() => {
+    if (isProfessionalHost && !isEditing) {
+      setHostLivesIn(false);
+      setExistingRoommatesCount(0);
+    }
+  }, [isProfessionalHost, isEditing]);
 
   const loadProperty = async () => {
     if (!propertyId) return;
@@ -278,6 +293,11 @@ export const CreateEditListingScreen = () => {
     if (prop.assigned_agent_id) {
       setAssignedAgentId(prop.assigned_agent_id);
     }
+    if (prop.unit_number) setUnitNumber(prop.unit_number);
+    if (prop.lease_term) setLeaseTerm(prop.lease_term);
+    if (prop.pet_policy) setPetPolicy(prop.pet_policy);
+    if (prop.parking_type) setParkingType(prop.parking_type);
+    if (prop.mls_number) setMlsNumber(prop.mls_number);
 
     const descParts = prop.description.split('\n\nSecurity Deposit:');
     if (descParts.length > 1) {
@@ -449,6 +469,16 @@ export const CreateEditListingScreen = () => {
         host_name: user?.name || '',
         host_profile_id: user?.id || '',
       };
+      if (isProfessionalHost) {
+        supaData.host_lives_in = false;
+        if (unitNumber.trim()) supaData.unit_number = unitNumber.trim();
+        supaData.lease_term = leaseTerm;
+        supaData.pet_policy = petPolicy;
+        supaData.parking_type = parkingType;
+      }
+      if (isAgent && mlsNumber.trim()) {
+        supaData.mls_number = mlsNumber.trim();
+      }
       if (savedCoords) supaData.coordinates = savedCoords;
       if (transitInfo) supaData.transit_info = transitInfo;
       if (isCompanyHost && assignedAgentId) supaData.assigned_agent_id = assignedAgentId;
@@ -654,10 +684,20 @@ export const CreateEditListingScreen = () => {
         </Pressable>
         <View style={{ alignItems: 'center' }}>
           <Text style={styles.headerTitle}>
-            {isEditing ? 'Edit Listing' : 'New Listing'}
+            {isEditing
+              ? 'Edit Listing'
+              : isProfessionalHost
+                ? 'New Property Listing'
+                : 'New Listing'
+            }
           </Text>
           {!isEditing ? (
-            <Text style={styles.headerSubtitle}>Fill in your listing details</Text>
+            <Text style={styles.headerSubtitle}>
+              {isProfessionalHost
+                ? 'Add a property to your portfolio'
+                : 'Fill in your listing details'
+              }
+            </Text>
           ) : null}
         </View>
         <View style={{ width: 40 }} />
@@ -695,7 +735,10 @@ export const CreateEditListingScreen = () => {
             style={[styles.input, styles.multilineInput]}
             value={description}
             onChangeText={setDescription}
-            placeholder="Describe your listing..."
+            placeholder={isProfessionalHost
+              ? "Describe this property — highlights, recent renovations, nearby attractions..."
+              : "Describe your listing..."
+            }
             placeholderTextColor="#666"
             multiline
             numberOfLines={4}
@@ -735,65 +778,77 @@ export const CreateEditListingScreen = () => {
         })}
         {renderNumberSelector('Bathrooms', BATHROOM_OPTIONS, bathrooms, setBathrooms)}
 
-        <View style={styles.fieldContainer}>
-          <Text style={styles.label}>Do you live in this unit?</Text>
-          <View style={styles.toggleRow}>
-            {[{ label: 'Yes', value: true, icon: 'check' }, { label: 'No', value: false, icon: 'x' }].map(opt => {
-              const selected = opt.value === hostLivesIn;
-              return (
-                <Pressable
-                  key={String(opt.value)}
-                  style={[styles.toggleButton, { backgroundColor: selected ? '#ff6b5b' : 'transparent' }]}
-                  onPress={() => {
-                    setHostLivesIn(opt.value);
-                    const maxExisting = bedrooms - (opt.value ? 1 : 0) - 1;
-                    if (existingRoommatesCount > maxExisting) setExistingRoommatesCount(Math.max(0, maxExisting));
-                  }}
-                >
-                  <Feather name={opt.icon as any} size={14} color={selected ? '#fff' : 'rgba(255,255,255,0.35)'} />
-                  <Text style={[styles.toggleText, { color: selected ? '#fff' : 'rgba(255,255,255,0.45)', fontWeight: selected ? '700' : '500', marginLeft: 5 }]}>
-                    {opt.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
+        {!isProfessionalHost && (
+          <View style={styles.fieldContainer}>
+            <Text style={styles.label}>Do you live in this unit?</Text>
+            <View style={styles.toggleRow}>
+              {[{ label: 'Yes', value: true, icon: 'check' }, { label: 'No', value: false, icon: 'x' }].map(opt => {
+                const selected = opt.value === hostLivesIn;
+                return (
+                  <Pressable
+                    key={String(opt.value)}
+                    style={[styles.toggleButton, { backgroundColor: selected ? '#ff6b5b' : 'transparent' }]}
+                    onPress={() => {
+                      setHostLivesIn(opt.value);
+                      const maxExisting = bedrooms - (opt.value ? 1 : 0) - 1;
+                      if (existingRoommatesCount > maxExisting) setExistingRoommatesCount(Math.max(0, maxExisting));
+                    }}
+                  >
+                    <Feather name={opt.icon as any} size={14} color={selected ? '#fff' : 'rgba(255,255,255,0.35)'} />
+                    <Text style={[styles.toggleText, { color: selected ? '#fff' : 'rgba(255,255,255,0.45)', fontWeight: selected ? '700' : '500', marginLeft: 5 }]}>
+                      {opt.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
           </View>
-        </View>
+        )}
 
-        <View style={styles.fieldContainer}>
-          <Text style={styles.label}>Existing Roommates</Text>
-          <Text style={styles.sectionSubtitle}>
-            How many people already live here (not counting yourself)?
-          </Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 20, marginTop: 8 }}>
-            <Pressable
-              style={[styles.chip, styles.chipUnselected, { width: 44, height: 44 }]}
-              onPress={() => setExistingRoommatesCount(Math.max(0, existingRoommatesCount - 1))}
-            >
-              <Text style={[styles.chipText, { color: 'rgba(255,255,255,0.45)' }]}>-</Text>
-            </Pressable>
-            <Text style={{ fontSize: 22, fontWeight: '700', color: '#fff', minWidth: 30, textAlign: 'center' }}>
-              {existingRoommatesCount}
+        {(!isProfessionalHost || roomType === 'room') && (
+          <View style={styles.fieldContainer}>
+            <Text style={styles.label}>
+              {isProfessionalHost ? 'Current Occupants' : 'Existing Roommates'}
             </Text>
-            <Pressable
-              style={[styles.chip, styles.chipUnselected, { width: 44, height: 44 }]}
-              onPress={() => {
-                const maxExisting = bedrooms - (hostLivesIn ? 1 : 0) - 1;
-                setExistingRoommatesCount(Math.min(maxExisting, existingRoommatesCount + 1));
-              }}
-            >
-              <Text style={[styles.chipText, { color: 'rgba(255,255,255,0.45)' }]}>+</Text>
-            </Pressable>
+            <Text style={styles.sectionSubtitle}>
+              {isProfessionalHost
+                ? 'How many tenants currently occupy this unit?'
+                : 'How many people already live here (not counting yourself)?'
+              }
+            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 20, marginTop: 8 }}>
+              <Pressable
+                style={[styles.chip, styles.chipUnselected, { width: 44, height: 44 }]}
+                onPress={() => setExistingRoommatesCount(Math.max(0, existingRoommatesCount - 1))}
+              >
+                <Text style={[styles.chipText, { color: 'rgba(255,255,255,0.45)' }]}>-</Text>
+              </Pressable>
+              <Text style={{ fontSize: 22, fontWeight: '700', color: '#fff', minWidth: 30, textAlign: 'center' }}>
+                {existingRoommatesCount}
+              </Text>
+              <Pressable
+                style={[styles.chip, styles.chipUnselected, { width: 44, height: 44 }]}
+                onPress={() => {
+                  const maxExisting = bedrooms - (hostLivesIn ? 1 : 0) - 1;
+                  setExistingRoommatesCount(Math.min(maxExisting, existingRoommatesCount + 1));
+                }}
+              >
+                <Text style={[styles.chipText, { color: 'rgba(255,255,255,0.45)' }]}>+</Text>
+              </Pressable>
+            </View>
           </View>
-        </View>
+        )}
 
-        {(() => {
+        {(!isProfessionalHost || roomType === 'room') && (() => {
           const roomsAvailable = bedrooms - (hostLivesIn ? 1 : 0) - existingRoommatesCount;
           return (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,107,91,0.08)', padding: 10, borderRadius: 8, marginTop: 4 }}>
               <Feather name="key" size={16} color="#ff6b5b" />
               <Text style={{ fontSize: 13, color: '#ff6b5b', fontWeight: '600' }}>
-                {roomsAvailable} room{roomsAvailable !== 1 ? 's' : ''} available to fill
+                {isProfessionalHost
+                  ? `${roomsAvailable} room${roomsAvailable !== 1 ? 's' : ''} to fill`
+                  : `${roomsAvailable} room${roomsAvailable !== 1 ? 's' : ''} available to fill`
+                }
               </Text>
             </View>
           );
@@ -834,6 +889,124 @@ export const CreateEditListingScreen = () => {
             keyboardType="numeric"
           />
         </View>
+
+        {isProfessionalHost && (
+          <>
+            <View style={styles.fieldContainer}>
+              <ThemedText style={styles.label}>Unit / Suite #</ThemedText>
+              <TextInput
+                style={styles.input}
+                value={unitNumber}
+                onChangeText={setUnitNumber}
+                placeholder="e.g. 4B, Suite 201"
+                placeholderTextColor="#666"
+              />
+            </View>
+
+            <View style={styles.fieldContainer}>
+              <ThemedText style={styles.label}>Lease Term</ThemedText>
+              <View style={styles.chipRow}>
+                {([
+                  { label: 'Month-to-Month', value: 'month_to_month' },
+                  { label: '6 Months', value: '6_months' },
+                  { label: '12 Months', value: '12_months' },
+                  { label: '24 Months', value: '24_months' },
+                ] as const).map(opt => {
+                  const selected = leaseTerm === opt.value;
+                  return (
+                    <Pressable
+                      key={opt.value}
+                      style={[
+                        styles.chip,
+                        selected ? styles.chipSelected : styles.chipUnselected,
+                      ]}
+                      onPress={() => setLeaseTerm(opt.value)}
+                    >
+                      <Text style={[styles.chipText, { color: selected ? '#fff' : '#aaa' }]}>
+                        {opt.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+
+            <View style={styles.fieldContainer}>
+              <ThemedText style={styles.label}>Pet Policy</ThemedText>
+              <View style={styles.chipRow}>
+                {([
+                  { label: 'No Pets', value: 'no_pets', icon: 'x' },
+                  { label: 'Cats Only', value: 'cats_only', icon: 'heart' },
+                  { label: 'Dogs Only', value: 'dogs_only', icon: 'heart' },
+                  { label: 'Cats & Dogs', value: 'cats_and_dogs', icon: 'check' },
+                  { label: 'All Pets', value: 'all_pets', icon: 'check-circle' },
+                ] as const).map(opt => {
+                  const selected = petPolicy === opt.value;
+                  return (
+                    <Pressable
+                      key={opt.value}
+                      style={[
+                        styles.chip,
+                        selected ? styles.chipSelected : styles.chipUnselected,
+                      ]}
+                      onPress={() => setPetPolicy(opt.value)}
+                    >
+                      <Feather name={opt.icon as any} size={12} color={selected ? '#fff' : '#666'} style={{ marginRight: 4 }} />
+                      <Text style={[styles.chipText, { color: selected ? '#fff' : '#aaa' }]}>
+                        {opt.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+
+            <View style={styles.fieldContainer}>
+              <ThemedText style={styles.label}>Parking</ThemedText>
+              <View style={styles.chipRow}>
+                {([
+                  { label: 'None', value: 'none' },
+                  { label: 'Street', value: 'street' },
+                  { label: 'Lot', value: 'lot' },
+                  { label: 'Garage', value: 'garage' },
+                  { label: 'Covered', value: 'covered' },
+                ] as const).map(opt => {
+                  const selected = parkingType === opt.value;
+                  return (
+                    <Pressable
+                      key={opt.value}
+                      style={[
+                        styles.chip,
+                        selected ? styles.chipSelected : styles.chipUnselected,
+                      ]}
+                      onPress={() => setParkingType(opt.value)}
+                    >
+                      <Text style={[styles.chipText, { color: selected ? '#fff' : '#aaa' }]}>
+                        {opt.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+
+            {isAgent && (
+              <View style={styles.fieldContainer}>
+                <ThemedText style={styles.label}>MLS / Reference #</ThemedText>
+                <ThemedText style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, marginBottom: 6 }}>
+                  Optional — for your internal tracking
+                </ThemedText>
+                <TextInput
+                  style={styles.input}
+                  value={mlsNumber}
+                  onChangeText={setMlsNumber}
+                  placeholder="e.g. MLS-2024-12345"
+                  placeholderTextColor="#666"
+                />
+              </View>
+            )}
+          </>
+        )}
 
         {isCompanyHost ? (
           <View style={styles.fieldContainer}>
@@ -903,7 +1076,12 @@ export const CreateEditListingScreen = () => {
           roomType,
           (val: 'room' | 'entire') => {
             setRoomType(val);
-            if (val === 'entire') setPreferredTenantGender('any');
+            if (val === 'entire') {
+              setPreferredTenantGender('any');
+              if (isProfessionalHost) {
+                setExistingRoommatesCount(0);
+              }
+            }
           },
         )}
 
@@ -1232,15 +1410,26 @@ export const CreateEditListingScreen = () => {
       </View>
 
       <View style={styles.card}>
-        {renderSectionTitle('House Rules', 'Optional — helps set renter expectations')}
+        {renderSectionTitle(
+          isProfessionalHost ? 'Lease Terms & Rules' : 'House Rules',
+          isProfessionalHost ? 'Terms tenants should know' : 'Optional — helps set renter expectations',
+        )}
 
         <View style={styles.fieldContainer}>
-          <ThemedText style={styles.hintText}>e.g. No smoking indoors, quiet hours after 10pm, guests allowed with notice</ThemedText>
+          <ThemedText style={styles.hintText}>
+            {isProfessionalHost
+              ? 'e.g. No smoking on premises. Quiet hours 10pm-8am. Tenant responsible for utilities.'
+              : 'e.g. No smoking indoors, quiet hours after 10pm, guests allowed with notice'
+            }
+          </ThemedText>
           <TextInput
             style={[styles.input, styles.multilineInput]}
             value={houseRules}
             onChangeText={setHouseRules}
-            placeholder="e.g. No smoking, quiet hours after 10pm..."
+            placeholder={isProfessionalHost
+              ? "e.g. No smoking on premises. Quiet hours 10pm-8am. Tenant responsible for utilities."
+              : "e.g. No smoking, quiet hours after 10pm..."
+            }
             placeholderTextColor="#666"
             multiline
             numberOfLines={3}
