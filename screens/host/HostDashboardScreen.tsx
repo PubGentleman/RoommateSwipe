@@ -183,17 +183,13 @@ export const HostDashboardScreen = () => {
         setListings(freshListings);
       } else {
         const allProperties = await StorageService.getProperties();
-        const myListings = allProperties.filter(p =>
-          p.hostId === user.id || p.hostProfileId === user.id || (p as any).created_by === user.id
-        );
+        const myListings = allProperties.filter(p => p.hostId === user.id || p.hostProfileId === user.id);
         freshListings = myListings.length > 0 ? myListings : allProperties;
         setListings(freshListings);
       }
     } catch {
       const allProperties = await StorageService.getProperties();
-      const myListings = allProperties.filter(p =>
-        p.hostId === user.id || p.hostProfileId === user.id || (p as any).created_by === user.id
-      );
+      const myListings = allProperties.filter(p => p.hostId === user.id || p.hostProfileId === user.id);
       freshListings = myListings.length > 0 ? myListings : allProperties;
       setListings(freshListings);
     }
