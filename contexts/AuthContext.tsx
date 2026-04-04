@@ -2608,9 +2608,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       case 'company_enterprise':
       case 'business': return Infinity;
       case 'company_pro':
-      case 'pro': return 20;
+      case 'pro': return 10;
       case 'company_starter':
-      case 'starter': return 5;
+      case 'starter': return 3;
       default: return 1;
     }
   }
