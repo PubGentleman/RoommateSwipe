@@ -136,7 +136,7 @@ export async function getMyListings(userId: string) {
   const { data, error } = await supabase
     .from('listings')
     .select('*')
-    .eq('host_id', userId)
+    .eq('created_by', userId)
     .order('created_at', { ascending: false });
 
   if (error) throw error;
