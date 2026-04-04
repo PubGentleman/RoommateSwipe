@@ -1338,19 +1338,20 @@ export const HostDashboardScreen = () => {
           <Pressable style={styles.qaSecondary} onPress={() => navigation.navigate('Analytics')}>
             <Feather name="bar-chart-2" size={15} color="rgba(255,255,255,0.6)" />
             <Text style={styles.qaSecondaryText}>Analytics</Text>
-            {isAgent
-              ? (!agentPlanBase || agentPlanBase === 'pay_per_use' || agentPlanBase === 'starter' || agentPlanBase === 'free'
-                ? <View style={styles.proBadge}><Text style={styles.proBadgeText}>Pro</Text></View>
-                : null)
-              : (hostPlan === 'free' || hostPlan === 'none' || hostPlan === 'starter'
-                ? <View style={styles.proBadge}><Text style={styles.proBadgeText}>Pro</Text></View>
-                : null)}
+            {(() => {
+              const planBase = isAgent ? agentPlanBase : hostPlan.replace(/^(agent_|company_)/, '');
+              const needsPro = !planBase || planBase === 'pay_per_use' || planBase === 'free' || planBase === 'none' || planBase === 'starter';
+              return needsPro ? <View style={styles.proBadge}><Text style={styles.proBadgeText}>Pro</Text></View> : null;
+            })()}
           </Pressable>
           <Pressable style={styles.qaSecondary} onPress={() => navigation.navigate('HostSubscription')}>
             <Feather name="star" size={15} color={GOLD} />
             <Text style={styles.qaSecondaryText}>Plans</Text>
           </Pressable>
-          {(isAgent ? agentPlanBase === 'business' : hostPlan === 'business') ? (
+          {(() => {
+            const planBase = isAgent ? agentPlanBase : hostPlan.replace(/^(agent_|company_)/, '');
+            return planBase === 'business' || planBase === 'enterprise';
+          })() ? (
             <Pressable style={styles.qaSecondary} onPress={() => {
               Linking.openURL(`mailto:support@rhomeapp.io?subject=${encodeURIComponent('Support Request — ' + (user?.name || 'Business Account'))}`).catch(() => {
                 showAlert({
