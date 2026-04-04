@@ -34,7 +34,7 @@ export const AIFloatingButton = ({ onPress, top = 16, position = 'floating', siz
         end={{ x: 1, y: 1 }}
       >
         <Feather name="cpu" size={iconSize} color="#fff" />
-        <Text style={styles.label}>AI</Text>
+        <Text style={styles.label}>Pi</Text>
       </LinearGradient>
     </Pressable>
   );
