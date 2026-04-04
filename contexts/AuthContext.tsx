@@ -1157,9 +1157,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const SAFE_UPDATE_FIELDS = new Set([
     'name', 'firstName', 'lastName', 'bio', 'profilePicture', 'coverPhoto', 'photos',
     'occupation', 'company', 'school', 'aboutMe', 'zodiacSign',
-    'brokerageName', 'licenseNumber', 'licenseState',
+    'brokerageName', 'brokerageLicense', 'licenseNumber', 'licenseState', 'licensingState',
+    'agencyName', 'companyName', 'unitsManaged',
+    'hostType', 'hostTypeLockedAt', 'hostTypeChangeRequested',
+    'licenseVerificationStatus', 'licenseVerified', 'licenseVerifiedAt',
+    'licenseDocumentUrl',
     'preferredNeighborhoods', 'interestTags', 'profileData',
-    'notificationPreferences', 'privacySettings',
+    'notificationPreferences', 'privacySettings', 'verification', 'acceptAgentOffers',
     'searchPaused', 'searchPausedAt',
   ]);
 
@@ -1244,6 +1248,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (updates.licenseVerificationStatus !== undefined) supabaseFields.license_verification_status = updates.licenseVerificationStatus;
     if (updates.agencyName !== undefined) supabaseFields.agency_name = updates.agencyName;
     if (updates.companyName !== undefined) supabaseFields.company_name = updates.companyName;
+    if (updates.brokerageLicense !== undefined) supabaseFields.brokerage_license = updates.brokerageLicense;
+    if (updates.licensingState !== undefined) supabaseFields.licensing_state = updates.licensingState;
+    if (updates.unitsManaged !== undefined) supabaseFields.units_managed = updates.unitsManaged;
 
     if (Object.keys(supabaseFields).length > 0) {
       supabaseFields.updated_at = new Date().toISOString();

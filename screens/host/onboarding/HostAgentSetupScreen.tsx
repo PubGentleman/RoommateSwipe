@@ -376,9 +376,13 @@ async function verifyAgentLicense(params: {
   lastName?: string;
 }): Promise<{ verified: boolean; reason: string }> {
   try {
-    const { data, error } = await supabase.functions.invoke('verify-agent-license', {
+    const timeout = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Verification timed out')), 15000)
+    );
+    const request = supabase.functions.invoke('verify-agent-license', {
       body: params,
     });
+    const { data, error } = await Promise.race([request, timeout]);
     if (error) return { verified: false, reason: 'manual_review' };
     return {
       verified: data?.verified === true,

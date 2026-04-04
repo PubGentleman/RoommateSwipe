@@ -91,6 +91,19 @@ export const RootNavigator = () => {
     setShowOnboarding(false);
   }, []);
 
+  const step = user?.onboardingStep || 'complete';
+  const isHostProfessional = !!user && user.role === 'host' && (user.hostType === 'agent' || user.hostType === 'company');
+  const shouldSkipProfile = !!user && step === 'profile' && isHostProfessional;
+  const shouldSkipHostType = !!user && step === 'hostType' && user.role === 'host' && !!user.hostType;
+
+  useEffect(() => {
+    if (shouldSkipProfile) {
+      completeOnboardingStep(user!.hostType ? 'plan' : 'hostType');
+    } else if (shouldSkipHostType) {
+      completeOnboardingStep('plan');
+    }
+  }, [shouldSkipProfile, shouldSkipHostType]);
+
   if (isLoading || !onboardingChecked) {
     return (
       <View style={[styles.loading, { backgroundColor: theme.backgroundRoot }]}>
@@ -130,8 +143,6 @@ export const RootNavigator = () => {
     );
   }
 
-  const step = user.onboardingStep || 'complete';
-
   const needsRenterIntent = user.role === 'renter'
     && intentCompletedForUserId !== user.id
     && !user.profileData?.apartment_search_type
@@ -149,12 +160,15 @@ export const RootNavigator = () => {
     );
   }
 
+  if (shouldSkipProfile || shouldSkipHostType) {
+    return (
+      <View style={{ flex: 1, backgroundColor: theme.background, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color={theme.primary} />
+      </View>
+    );
+  }
+
   if (step === 'profile') {
-    const isHostProfessional = user.role === 'host' && (user.hostType === 'agent' || user.hostType === 'company');
-    if (isHostProfessional) {
-      completeOnboardingStep(user.hostType ? 'plan' : 'hostType');
-      return null;
-    }
     return (
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="OnboardingProfile" component={ProfileQuestionnaireScreen} />
@@ -163,10 +177,6 @@ export const RootNavigator = () => {
   }
 
   if (step === 'hostType' && user.role === 'host') {
-    if (user.hostType) {
-      completeOnboardingStep('plan');
-      return null;
-    }
     return (
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="OnboardingHostType" component={HostTypeSelectScreen} />
