@@ -18,35 +18,35 @@ interface AgentPlanLimits {
 
 const AGENT_PLAN_LIMITS: Record<string, AgentPlanLimits> = {
   pay_per_use: {
-    listingLimit: 3, placementFee: 149, teamSeats: 1,
+    listingLimit: 3, placementFee: 149, teamSeats: 0,
     hasAIMatching: false, hasAdvancedAI: false, hasPIMatching: false,
     hasBackgroundChecks: false, hasAdvancedAnalytics: false, hasCRM: false,
     hasVerifiedBadge: false, hasBoosts: false, hasDedicatedSupport: false,
     label: 'Pay Per Use',
   },
   free: {
-    listingLimit: 3, placementFee: 149, teamSeats: 1,
+    listingLimit: 3, placementFee: 149, teamSeats: 0,
     hasAIMatching: false, hasAdvancedAI: false, hasPIMatching: false,
     hasBackgroundChecks: false, hasAdvancedAnalytics: false, hasCRM: false,
     hasVerifiedBadge: false, hasBoosts: false, hasDedicatedSupport: false,
     label: 'Pay Per Use',
   },
   agent_starter: {
-    listingLimit: 10, placementFee: 99, teamSeats: 1,
+    listingLimit: 10, placementFee: 99, teamSeats: 0,
     hasAIMatching: true, hasAdvancedAI: false, hasPIMatching: false,
     hasBackgroundChecks: false, hasAdvancedAnalytics: false, hasCRM: false,
     hasVerifiedBadge: true, hasBoosts: true, hasDedicatedSupport: false,
     label: 'Agent Starter',
   },
   agent_pro: {
-    listingLimit: 30, placementFee: 49, teamSeats: 3,
+    listingLimit: 30, placementFee: 49, teamSeats: 0,
     hasAIMatching: true, hasAdvancedAI: true, hasPIMatching: true,
     hasBackgroundChecks: true, hasAdvancedAnalytics: true, hasCRM: false,
     hasVerifiedBadge: true, hasBoosts: true, hasDedicatedSupport: true,
     label: 'Agent Pro',
   },
   agent_business: {
-    listingLimit: -1, placementFee: 25, teamSeats: 10,
+    listingLimit: -1, placementFee: 25, teamSeats: 0,
     hasAIMatching: true, hasAdvancedAI: true, hasPIMatching: true,
     hasBackgroundChecks: true, hasAdvancedAnalytics: true, hasCRM: true,
     hasVerifiedBadge: true, hasBoosts: true, hasDedicatedSupport: true,
@@ -78,8 +78,9 @@ export function canAgentRunBackgroundChecks(plan: string): boolean {
   return getAgentLimits(plan).hasBackgroundChecks;
 }
 
-export function getAgentTeamSeats(plan: string): number {
-  return getAgentLimits(plan).teamSeats;
+/** @deprecated Agents do not manage teams — only companies do. Always returns 0. */
+export function getAgentTeamSeats(_plan: string): number {
+  return 0;
 }
 
 export function isAgentPlan(plan: string): boolean {

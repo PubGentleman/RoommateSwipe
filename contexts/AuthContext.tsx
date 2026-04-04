@@ -2605,12 +2605,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   function getTeamSeatLimitForPlan(plan: string): number {
     switch (plan) {
-      case 'company_starter':
-      case 'starter': return 3;
-      case 'company_pro':
-      case 'pro': return 10;
       case 'company_enterprise':
       case 'business': return Infinity;
+      case 'company_pro':
+      case 'pro': return 20;
+      case 'company_starter':
+      case 'starter': return 5;
       default: return 1;
     }
   }
