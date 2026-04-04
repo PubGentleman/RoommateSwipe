@@ -140,16 +140,16 @@ const PLACE_SEEKER_FIELDS: ProfileField[] = [
     icon: 'camera',
     tip: 'with a photo',
     boostText: '3x more responses',
-    weight: 15,
+    weight: 20,
     check: (u) => !!(u.photos?.length || u.profilePicture),
   },
   {
     key: 'bio',
     label: 'Write a Bio',
     icon: 'edit-2',
-    tip: 'Stand out to hosts',
-    boostText: 'with a bio',
-    weight: 15,
+    tip: 'Tell others about yourself',
+    boostText: 'Stand out',
+    weight: 25,
     check: (u) => !!(u.profileData?.bio && u.profileData.bio.trim().length >= 20),
   },
   {
@@ -158,43 +158,16 @@ const PLACE_SEEKER_FIELDS: ProfileField[] = [
     icon: 'calendar',
     tip: 'auto-updates from your birthday',
     boostText: 'Age verification',
-    weight: 10,
+    weight: 15,
     check: (u) => !!u.birthday,
-  },
-  {
-    key: 'occupation',
-    label: 'Add Occupation',
-    icon: 'briefcase',
-    tip: 'hosts prefer verified tenants',
-    boostText: 'Builds trust',
-    weight: 15,
-    check: (u) => !!(u.profileData?.occupation && u.profileData.occupation.trim().length > 0),
-  },
-  {
-    key: 'work',
-    label: 'Work Info',
-    icon: 'map-pin',
-    tip: 'for faster approvals',
-    boostText: 'Verify employment',
-    weight: 15,
-    check: (u) => !!(u.profileData?.preferences?.workLocation || u.profileData?.preferences?.workSchedule),
-  },
-  {
-    key: 'moveInDate',
-    label: 'Move-in Date',
-    icon: 'clock',
-    tip: 'with available listings',
-    boostText: 'Match timing',
-    weight: 15,
-    check: (u) => !!(u.profileData?.preferences?.moveInDate || u.profileData?.moveInDate),
   },
   {
     key: 'interests',
     label: 'Add Interests',
     icon: 'heart',
-    tip: 'helps hosts know you',
-    boostText: 'Show personality',
-    weight: 15,
+    tip: 'show your personality',
+    boostText: 'Find your vibe',
+    weight: 25,
     check: (u) => {
       const interests = u.profileData?.interests;
       return Array.isArray(interests) && interests.length >= 3;
@@ -234,23 +207,36 @@ function getCompletionData(user: User, searchType?: SearchType) {
   return { percentage, missing, completed, total: fields.length, completedCount: completed.length };
 }
 
-const FIELD_TO_STEP: Record<string, string> = {
-  photo: 'photos',
-  bio: 'basicInfo',
-  birthday: 'basicInfo',
-  budget: 'budgetLocation',
-  location: 'budgetLocation',
-  occupation: 'budgetLocation',
-  interests: 'interests',
-  sleepSchedule: 'sleepCleanliness',
-  cleanliness: 'sleepCleanliness',
-  smoking: 'smokingPets',
-  pets: 'smokingPets',
-  maxRoommates: 'lifestyle',
-  genderPreference: 'lifestyle',
-  work: 'lifestyle',
-  moveInDate: 'housing',
-};
+function getFieldToStep(searchType?: string | null): Record<string, string> {
+  const isPlaceSeeker = !!searchType && searchType !== 'with_roommates';
+
+  if (isPlaceSeeker) {
+    return {
+      photo: 'photos',
+      bio: 'basicInfo',
+      birthday: 'basicInfo',
+      interests: 'interests',
+    };
+  }
+
+  return {
+    photo: 'photos',
+    bio: 'basicInfo',
+    birthday: 'basicInfo',
+    budget: 'budgetLocation',
+    location: 'budgetLocation',
+    occupation: 'budgetLocation',
+    interests: 'interests',
+    sleepSchedule: 'sleepCleanliness',
+    cleanliness: 'sleepCleanliness',
+    smoking: 'smokingPets',
+    pets: 'smokingPets',
+    maxRoommates: 'lifestyle',
+    genderPreference: 'lifestyle',
+    work: 'lifestyle',
+    moveInDate: 'housing',
+  };
+}
 
 interface ProfileCompletionCardProps {
   user: User;
@@ -317,7 +303,8 @@ export const ProfileCompletionCard = ({ user, searchType, onEditProfile }: Profi
         </Text>
 
         {topMissing.map((field) => {
-          const tappedStep = FIELD_TO_STEP[field.key];
+          const fieldToStep = getFieldToStep(searchType);
+          const tappedStep = fieldToStep[field.key];
           return (
             <Pressable key={field.key} style={styles.completionItem} onPress={() => onEditProfile(tappedStep ? [tappedStep] : undefined)}>
               <View style={styles.completionIcon}>
@@ -338,8 +325,9 @@ export const ProfileCompletionCard = ({ user, searchType, onEditProfile }: Profi
 
         {missing.length > 3 ? (
           <Pressable style={styles.moreLink} onPress={() => {
+            const fieldToStep = getFieldToStep(searchType);
             const allMissingSteps = [...new Set(
-              missing.map(f => FIELD_TO_STEP[f.key]).filter(Boolean)
+              missing.map(f => fieldToStep[f.key]).filter(Boolean)
             )];
             onEditProfile(allMissingSteps.length > 0 ? allMissingSteps : undefined);
           }}>

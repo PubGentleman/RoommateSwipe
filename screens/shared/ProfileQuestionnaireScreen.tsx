@@ -299,13 +299,11 @@ const ONBOARDING_STEPS: StepId[] = [
 const ONBOARDING_STEPS_LITE: StepId[] = [
   'photos',
   'basicInfo',
-  'budgetLocation',
 ];
 
 const PLACE_SEEKER_STEPS: StepId[] = [
   'photos',
   'basicInfo',
-  'lifestyle',
   'interests',
   'profileNote',
 ];
@@ -340,6 +338,15 @@ const STEP_SUBTITLES: Record<StepId, string> = {
   personality: 'How you live with others.',
   profileNote: 'Write anything you want potential roommates to know about you.',
   idealRoommate: 'Describe your ideal roommate in your own words. Pi uses this to find better matches.',
+};
+
+const PLACE_SEEKER_TITLES: Partial<Record<StepId, string>> = {
+  profileNote: 'In Your Own Words',
+};
+
+const PLACE_SEEKER_SUBTITLES: Partial<Record<StepId, string>> = {
+  interests: 'Pick at least 1 tag from each category.',
+  profileNote: 'Write anything you want others to know about you.',
 };
 
 const STEP_ICONS: Record<StepId, keyof typeof Feather.glyphMap> = {
@@ -397,6 +404,7 @@ export const ProfileQuestionnaireScreen = () => {
       case 'idealRoommate':
         return !!((pd.ideal_roommate_text || user.ideal_roommate_text)?.trim()?.length >= 10);
       case 'lifestyle':
+        if (isPlaceSeekerUser) return true;
         return !!(prefs.workLocation && prefs.guestPolicy && prefs.noiseTolerance);
       default:
         return false;
@@ -1676,8 +1684,8 @@ export const ProfileQuestionnaireScreen = () => {
             <View style={styles.stepBadge}>
               <Text style={styles.stepBadgeText}>{currentFilteredIndex + 1} of {stepsToShow.length}</Text>
             </View>
-            <ThemedText style={styles.stepTitle}>{STEP_TITLES[currentStepId]}</ThemedText>
-            <ThemedText style={styles.stepSubtitle}>{STEP_SUBTITLES[currentStepId]}</ThemedText>
+            <ThemedText style={styles.stepTitle}>{isPlaceSeekerUser ? (PLACE_SEEKER_TITLES[currentStepId] || STEP_TITLES[currentStepId]) : STEP_TITLES[currentStepId]}</ThemedText>
+            <ThemedText style={styles.stepSubtitle}>{isPlaceSeekerUser ? (PLACE_SEEKER_SUBTITLES[currentStepId] || STEP_SUBTITLES[currentStepId]) : STEP_SUBTITLES[currentStepId]}</ThemedText>
           </View>
           {renderStepContent()}
         </Animated.View>
