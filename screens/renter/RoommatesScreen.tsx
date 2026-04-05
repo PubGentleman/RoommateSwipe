@@ -1858,9 +1858,6 @@ export const RoommatesScreen = () => {
               />
             </View>
           </View>
-          <View style={styles.completionBannerRight}>
-            <Feather name="chevron-right" size={18} color="rgba(255,255,255,0.4)" />
-          </View>
           <Pressable
             style={styles.completionDismissBtn}
             hitSlop={8}
@@ -4572,7 +4569,8 @@ const styles = StyleSheet.create({
     marginHorizontal: Spacing.md,
     marginBottom: 10,
     paddingVertical: 14,
-    paddingHorizontal: 16,
+    paddingLeft: 16,
+    paddingRight: 36,
     backgroundColor: 'rgba(255,107,91,0.08)',
     borderWidth: 1,
     borderColor: 'rgba(255,107,91,0.15)',
@@ -4596,9 +4594,6 @@ const styles = StyleSheet.create({
   completionBarFill: {
     height: '100%' as any,
     borderRadius: 2,
-  },
-  completionBannerRight: {
-    paddingLeft: 12,
   },
   completionDismissBtn: {
     position: 'absolute' as const,

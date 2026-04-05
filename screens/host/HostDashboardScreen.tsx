@@ -727,7 +727,6 @@ export const HostDashboardScreen = () => {
                 />
               </View>
             </View>
-            <Feather name="chevron-right" size={18} color="rgba(255,255,255,0.4)" />
             <Pressable
               style={styles.completionDismissBtn}
               hitSlop={8}
@@ -1936,7 +1935,8 @@ const styles = StyleSheet.create({
     marginHorizontal: 20,
     marginBottom: 12,
     paddingVertical: 14,
-    paddingHorizontal: 16,
+    paddingLeft: 16,
+    paddingRight: 36,
     backgroundColor: 'rgba(255,107,91,0.08)',
     borderWidth: 1,
     borderColor: 'rgba(255,107,91,0.15)',
