@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { View, StyleSheet, Pressable, Image as RNImage, Modal, ScrollView, Text, TouchableOpacity, Platform, Switch } from 'react-native';
+import { View, StyleSheet, Pressable, Image as RNImage, Modal, ScrollView, Text, TextInput, TouchableOpacity, Platform, Switch } from 'react-native';
 import { Image } from 'expo-image';
 import Animated, { useSharedValue, useAnimatedScrollHandler, useAnimatedStyle, interpolate, Extrapolation } from 'react-native-reanimated';
 import { Feather } from '../../components/VectorIcons';
@@ -31,7 +31,7 @@ import { getHostPlanDisplayInfo, resolveEffectiveHostPlan, isFreeTier } from '..
 import { getProfileGateStatus, TIER_INFO, ProfileTier } from '../../utils/profileGate';
 import LevelUpToast from '../../components/LevelUpToast';
 import { ShareProfileSheet } from '../../components/ShareProfileSheet';
-import { getReceivedTestimonials, refreshProfileStats, getTraitEmoji, type PublicProfile, type Testimonial } from '../../services/socialProfileService';
+import { getReceivedTestimonials, refreshProfileStats, updateTagline, getTraitEmoji, type PublicProfile, type Testimonial } from '../../services/socialProfileService';
 
 type ProfileScreenNavigationProp = NativeStackNavigationProp<ProfileStackParamList, 'ProfileMain'>;
 
@@ -55,6 +55,8 @@ export const ProfileScreen = () => {
   const [showShareSheet, setShowShareSheet] = useState(false);
   const [testimonials, setTestimonials] = useState<any[]>([]);
   const [profileStats, setProfileStats] = useState<any>({});
+  const [editingTagline, setEditingTagline] = useState(false);
+  const [taglineText, setTaglineText] = useState('');
 
   const PROFILE_COLLAPSE_H = 280;
   const profileScrollY = useSharedValue(0);
@@ -694,9 +696,47 @@ export const ProfileScreen = () => {
               </Pressable>
             )}
 
-            {profileStats?.profile_tagline ? (
-              <Text style={styles.spTagline}>"{profileStats.profile_tagline}"</Text>
-            ) : null}
+            {editingTagline ? (
+              <View style={styles.spTaglineEditRow}>
+                <TextInput
+                  style={styles.spTaglineInput}
+                  value={taglineText}
+                  onChangeText={t => setTaglineText(t.slice(0, 100))}
+                  placeholder="Add a tagline..."
+                  placeholderTextColor="#555"
+                  maxLength={100}
+                  autoFocus
+                  onBlur={async () => {
+                    setEditingTagline(false);
+                    if (user?.id && taglineText !== (profileStats?.profile_tagline || '')) {
+                      try {
+                        await updateTagline(user.id, taglineText);
+                        setProfileStats((prev: any) => ({ ...prev, profile_tagline: taglineText }));
+                      } catch {}
+                    }
+                  }}
+                  returnKeyType="done"
+                  onSubmitEditing={async () => {
+                    setEditingTagline(false);
+                    if (user?.id && taglineText !== (profileStats?.profile_tagline || '')) {
+                      try {
+                        await updateTagline(user.id, taglineText);
+                        setProfileStats((prev: any) => ({ ...prev, profile_tagline: taglineText }));
+                      } catch {}
+                    }
+                  }}
+                />
+                <Text style={styles.spTaglineCount}>{taglineText.length}/100</Text>
+              </View>
+            ) : (
+              <Pressable onPress={() => { setTaglineText(profileStats?.profile_tagline || ''); setEditingTagline(true); }}>
+                {profileStats?.profile_tagline ? (
+                  <Text style={styles.spTagline}>"{profileStats.profile_tagline}"</Text>
+                ) : (
+                  <Text style={styles.spTaglinePlaceholder}>Tap to add a tagline...</Text>
+                )}
+              </Pressable>
+            )}
 
             <View style={styles.spStatsRow}>
               <View style={styles.spStatItem}>
@@ -1429,10 +1469,20 @@ export const ProfileScreen = () => {
           interests: user?.profileData?.interests || [],
           verifications: [],
           stats: profileStats?.profile_stats || { matchCount: 0, groupCount: 0, responseRate: 0, memberSince: '' },
-          testimonials: [],
+          testimonials: testimonials.map((t: any) => ({
+            id: t.id,
+            authorName: t.author?.full_name || 'Anonymous',
+            authorPhoto: t.author?.avatar_url,
+            relationship: t.relationship,
+            content: t.content,
+            rating: t.rating,
+            traits: t.traits || [],
+            createdAt: t.created_at,
+          })),
           traits: [],
         }}
         userId={user?.id || ''}
+        userPlan={user?.subscription?.plan}
       />
 
       <RhomeAISheet
@@ -1621,6 +1671,36 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingHorizontal: 20,
     marginBottom: 12,
+  },
+  spTaglinePlaceholder: {
+    fontSize: 13,
+    color: '#555',
+    fontStyle: 'italic',
+    textAlign: 'center',
+    paddingHorizontal: 20,
+    marginBottom: 12,
+  },
+  spTaglineEditRow: {
+    marginHorizontal: 16,
+    marginBottom: 12,
+  },
+  spTaglineInput: {
+    backgroundColor: '#141414',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: '#fff',
+    fontStyle: 'italic',
+    textAlign: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,91,0.3)',
+  },
+  spTaglineCount: {
+    fontSize: 10,
+    color: '#555',
+    textAlign: 'right',
+    marginTop: 4,
   },
   spStatsRow: {
     flexDirection: 'row',

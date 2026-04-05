@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, Pressable, StyleSheet, FlatList, Image, Alert, RefreshControl } from 'react-native';
+import { View, Text, Pressable, StyleSheet, FlatList, Image, Alert, RefreshControl, Share } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import { Feather } from '../../components/VectorIcons';
-import { getReceivedTestimonials, getTestimonialsWrittenByMe, updateTestimonialStatus, getTraitEmoji } from '../../services/socialProfileService';
+import { getReceivedTestimonials, getTestimonialsWrittenByMe, updateTestimonialStatus, getTraitEmoji, getProfileShareLink } from '../../services/socialProfileService';
 import { useAuth } from '../../contexts/AuthContext';
+import { normalizeRenterPlan } from '../../constants/renterPlanLimits';
 
 type Tab = 'received' | 'written';
 
@@ -147,8 +148,25 @@ export default function TestimonialsScreen() {
     }
   };
 
-  const data = tab === 'received' ? received : written;
-  const pendingCount = received.filter(t => t.status === 'pending').length;
+  const plan = normalizeRenterPlan(user?.subscription?.plan);
+  const maxVisible = plan === 'elite' ? Infinity : plan === 'plus' ? 10 : 3;
+  const approvedReceived = received.filter(t => t.status === 'approved');
+  const pendingReceived = received.filter(t => t.status === 'pending');
+  const visibleApproved = approvedReceived.slice(0, maxVisible);
+  const gatedCount = Math.max(0, approvedReceived.length - maxVisible);
+  const displayReceived = [...pendingReceived, ...visibleApproved];
+  const data = tab === 'received' ? displayReceived : written;
+  const pendingCount = pendingReceived.length;
+
+  const handleRequestTestimonial = async () => {
+    try {
+      const slug = user?.profile_slug || user?.id || '';
+      const link = getProfileShareLink(slug);
+      await Share.share({
+        message: `Hey! Could you write a testimonial about me on Rhome? It really helps with finding roommates. Here's my profile: ${link}`,
+      });
+    } catch {}
+  };
 
   return (
     <View style={styles.container}>
@@ -195,6 +213,24 @@ export default function TestimonialsScreen() {
             onRefresh={() => { setRefreshing(true); loadData(); }}
             tintColor="#ff6b5b"
           />
+        }
+        ListFooterComponent={
+          <>
+            {tab === 'received' && gatedCount > 0 ? (
+              <View style={styles.gatedBanner}>
+                <Feather name="lock" size={14} color="#ff6b5b" />
+                <Text style={styles.gatedText}>
+                  {gatedCount} more testimonial{gatedCount > 1 ? 's' : ''} visible with {plan === 'basic' ? 'Plus' : 'Elite'}
+                </Text>
+              </View>
+            ) : null}
+            {tab === 'received' ? (
+              <Pressable style={styles.requestBtn} onPress={handleRequestTestimonial}>
+                <Feather name="send" size={16} color="#ff6b5b" />
+                <Text style={styles.requestBtnText}>Request a Testimonial</Text>
+              </Pressable>
+            ) : null}
+          </>
         }
         ListEmptyComponent={
           <View style={styles.empty}>
@@ -285,6 +321,38 @@ const styles = StyleSheet.create({
     color: '#A0A0A0',
     textAlign: 'center',
     lineHeight: 18,
+  },
+  gatedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(255,107,91,0.08)',
+    borderRadius: 12,
+    padding: 14,
+    marginTop: 4,
+  },
+  gatedText: {
+    fontSize: 13,
+    color: '#ff6b5b',
+    fontWeight: '600',
+  },
+  requestBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(255,107,91,0.1)',
+    borderRadius: 14,
+    padding: 16,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,91,0.2)',
+  },
+  requestBtnText: {
+    fontSize: 15,
+    color: '#ff6b5b',
+    fontWeight: '700',
   },
 });
 

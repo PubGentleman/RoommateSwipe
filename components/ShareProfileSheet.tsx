@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { View, Text, Pressable, StyleSheet, Modal, Switch, Alert } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Modal, Switch, Alert, Linking, Platform } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import * as Sharing from 'expo-sharing';
 import * as Haptics from 'expo-haptics';
@@ -9,23 +9,33 @@ import { ProfileShareCard } from './ProfileShareCard';
 import { supabase } from '../lib/supabase';
 import { getProfileShareLink, trackProfileShare, togglePublicProfile, type PublicProfile } from '../services/socialProfileService';
 import { generateResumeText } from '../utils/roommateResume';
+import { normalizeRenterPlan } from '../constants/renterPlanLimits';
 
 interface Props {
   visible: boolean;
   onClose: () => void;
   profile: PublicProfile;
   userId: string;
+  userPlan?: string;
 }
 
 const SHARE_OPTIONS = [
-  { key: 'copy', icon: 'copy', label: 'Copy Link', color: '#3b82f6' },
-  { key: 'card', icon: 'image', label: 'Share Card', color: '#ff6b5b' },
-  { key: 'message', icon: 'message-circle', label: 'Message', color: '#22C55E' },
-  { key: 'resume', icon: 'file-text', label: 'Resume', color: '#6C5CE7' },
+  { key: 'copy', icon: 'copy', label: 'Copy Link', color: '#3b82f6', gated: false },
+  { key: 'card', icon: 'image', label: 'Share Card', color: '#ff6b5b', gated: true, minPlan: 'plus' },
+  { key: 'sms', icon: 'message-circle', label: 'iMessage', color: '#22C55E', gated: false },
+  { key: 'whatsapp', icon: 'phone', label: 'WhatsApp', color: '#25D366', gated: false },
+  { key: 'twitter', icon: 'globe', label: 'Twitter/X', color: '#1DA1F2', gated: false },
+  { key: 'resume', icon: 'file-text', label: 'Resume', color: '#6C5CE7', gated: true, minPlan: 'plus' },
 ];
 
-export function ShareProfileSheet({ visible, onClose, profile, userId }: Props) {
+function isPlanAtLeast(current: string, required: string): boolean {
+  const order = ['basic', 'plus', 'elite'];
+  return order.indexOf(current) >= order.indexOf(required);
+}
+
+export function ShareProfileSheet({ visible, onClose, profile, userId, userPlan }: Props) {
   const [publicEnabled, setPublicEnabled] = useState(false);
+  const plan = normalizeRenterPlan(userPlan);
 
   React.useEffect(() => {
     if (visible) {
@@ -36,6 +46,7 @@ export function ShareProfileSheet({ visible, onClose, profile, userId }: Props) 
   }, [visible, userId]);
   const cardRef = useRef<View>(null);
   const shareLink = getProfileShareLink(profile.slug);
+  const shareMessage = `Check out my roommate profile on Rhome: ${shareLink}`;
 
   const handleCopyLink = useCallback(async () => {
     try {
@@ -49,35 +60,75 @@ export function ShareProfileSheet({ visible, onClose, profile, userId }: Props) 
   }, [shareLink, userId]);
 
   const handleShareCard = useCallback(async () => {
+    if (!isPlanAtLeast(plan, 'plus')) {
+      Alert.alert('Plus Required', 'Upgrade to Plus to share your profile as an image card.');
+      return;
+    }
     try {
       if (!cardRef.current) return;
       const uri = await captureRef(cardRef, { format: 'png', quality: 0.9 });
       const canShare = await Sharing.isAvailableAsync();
       if (canShare) {
         await Sharing.shareAsync(uri, { mimeType: 'image/png' });
-        trackProfileShare(userId, 'card_image').catch(() => {});
+        trackProfileShare(userId, 'card_image', 'share_card').catch(() => {});
       }
     } catch {
       Alert.alert('Error', 'Failed to generate share card');
     }
-  }, [userId]);
+  }, [userId, plan]);
 
-  const handleShareMessage = useCallback(async () => {
+  const handleShareSMS = useCallback(async () => {
     try {
-      const canShare = await Sharing.isAvailableAsync();
-      if (canShare) {
-        const text = `Check out my roommate profile on Rhome: ${shareLink}`;
-        await Clipboard.setStringAsync(text);
+      const url = Platform.OS === 'ios'
+        ? `sms:&body=${encodeURIComponent(shareMessage)}`
+        : `sms:?body=${encodeURIComponent(shareMessage)}`;
+      const canOpen = await Linking.canOpenURL(url);
+      if (canOpen) {
+        await Linking.openURL(url);
+        trackProfileShare(userId, 'link', 'sms').catch(() => {});
+      } else {
+        await Clipboard.setStringAsync(shareMessage);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-        Alert.alert('Copied!', 'Message with link copied to clipboard');
+        Alert.alert('Copied!', 'Message copied to clipboard');
         trackProfileShare(userId, 'link', 'sms').catch(() => {});
       }
     } catch {
-      Alert.alert('Error', 'Failed to share');
+      await Clipboard.setStringAsync(shareMessage);
+      Alert.alert('Copied!', 'Message copied to clipboard');
+    }
+  }, [shareLink, userId, shareMessage]);
+
+  const handleShareWhatsApp = useCallback(async () => {
+    try {
+      const url = `https://wa.me/?text=${encodeURIComponent(shareMessage)}`;
+      const canOpen = await Linking.canOpenURL(url);
+      if (canOpen) {
+        await Linking.openURL(url);
+        trackProfileShare(userId, 'link', 'whatsapp').catch(() => {});
+      } else {
+        Alert.alert('WhatsApp not available', 'WhatsApp is not installed on this device.');
+      }
+    } catch {
+      Alert.alert('Error', 'Failed to open WhatsApp');
+    }
+  }, [shareMessage, userId]);
+
+  const handleShareTwitter = useCallback(async () => {
+    try {
+      const text = `Check out my roommate profile on @RhomeApp`;
+      const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(shareLink)}`;
+      await Linking.openURL(url);
+      trackProfileShare(userId, 'link', 'twitter').catch(() => {});
+    } catch {
+      Alert.alert('Error', 'Failed to open Twitter');
     }
   }, [shareLink, userId]);
 
   const handleShareResume = useCallback(async () => {
+    if (!isPlanAtLeast(plan, 'plus')) {
+      Alert.alert('Plus Required', 'Upgrade to Plus to export your roommate resume.');
+      return;
+    }
     try {
       const resumeText = generateResumeText(profile);
       await Clipboard.setStringAsync(resumeText);
@@ -87,7 +138,7 @@ export function ShareProfileSheet({ visible, onClose, profile, userId }: Props) 
     } catch {
       Alert.alert('Error', 'Failed to generate resume');
     }
-  }, [profile, userId]);
+  }, [profile, userId, plan]);
 
   const handleTogglePublic = async (val: boolean) => {
     setPublicEnabled(val);
@@ -103,7 +154,9 @@ export function ShareProfileSheet({ visible, onClose, profile, userId }: Props) 
     switch (key) {
       case 'copy': handleCopyLink(); break;
       case 'card': handleShareCard(); break;
-      case 'message': handleShareMessage(); break;
+      case 'sms': handleShareSMS(); break;
+      case 'whatsapp': handleShareWhatsApp(); break;
+      case 'twitter': handleShareTwitter(); break;
       case 'resume': handleShareResume(); break;
     }
   };
@@ -126,14 +179,22 @@ export function ShareProfileSheet({ visible, onClose, profile, userId }: Props) 
           </View>
 
           <View style={styles.optionsGrid}>
-            {SHARE_OPTIONS.map(opt => (
-              <Pressable key={opt.key} style={styles.optionItem} onPress={() => handleOptionPress(opt.key)}>
-                <View style={[styles.optionIcon, { backgroundColor: `${opt.color}20` }]}>
-                  <Feather name={opt.icon} size={20} color={opt.color} />
-                </View>
-                <Text style={styles.optionLabel}>{opt.label}</Text>
-              </Pressable>
-            ))}
+            {SHARE_OPTIONS.map(opt => {
+              const locked = opt.gated && opt.minPlan && !isPlanAtLeast(plan, opt.minPlan);
+              return (
+                <Pressable key={opt.key} style={styles.optionItem} onPress={() => handleOptionPress(opt.key)}>
+                  <View style={[styles.optionIcon, { backgroundColor: `${opt.color}20` }]}>
+                    <Feather name={opt.icon} size={20} color={locked ? '#555' : opt.color} />
+                    {locked ? (
+                      <View style={styles.lockBadge}>
+                        <Feather name="lock" size={8} color="#fff" />
+                      </View>
+                    ) : null}
+                  </View>
+                  <Text style={[styles.optionLabel, locked ? { color: '#555' } : null]}>{opt.label}</Text>
+                </Pressable>
+              );
+            })}
           </View>
 
           <View style={styles.toggleRow}>
@@ -212,9 +273,10 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   optionItem: {
-    width: '22%',
+    width: '30%',
     alignItems: 'center',
     gap: 6,
+    marginBottom: 4,
   },
   optionIcon: {
     width: 48,
@@ -227,6 +289,17 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#A0A0A0',
     textAlign: 'center',
+  },
+  lockBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#555',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   toggleRow: {
     flexDirection: 'row',

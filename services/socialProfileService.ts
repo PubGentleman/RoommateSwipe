@@ -52,7 +52,7 @@ export async function getPublicProfile(slug: string): Promise<PublicProfile | nu
 
   const { data: testimonials } = await supabase
     .from('testimonials')
-    .select('id, content, rating, traits, relationship, created_at, author_id')
+    .select('id, content, rating, traits, relationship, created_at, author:users!author_id(full_name, avatar_url)')
     .eq('recipient_id', user.id)
     .eq('status', 'approved')
     .order('created_at', { ascending: false })
@@ -88,8 +88,8 @@ export async function getPublicProfile(slug: string): Promise<PublicProfile | nu
     stats: user.profile_stats || { matchCount: 0, groupCount: 0, responseRate: 0, memberSince: user.created_at },
     testimonials: (testimonials || []).map((t: any) => ({
       id: t.id,
-      authorName: 'Rhome User',
-      authorPhoto: undefined,
+      authorName: t.author?.full_name || 'Anonymous',
+      authorPhoto: t.author?.avatar_url,
       relationship: t.relationship,
       content: t.content,
       rating: t.rating,
@@ -217,7 +217,7 @@ export async function updateTestimonialStatus(testimonialId: string, userId: str
 export async function getPendingTestimonials(userId: string) {
   const { data } = await supabase
     .from('testimonials')
-    .select('*')
+    .select('*, author:users!author_id(full_name, avatar_url)')
     .eq('recipient_id', userId)
     .eq('status', 'pending')
     .order('created_at', { ascending: false });
