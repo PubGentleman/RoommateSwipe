@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   StyleSheet,
@@ -11,6 +11,7 @@ import {
   KeyboardAvoidingView,
   Keyboard,
   Text,
+  Dimensions,
 } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -26,13 +27,19 @@ import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
+  withSpring,
+  withRepeat,
+  withSequence,
   FadeIn,
   FadeInDown,
-  SlideInRight,
-  SlideOutLeft,
-  SlideInLeft,
-  SlideOutRight,
+  FadeInRight,
+  FadeOutLeft,
+  FadeInLeft,
+  FadeOutRight,
+  BounceIn,
+  ZoomIn,
 } from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemedText } from '../../components/ThemedText';
@@ -48,248 +55,31 @@ import { updateProfile } from '../../services/profileService';
 import { AppHeader } from '../../components/AppHeader';
 import { RhomeLogo } from '../../components/RhomeLogo';
 
-const TOTAL_STEPS = 12;
-
-function EmojiTileGrid({
-  options,
-  selected,
-  onSelect,
-  multiSelect = false,
-}: {
-  options: { value: string; emoji: string; label: string; subtitle?: string }[];
-  selected: string | string[];
-  onSelect: (value: string) => void;
-  multiSelect?: boolean;
-}) {
-  const { theme } = useTheme();
-  const isActive = (value: string) =>
-    multiSelect ? (selected as string[]).includes(value) : selected === value;
-
-  return (
-    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-      {options.map((opt) => {
-        const active = isActive(opt.value);
-        return (
-          <TouchableOpacity
-            key={opt.value}
-            onPress={() => onSelect(opt.value)}
-            style={{
-              width: '47%',
-              backgroundColor: active ? theme.primary + '20' : theme.backgroundSecondary,
-              borderWidth: 2,
-              borderColor: active ? theme.primary : theme.border,
-              borderRadius: 14,
-              paddingVertical: 14,
-              paddingHorizontal: 12,
-              alignItems: 'center',
-              gap: 6,
-            }}
-            activeOpacity={0.7}
-          >
-            <Text style={{ fontSize: 28 }}>{opt.emoji}</Text>
-            <Text style={{
-              fontSize: 13,
-              fontWeight: '600',
-              color: active ? theme.primary : theme.text,
-              textAlign: 'center',
-            }}>
-              {opt.label}
-            </Text>
-            {opt.subtitle ? (
-              <Text style={{
-                fontSize: 11,
-                color: theme.textSecondary,
-                textAlign: 'center',
-                lineHeight: 14,
-              }}>
-                {opt.subtitle}
-              </Text>
-            ) : null}
-          </TouchableOpacity>
-        );
-      })}
-    </View>
-  );
-}
-
-function BinaryChoice({
-  options,
-  selected,
-  onSelect,
-}: {
-  options: { value: string; emoji: string; label: string }[];
-  selected: string;
-  onSelect: (value: string) => void;
-}) {
-  const { theme } = useTheme();
-
-  return (
-    <View style={{ flexDirection: 'row', gap: 14 }}>
-      {options.map((opt) => {
-        const active = selected === opt.value;
-        return (
-          <TouchableOpacity
-            key={opt.value}
-            onPress={() => onSelect(opt.value)}
-            style={{
-              flex: 1,
-              backgroundColor: active ? theme.primary : theme.backgroundSecondary,
-              borderWidth: 2,
-              borderColor: active ? theme.primary : theme.border,
-              borderRadius: 18,
-              paddingVertical: 28,
-              alignItems: 'center',
-              gap: 10,
-            }}
-            activeOpacity={0.7}
-          >
-            <Text style={{ fontSize: 36 }}>{opt.emoji}</Text>
-            <Text style={{
-              fontSize: 16,
-              fontWeight: '700',
-              color: active ? '#fff' : theme.text,
-            }}>
-              {opt.label}
-            </Text>
-          </TouchableOpacity>
-        );
-      })}
-    </View>
-  );
-}
-
-function IconScale({
-  levels,
-  selected,
-  onSelect,
-}: {
-  levels: { value: string; emoji: string; label: string }[];
-  selected: string;
-  onSelect: (value: string) => void;
-}) {
-  const { theme } = useTheme();
-
-  return (
-    <View>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
-        {levels.map((level) => {
-          const active = selected === level.value;
-          return (
-            <TouchableOpacity
-              key={level.value}
-              onPress={() => onSelect(level.value)}
-              style={{
-                flex: 1,
-                alignItems: 'center',
-                paddingVertical: 14,
-                marginHorizontal: 3,
-                backgroundColor: active ? theme.primary + '20' : theme.backgroundSecondary,
-                borderWidth: 2,
-                borderColor: active ? theme.primary : theme.border,
-                borderRadius: 12,
-                gap: 4,
-              }}
-              activeOpacity={0.7}
-            >
-              <Text style={{ fontSize: 24 }}>{level.emoji}</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-      {selected ? (
-        <Text style={{
-          textAlign: 'center',
-          color: theme.primary,
-          fontWeight: '600',
-          fontSize: 14,
-          marginTop: 6,
-        }}>
-          {levels.find(l => l.value === selected)?.label}
-        </Text>
-      ) : null}
-    </View>
-  );
-}
-
-function CheckboxPills({
-  options,
-  selected,
-  onToggle,
-}: {
-  options: { value: string; label: string; emoji: string }[];
-  selected: string[];
-  onToggle: (value: string) => void;
-}) {
-  const { theme } = useTheme();
-
-  return (
-    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-      {options.map((opt) => {
-        const active = selected.includes(opt.value);
-        return (
-          <TouchableOpacity
-            key={opt.value}
-            onPress={() => onToggle(opt.value)}
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 8,
-              paddingVertical: 10,
-              paddingHorizontal: 16,
-              backgroundColor: active ? theme.primary + '20' : theme.backgroundSecondary,
-              borderWidth: 2,
-              borderColor: active ? theme.primary : theme.border,
-              borderRadius: 100,
-            }}
-            activeOpacity={0.7}
-          >
-            <Text style={{ fontSize: 16 }}>{opt.emoji}</Text>
-            <Text style={{
-              fontSize: 13,
-              fontWeight: active ? '700' : '500',
-              color: active ? theme.primary : theme.text,
-            }}>
-              {opt.label}
-            </Text>
-            {active ? (
-              <Feather name="check-circle" size={16} color={theme.primary} />
-            ) : null}
-          </TouchableOpacity>
-        );
-      })}
-    </View>
-  );
-}
+const SCREEN_WIDTH = Dimensions.get('window').width;
 
 type StepId =
   | 'photos'
   | 'basicInfo'
   | 'budgetLocation'
   | 'dealbreakers'
-  | 'sleepCleanliness'
-  | 'smokingPets'
+  | 'houseRules'
   | 'lifestyle'
-  | 'housing'
-  | 'roommateSetup'
+  | 'yourSetup'
   | 'interests'
   | 'personality'
-  | 'profileNote'
-  | 'idealRoommate';
+  | 'finalWords';
 
 const STEP_ORDER: StepId[] = [
   'photos',
   'basicInfo',
   'budgetLocation',
   'dealbreakers',
-  'sleepCleanliness',
-  'smokingPets',
+  'houseRules',
   'lifestyle',
-  'housing',
-  'roommateSetup',
+  'yourSetup',
   'interests',
   'personality',
-  'profileNote',
-  'idealRoommate',
+  'finalWords',
 ];
 
 const ONBOARDING_STEPS: StepId[] = [
@@ -308,45 +98,48 @@ const PLACE_SEEKER_STEPS: StepId[] = [
   'basicInfo',
 ];
 
+const LEGACY_STEP_MAP: Record<string, StepId> = {
+  sleepCleanliness: 'houseRules',
+  smokingPets: 'houseRules',
+  housing: 'yourSetup',
+  roommateSetup: 'yourSetup',
+  profileNote: 'finalWords',
+  idealRoommate: 'finalWords',
+};
+
 const STEP_TITLES: Record<StepId, string> = {
-  photos: 'Add Your Photos',
-  basicInfo: 'About You',
-  budgetLocation: 'Budget & Location',
-  dealbreakers: 'Any Dealbreakers?',
-  sleepCleanliness: 'Sleep & Cleanliness',
-  smokingPets: 'Smoking & Pets',
-  lifestyle: 'Your Lifestyle',
-  housing: 'Housing Needs',
-  roommateSetup: 'Roommate Preferences',
-  interests: 'Interests',
-  personality: 'Your Living Style',
-  profileNote: 'In Your Own Words',
-  idealRoommate: 'Your Ideal Roommate',
+  photos: 'First impressions matter',
+  basicInfo: "Let's get to know you",
+  budgetLocation: "What's the plan?",
+  dealbreakers: "What's a dealbreaker?",
+  houseRules: 'The make-or-break stuff',
+  lifestyle: 'A day in your life',
+  yourSetup: 'Build your crew',
+  interests: 'What makes you, you?',
+  personality: 'Living with you',
+  finalWords: 'Almost done!',
 };
 
 const STEP_SUBTITLES: Record<StepId, string> = {
-  photos: 'Add up to 6 photos. Your first photo is your main profile picture.',
-  basicInfo: 'Let others know who you are.',
-  budgetLocation: 'This is how we filter your matches. Be honest \u2014 it helps.',
-  dealbreakers: 'These filter out incompatible matches entirely. Select everything that applies.',
-  sleepCleanliness: 'The top two causes of roommate friction. Be honest.',
-  smokingPets: 'Hard preferences \u2014 we use these to filter your matches.',
-  lifestyle: 'How you actually live day-to-day.',
-  housing: 'What you need in your next place.',
-  roommateSetup: 'Help Pi find your ideal roommate group.',
-  interests: 'Pick at least 1 tag from each category.',
-  personality: 'How you live with others.',
-  profileNote: 'Write anything you want potential roommates to know about you.',
-  idealRoommate: 'Describe your ideal roommate in your own words. Pi uses this to find better matches.',
+  photos: 'Roommates want to know who they\'ll be living with. Add at least one photo.',
+  basicInfo: 'Just the essentials \u2014 takes 30 seconds',
+  budgetLocation: 'Budget and location \u2014 the two things that matter most',
+  dealbreakers: 'These are non-negotiable. We\'ll filter out anyone who doesn\'t fit.',
+  houseRules: 'Sleep and cleanliness cause 80% of roommate conflicts. Be honest.',
+  lifestyle: 'How do you actually spend your time at home?',
+  yourSetup: 'What kind of household are you looking for?',
+  interests: 'Pick what resonates. This helps roommates see if you\'d vibe.',
+  personality: 'Five quick scenarios. Pick what feels most like you.',
+  finalWords: 'Tell us about yourself and your ideal roommate in your own words.',
 };
 
 const PLACE_SEEKER_TITLES: Partial<Record<StepId, string>> = {
-  profileNote: 'In Your Own Words',
+  finalWords: 'In Your Own Words',
 };
 
 const PLACE_SEEKER_SUBTITLES: Partial<Record<StepId, string>> = {
   interests: 'Pick at least 1 tag from each category.',
-  profileNote: 'Write anything you want others to know about you.',
+  finalWords: 'Write anything you want others to know about you.',
 };
 
 const STEP_ICONS: Record<StepId, keyof typeof Feather.glyphMap> = {
@@ -354,16 +147,206 @@ const STEP_ICONS: Record<StepId, keyof typeof Feather.glyphMap> = {
   basicInfo: 'user',
   budgetLocation: 'dollar-sign',
   dealbreakers: 'shield',
-  sleepCleanliness: 'moon',
-  smokingPets: 'wind',
+  houseRules: 'home',
   lifestyle: 'users',
-  housing: 'home',
-  roommateSetup: 'users',
+  yourSetup: 'layout',
   interests: 'star',
   personality: 'cpu',
-  profileNote: 'edit-3',
-  idealRoommate: 'cpu',
+  finalWords: 'edit-3',
 };
+
+const STEP_ACCENT_COLORS: Record<StepId, string[]> = {
+  photos: ['rgba(255,107,91,0.10)', 'rgba(255,107,91,0)'],
+  basicInfo: ['rgba(108,92,231,0.10)', 'rgba(108,92,231,0)'],
+  budgetLocation: ['rgba(39,174,96,0.10)', 'rgba(39,174,96,0)'],
+  dealbreakers: ['rgba(231,76,60,0.10)', 'rgba(231,76,60,0)'],
+  houseRules: ['rgba(52,152,219,0.10)', 'rgba(52,152,219,0)'],
+  lifestyle: ['rgba(168,85,247,0.10)', 'rgba(168,85,247,0)'],
+  yourSetup: ['rgba(46,204,113,0.10)', 'rgba(46,204,113,0)'],
+  interests: ['rgba(241,196,15,0.10)', 'rgba(241,196,15,0)'],
+  personality: ['rgba(155,89,182,0.10)', 'rgba(155,89,182,0)'],
+  finalWords: ['rgba(52,152,219,0.10)', 'rgba(52,152,219,0)'],
+};
+
+const BIO_PLACEHOLDERS = [
+  "I'm a software engineer who loves cooking...",
+  "Film student, big coffee person, clean freak...",
+  "Night owl, gym rat, always down for takeout...",
+  "Teacher by day, gamer by night. Quiet but friendly...",
+  "Dog mom, WFH, love a clean kitchen...",
+];
+
+const PROFILE_NOTE_SNIPPETS = [
+  { label: 'I work from home', text: "I work from home so I'm around during the day, but I keep to myself and wear headphones." },
+  { label: "I'm pretty quiet", text: "I'm on the quieter side. I like peaceful evenings and keeping shared spaces clean." },
+  { label: 'I love cooking', text: "I love cooking and always make extra. Happy to share meals with a roommate who appreciates good food." },
+  { label: 'Looking for friends', text: "Looking for roommates who could become actual friends, not just people who split rent." },
+];
+
+const IDEAL_SNIPPETS = [
+  { label: 'Clean and quiet', text: "Someone who's clean but not uptight about it. Keeps shared spaces tidy." },
+  { label: 'Social and outgoing', text: "A social person who loves going out. Someone who's down for weekend plans." },
+  { label: 'Remote worker', text: "Another remote worker on a similar schedule. WFH buddies who respect focus time." },
+  { label: 'Chill vibes', text: "Someone laid back and easygoing. Low drama, good energy." },
+];
+
+function generateVibeSummary(selectedInterests: string[]): string {
+  if (selectedInterests.length < 3) return '';
+  const vibes: string[] = [];
+  const has = (s: string) => selectedInterests.some(i => i.toLowerCase().includes(s.toLowerCase()));
+  if (has('Early Bird') && has('Fitness')) vibes.push('morning wellness');
+  if (has('Night Owl') && has('Gaming')) vibes.push('late-night gaming');
+  if (has('Cooking') && has('Foodie')) vibes.push('kitchen enthusiast');
+  if (has('Introvert') && has('Reading')) vibes.push('quiet bookworm');
+  if (has('Social') && has('Host')) vibes.push('social host');
+  if (has('Minimalist') && has('Clean')) vibes.push('tidy minimalist');
+  if (has('Plant')) vibes.push('green thumb');
+  if (has('Music')) vibes.push('music lover');
+  if (has('Travel')) vibes.push('wanderlust');
+  if (vibes.length === 0) return `${selectedInterests.length} interests selected`;
+  return `You're giving ${vibes.join(' + ')} energy`;
+}
+
+function SelectionCard({
+  icon,
+  label,
+  subtitle,
+  selected,
+  onPress,
+  accentColor = '#ff6b5b',
+  danger = false,
+}: {
+  icon: keyof typeof Feather.glyphMap;
+  label: string;
+  subtitle?: string;
+  selected: boolean;
+  onPress: () => void;
+  accentColor?: string;
+  danger?: boolean;
+}) {
+  const borderColor = danger
+    ? (selected ? '#E74C3C' : '#2a2a2a')
+    : (selected ? accentColor : '#2a2a2a');
+  const bgColor = danger
+    ? (selected ? 'rgba(231,76,60,0.08)' : '#1a1a1a')
+    : (selected ? accentColor + '12' : '#1a1a1a');
+
+  return (
+    <Pressable
+      onPress={onPress}
+      style={[styles.selectionCard, { borderColor, backgroundColor: bgColor }]}
+    >
+      <View style={[styles.selectionCardIcon, { backgroundColor: (danger && selected ? '#E74C3C' : accentColor) + '15' }]}>
+        <Feather name={icon} size={20} color={danger && selected ? '#E74C3C' : (selected ? accentColor : 'rgba(255,255,255,0.5)')} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.selectionCardLabel, selected ? { color: danger ? '#E74C3C' : accentColor } : null]}>
+          {label}
+        </Text>
+        {subtitle ? (
+          <Text style={styles.selectionCardSubtitle}>{subtitle}</Text>
+        ) : null}
+      </View>
+      {selected ? (
+        <Feather name="check-circle" size={18} color={danger ? '#E74C3C' : accentColor} />
+      ) : null}
+    </Pressable>
+  );
+}
+
+function OptionCard({
+  icon,
+  label,
+  subtitle,
+  selected,
+  onPress,
+  accentColor = '#ff6b5b',
+  wide = false,
+}: {
+  icon: keyof typeof Feather.glyphMap;
+  label: string;
+  subtitle?: string;
+  selected: boolean;
+  onPress: () => void;
+  accentColor?: string;
+  wide?: boolean;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={[
+        styles.optionCard,
+        wide ? { width: '100%' } : { width: '47%' },
+        selected ? { borderColor: accentColor, backgroundColor: accentColor + '12' } : null,
+      ]}
+    >
+      <View style={[styles.optionCardIconWrap, { backgroundColor: accentColor + '15' }]}>
+        <Feather name={icon} size={22} color={selected ? accentColor : 'rgba(255,255,255,0.5)'} />
+      </View>
+      <Text style={[styles.optionCardLabel, selected ? { color: accentColor } : null]}>
+        {label}
+      </Text>
+      {subtitle ? (
+        <Text style={styles.optionCardSubtitle}>{subtitle}</Text>
+      ) : null}
+    </Pressable>
+  );
+}
+
+function ScaleSelector({
+  levels,
+  selected,
+  onSelect,
+  accentColor = '#ff6b5b',
+}: {
+  levels: { value: string; icon: keyof typeof Feather.glyphMap; label: string; desc?: string }[];
+  selected: string;
+  onSelect: (v: string) => void;
+  accentColor?: string;
+}) {
+  return (
+    <View style={{ gap: 8 }}>
+      {levels.map((level) => {
+        const active = selected === level.value;
+        return (
+          <Pressable
+            key={level.value}
+            onPress={() => onSelect(level.value)}
+            style={[
+              styles.scaleItem,
+              active ? { borderColor: accentColor, backgroundColor: accentColor + '10' } : null,
+            ]}
+          >
+            <View style={[styles.scaleIcon, { backgroundColor: accentColor + '15' }]}>
+              <Feather name={level.icon} size={18} color={active ? accentColor : 'rgba(255,255,255,0.4)'} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.scaleLabel, active ? { color: accentColor } : null]}>{level.label}</Text>
+              {level.desc ? <Text style={styles.scaleDesc}>{level.desc}</Text> : null}
+            </View>
+            {active ? <Feather name="check" size={16} color={accentColor} /> : null}
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+function MilestoneToast({ text }: { text: string }) {
+  return (
+    <Animated.View entering={BounceIn.duration(400)} style={styles.milestoneToast}>
+      <LinearGradient
+        colors={['rgba(255,107,91,0.15)', 'rgba(168,85,247,0.1)']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={styles.milestoneGradient}
+      >
+        <Feather name="award" size={16} color="#ff6b5b" />
+        <Text style={styles.milestoneText}>{text}</Text>
+      </LinearGradient>
+    </Animated.View>
+  );
+}
 
 export const ProfileQuestionnaireScreen = () => {
   const { theme } = useTheme();
@@ -391,17 +374,13 @@ export const ProfileQuestionnaireScreen = () => {
         return (Array.isArray(user.photos) && user.photos.length > 0) || !!user.profile_picture;
       case 'budgetLocation':
         return !!((pd.budget || pd.budgetMin || pd.budgetMax) && (pd.city || user.city));
-      case 'sleepCleanliness':
-        return !!(prefs.sleepSchedule && prefs.cleanliness);
-      case 'smokingPets':
-        return !!((prefs.smoking || pd.dealbreakers?.includes?.('smoking')) && (prefs.pets || pd.dealbreakers?.includes?.('pets')));
+      case 'houseRules':
+        return !!(prefs.sleepSchedule && prefs.cleanliness && prefs.smoking && prefs.pets);
       case 'dealbreakers':
         return Array.isArray(pd.dealbreakers) && pd.dealbreakers.length > 0;
-      case 'housing':
+      case 'yourSetup':
         return isPlaceSeekerUser || !!(prefs.moveInDate || user.moveInTimeline || pd.lookingFor);
-      case 'roommateSetup':
-        return !!(user.preferredBedrooms !== undefined && user.preferredBedrooms !== null);
-      case 'idealRoommate':
+      case 'finalWords':
         return !!((pd.ideal_roommate_text || user.ideal_roommate_text)?.trim()?.length >= 10);
       case 'lifestyle':
         if (isPlaceSeekerUser) return true;
@@ -409,8 +388,7 @@ export const ProfileQuestionnaireScreen = () => {
       case 'interests':
         if (isPlaceSeekerUser) return true;
         return false;
-      case 'profileNote':
-        if (isPlaceSeekerUser) return true;
+      case 'personality':
         return false;
       default:
         return false;
@@ -419,7 +397,8 @@ export const ProfileQuestionnaireScreen = () => {
 
   const filteredSteps = React.useMemo(() => {
     if (missingStepsParam?.length) {
-      return missingStepsParam.filter(s => allStepsForType.includes(s as StepId)) as StepId[];
+      const mapped = missingStepsParam.map(s => LEGACY_STEP_MAP[s] || s).filter(s => allStepsForType.includes(s as StepId));
+      return [...new Set(mapped)] as StepId[];
     }
     return null;
   }, []);
@@ -427,8 +406,8 @@ export const ProfileQuestionnaireScreen = () => {
   const isHostUser = user?.role === 'host';
   const isHostProfessional = isHostUser && (user?.hostType === 'agent' || user?.hostType === 'company');
   const HOST_EXCLUDED_STEPS: StepId[] = isHostProfessional
-    ? ['photos', 'budgetLocation', 'dealbreakers', 'sleepCleanliness', 'smokingPets', 'housing', 'roommateSetup', 'idealRoommate', 'lifestyle', 'interests', 'personality', 'profileNote']
-    : ['budgetLocation', 'dealbreakers', 'sleepCleanliness', 'smokingPets', 'housing', 'roommateSetup', 'idealRoommate'];
+    ? ['photos', 'budgetLocation', 'dealbreakers', 'houseRules', 'yourSetup', 'finalWords', 'lifestyle', 'interests', 'personality']
+    : ['budgetLocation', 'dealbreakers', 'houseRules', 'yourSetup', 'finalWords'];
   const autoFilteredSteps = React.useMemo(() => {
     if (filteredSteps || isOnboarding) return null;
     let steps = allStepsForType.filter(s => !shouldSkipStep(s));
@@ -442,7 +421,7 @@ export const ProfileQuestionnaireScreen = () => {
   const onboardingSteps = isHostProfessional
     ? baseOnboardingSteps.filter(s => !HOST_EXCLUDED_STEPS.includes(s))
     : (renterOnboarding || isHostUser)
-      ? baseOnboardingSteps.filter(s => s !== 'budgetLocation' && s !== 'housing')
+      ? baseOnboardingSteps.filter(s => s !== 'budgetLocation' && s !== 'yourSetup')
       : baseOnboardingSteps;
   const stepsToShow = filteredSteps || autoFilteredSteps || onboardingSteps;
   const [currentFilteredIndex, setCurrentFilteredIndex] = useState(0);
@@ -454,12 +433,11 @@ export const ProfileQuestionnaireScreen = () => {
     }
   }, [stepsToShow.length]);
 
-  const currentStep = useFilteredMapping
-    ? STEP_ORDER.indexOf(stepsToShow[Math.min(currentFilteredIndex, stepsToShow.length - 1)])
-    : currentFilteredIndex;
+  const currentStepId = stepsToShow[Math.min(currentFilteredIndex, stepsToShow.length - 1)];
   const [direction, setDirection] = useState<'forward' | 'back'>('forward');
   const [isSaving, setIsSaving] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [milestone, setMilestone] = useState<string | null>(null);
 
   useEffect(() => {
     const showSub = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow', () => setKeyboardVisible(true));
@@ -513,7 +491,6 @@ export const ProfileQuestionnaireScreen = () => {
   const [bedrooms, setBedrooms] = useState(user?.profileData?.preferences?.bedrooms?.toString() || '');
   const [bathrooms, setBathrooms] = useState(user?.profileData?.preferences?.bathrooms?.toString() || '');
   const [privateBathroom, setPrivateBathroom] = useState<boolean | undefined>(user?.profileData?.preferences?.privateBathroom);
-
   const [personalityAnswers, setPersonalityAnswers] = useState<Record<string, string>>(
     user?.profileData?.personalityAnswers || {}
   );
@@ -527,11 +504,19 @@ export const ProfileQuestionnaireScreen = () => {
   const idealRoommateTextRef = React.useRef(idealRoommateText);
   React.useEffect(() => { idealRoommateTextRef.current = idealRoommateText; }, [idealRoommateText]);
   const idealRoommateCharLimit = 500;
-
   const [desiredRoommateCount, setDesiredRoommateCount] = useState<number>(user?.profileData?.desired_roommate_count ?? user?.desired_roommate_count ?? 0);
   const [desiredBedroomCount, setDesiredBedroomCount] = useState<number>(user?.profileData?.desired_bedroom_count ?? user?.desired_bedroom_count ?? 0);
   const [householdGenderPref, setHouseholdGenderPref] = useState<'any' | 'male_only' | 'female_only' | 'same_gender'>(user?.profileData?.household_gender_preference || user?.household_gender_preference || 'any');
   const [piAutoMatchEnabled, setPiAutoMatchEnabled] = useState<boolean>(user?.profileData?.pi_auto_match_enabled ?? user?.pi_auto_match_enabled ?? true);
+
+  const [placeholderIndex, setPlaceholderIndex] = useState(0);
+  useEffect(() => {
+    if (currentStepId !== 'basicInfo') return;
+    const interval = setInterval(() => {
+      setPlaceholderIndex(prev => (prev + 1) % BIO_PLACEHOLDERS.length);
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [currentStepId]);
 
   useEffect(() => {
     if (user?.photos && user.photos.length > 0) {
@@ -540,6 +525,42 @@ export const ProfileQuestionnaireScreen = () => {
       setPhotos([user.profilePicture]);
     }
   }, [user?.photos, user?.profilePicture]);
+
+  const pulse = useSharedValue(1);
+  const isStepValid = React.useMemo(() => {
+    switch (currentStepId) {
+      case 'photos': return photos.length > 0;
+      case 'basicInfo': return name.trim().length > 0 && email.trim().length > 0 && bio.trim().length >= 20 && (isHostProfessional || (birthday.trim().length > 0 && !!gender));
+      case 'budgetLocation': return !!budget && parseInt(budget) >= 100 && !!selectedCity;
+      case 'dealbreakers': return true;
+      case 'houseRules': return !!sleepSchedule && !!cleanliness && !!smoking && !!pets;
+      case 'lifestyle': return true;
+      case 'yourSetup': return !!lookingFor && moveInDate.trim().length > 0;
+      case 'interests': return interests.length >= 3;
+      case 'personality': return Object.keys(personalityAnswers).length >= 5;
+      case 'finalWords': return true;
+      default: return true;
+    }
+  }, [currentStepId, photos, name, email, bio, birthday, gender, budget, selectedCity, sleepSchedule, cleanliness, smoking, pets, lookingFor, moveInDate, interests, personalityAnswers, isHostProfessional]);
+
+  useEffect(() => {
+    if (isStepValid) {
+      pulse.value = withRepeat(
+        withSequence(
+          withSpring(1.02, { damping: 4, stiffness: 80 }),
+          withSpring(1, { damping: 4, stiffness: 80 })
+        ),
+        2,
+        false
+      );
+    } else {
+      pulse.value = 1;
+    }
+  }, [isStepValid]);
+
+  const pulseStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: pulse.value }],
+  }));
 
   const validateBirthday = (dateString: string): { valid: boolean; error: string } => {
     if (!dateString.trim()) return { valid: false, error: 'Please enter your date of birth' };
@@ -595,10 +616,8 @@ export const ProfileQuestionnaireScreen = () => {
     }
   };
 
-
   const validateCurrentStep = async (): Promise<boolean> => {
-    const stepId = STEP_ORDER[currentStep];
-    switch (stepId) {
+    switch (currentStepId) {
       case 'photos':
         if (photos.length === 0) { await showAlert({ title: 'Required', message: 'Please add at least one photo', variant: 'warning' }); return false; }
         return true;
@@ -633,17 +652,13 @@ export const ProfileQuestionnaireScreen = () => {
         return true;
       case 'dealbreakers':
         return true;
-      case 'sleepCleanliness':
+      case 'houseRules':
         if (!sleepSchedule) { await showAlert({ title: 'Required', message: 'Please select your sleep schedule', variant: 'warning' }); return false; }
         if (!cleanliness) { await showAlert({ title: 'Required', message: 'Please select your cleanliness style', variant: 'warning' }); return false; }
-        return true;
-      case 'smokingPets':
         if (!smoking) { await showAlert({ title: 'Required', message: 'Please select your smoking preference', variant: 'warning' }); return false; }
         if (!pets) { await showAlert({ title: 'Required', message: 'Please select your pet preference', variant: 'warning' }); return false; }
         return true;
-      case 'lifestyle':
-        return true;
-      case 'housing':
+      case 'yourSetup':
         if (!lookingFor) { await showAlert({ title: 'Required', message: 'Please select what you are looking for', variant: 'warning' }); return false; }
         if (!moveInDate.trim()) { await showAlert({ title: 'Required', message: 'Please select your move-in date', variant: 'warning' }); return false; }
         return true;
@@ -734,18 +749,33 @@ export const ProfileQuestionnaireScreen = () => {
     };
   };
 
+  const showMilestone = (text: string) => {
+    setMilestone(text);
+    setTimeout(() => setMilestone(null), 2500);
+  };
+
   const goNext = async () => {
     if (!(await validateCurrentStep())) return;
     if (currentFilteredIndex < stepsToShow.length - 1) {
       setDirection('forward');
-      setCurrentFilteredIndex(currentFilteredIndex + 1);
+      const nextIdx = currentFilteredIndex + 1;
+      setCurrentFilteredIndex(nextIdx);
       try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
       updateUser(buildProfileData()).catch(() => {});
+
+      if (currentStepId === 'photos' && photos.length > 0) {
+        showMilestone('Looking good! Let\'s keep going');
+      } else if (currentStepId === 'budgetLocation') {
+        showMilestone('Great \u2014 we\'ll find listings in your range');
+      } else if (nextIdx === Math.floor(stepsToShow.length / 2)) {
+        showMilestone('Halfway there! Your profile is taking shape');
+      } else if (currentStepId === 'interests') {
+        showMilestone('Your roommate profile is looking great!');
+      }
     }
   };
 
   const goBack = async () => {
-    console.log('[ProfileQuestionnaire] goBack pressed, currentFilteredIndex:', currentFilteredIndex, 'onboardingStep:', user?.onboardingStep);
     if (currentFilteredIndex > 0) {
       setDirection('back');
       setCurrentFilteredIndex(currentFilteredIndex - 1);
@@ -815,50 +845,62 @@ export const ProfileQuestionnaireScreen = () => {
 
   const isLastStep = currentFilteredIndex === stepsToShow.length - 1;
 
-  const renderSubSectionHeader = (label: string) => (
-    <View style={styles.subSectionHeader}>
-      <View style={styles.subSectionBar} />
-      <ThemedText style={styles.subSectionTitle}>{label}</ThemedText>
+  const renderSectionLabel = (label: string) => (
+    <View style={styles.sectionLabel}>
+      <View style={styles.sectionBar} />
+      <Text style={styles.sectionLabelText}>{label}</Text>
     </View>
   );
 
   const renderStepContent = () => {
-    const stepId = STEP_ORDER[currentStep];
-
-    switch (stepId) {
+    switch (currentStepId) {
       case 'photos':
         return (
           <View style={styles.stepInner}>
-            <View style={styles.photoGrid}>
-              {photos.map((photo, index) => (
-                <View key={`photo-${index}`} style={styles.photoSlot}>
-                  <Image source={{ uri: photo }} style={styles.photoImage} />
-                  {index === 0 ? (
-                    <View style={styles.mainBadge}>
-                      <ThemedText style={{ color: '#FFFFFF', fontWeight: '600', fontSize: 11 }}>Main</ThemedText>
-                    </View>
-                  ) : null}
-                  <Pressable
-                    style={styles.removeBtn}
-                    onPress={() => setPhotos(photos.filter((_, i) => i !== index))}
-                  >
-                    <Feather name="x" size={14} color="#FFFFFF" />
-                  </Pressable>
-                </View>
-              ))}
-              {photos.length < 6 ? (
-                <Pressable
-                  style={[styles.photoSlot, styles.addPhotoSlot]}
-                  onPress={pickImage}
-                >
-                  <View style={styles.addPhotoIcon}>
-                    <Feather name="camera" size={22} color="rgba(255,255,255,0.4)" />
+            <Pressable style={styles.mainPhotoSlot} onPress={pickImage}>
+              {photos[0] ? (
+                <Animated.View entering={ZoomIn.duration(300)} style={{ width: '100%', height: '100%' }}>
+                  <Image source={{ uri: photos[0] }} style={{ width: '100%', height: '100%', borderRadius: 18 }} contentFit="cover" />
+                  <View style={styles.mainRibbon}>
+                    <Text style={styles.mainRibbonText}>Main</Text>
                   </View>
-                  <ThemedText style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', marginTop: 6 }}>Add Photo</ThemedText>
+                  <Pressable style={styles.removeBtn} onPress={() => setPhotos(photos.filter((_, i) => i !== 0))}>
+                    <Feather name="x" size={14} color="#fff" />
+                  </Pressable>
+                </Animated.View>
+              ) : (
+                <View style={styles.mainPhotoEmpty}>
+                  <Animated.View entering={BounceIn.delay(200)}>
+                    <View style={styles.cameraIconWrap}>
+                      <Feather name="camera" size={28} color="rgba(255,107,91,0.6)" />
+                    </View>
+                  </Animated.View>
+                  <Text style={styles.addPhotoLabel}>Tap to add your main photo</Text>
+                </View>
+              )}
+            </Pressable>
+
+            <View style={styles.secondaryGrid}>
+              {[1, 2, 3, 4, 5].map((idx) => (
+                <Pressable
+                  key={idx}
+                  style={styles.secondarySlot}
+                  onPress={() => photos[idx] ? setPhotos(photos.filter((_, i) => i !== idx)) : pickImage()}
+                >
+                  {photos[idx] ? (
+                    <View style={{ width: '100%', height: '100%' }}>
+                      <Image source={{ uri: photos[idx] }} style={{ width: '100%', height: '100%', borderRadius: 12 }} contentFit="cover" />
+                      <Pressable style={[styles.removeBtn, { width: 22, height: 22, top: 4, right: 4 }]} onPress={() => setPhotos(photos.filter((_, i) => i !== idx))}>
+                        <Feather name="x" size={11} color="#fff" />
+                      </Pressable>
+                    </View>
+                  ) : (
+                    <Feather name="plus" size={18} color="rgba(255,255,255,0.2)" />
+                  )}
                 </Pressable>
-              ) : null}
+              ))}
             </View>
-            <ThemedText style={styles.photoHint}>First photo is your main profile picture</ThemedText>
+            <Text style={styles.photoHint}>{photos.length}/6 photos added</Text>
           </View>
         );
 
@@ -866,7 +908,7 @@ export const ProfileQuestionnaireScreen = () => {
         return (
           <View style={styles.stepInner}>
             <View style={styles.inputGroup}>
-              <ThemedText style={styles.inputLabel}>Name *</ThemedText>
+              <Text style={styles.inputLabel}>{isHostProfessional ? (user?.hostType === 'company' ? 'Company Name *' : 'Name *') : 'Name *'}</Text>
               <TextInput
                 style={styles.textInput}
                 value={name}
@@ -876,7 +918,7 @@ export const ProfileQuestionnaireScreen = () => {
               />
             </View>
             <View style={styles.inputGroup}>
-              <ThemedText style={styles.inputLabel}>Email *</ThemedText>
+              <Text style={styles.inputLabel}>Email *</Text>
               <TextInput
                 style={styles.textInput}
                 value={email}
@@ -890,19 +932,32 @@ export const ProfileQuestionnaireScreen = () => {
             {!isHostProfessional ? (
               <>
                 <View style={styles.inputGroup}>
-                  <ThemedText style={styles.inputLabel}>Date of Birth *</ThemedText>
+                  <Text style={styles.inputLabel}>Date of Birth *</Text>
                   <Pressable
-                    style={[styles.dateTrigger, { borderColor: birthdayError ? theme.error : '#2a2a2a' }]}
+                    style={[styles.dateTrigger, birthdayError ? { borderColor: '#ef4444' } : null]}
                     onPress={() => setShowBirthdayPicker(true)}
                   >
                     <Feather name="calendar" size={18} color="rgba(255,255,255,0.35)" style={{ marginRight: 12 }} />
-                    <ThemedText style={{ color: birthday ? '#fff' : 'rgba(255,255,255,0.3)', fontSize: 16, flex: 1 }}>
+                    <Text style={{ color: birthday ? '#fff' : 'rgba(255,255,255,0.3)', fontSize: 16, flex: 1 }}>
                       {birthday ? formatDate(birthday) : 'Select your birthday'}
-                    </ThemedText>
+                    </Text>
                     <Feather name="chevron-right" size={16} color="rgba(255,255,255,0.2)" />
                   </Pressable>
                   {birthdayError ? (
-                    <ThemedText style={{ color: theme.error, fontSize: 12, marginTop: 4 }}>{birthdayError}</ThemedText>
+                    <Text style={{ color: '#ef4444', fontSize: 12, marginTop: 4 }}>{birthdayError}</Text>
+                  ) : null}
+                  {birthday && !birthdayError ? (
+                    <Animated.View entering={FadeIn.duration(300)} style={styles.ageReveal}>
+                      <Text style={styles.ageRevealText}>
+                        You're {new Date().getFullYear() - new Date(birthday).getFullYear()}!
+                      </Text>
+                      {calculateZodiacFromBirthday(birthday) ? (
+                        <View style={styles.zodiacBadge}>
+                          <Feather name="star" size={12} color="#A855F7" />
+                          <Text style={styles.zodiacText}>{calculateZodiacFromBirthday(birthday)}</Text>
+                        </View>
+                      ) : null}
+                    </Animated.View>
                   ) : null}
                   <DatePickerModal
                     visible={showBirthdayPicker}
@@ -913,24 +968,27 @@ export const ProfileQuestionnaireScreen = () => {
                     initialDate={birthday || undefined}
                   />
                 </View>
-                {renderSubSectionHeader('Gender *')}
-                <EmojiTileGrid
-                  options={[
-                    { value: 'male', emoji: '\uD83D\uDE4B\u200D\u2642\uFE0F', label: 'Male' },
-                    { value: 'female', emoji: '\uD83D\uDE4B\u200D\u2640\uFE0F', label: 'Female' },
-                    { value: 'other', emoji: '\uD83C\uDF08', label: 'Other' },
-                  ]}
-                  selected={gender || ''}
-                  onSelect={(v) => setGender(v as any)}
-                />
+                {renderSectionLabel('Gender *')}
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                  <OptionCard icon="user" label="Male" selected={gender === 'male'} onPress={() => setGender('male')} accentColor="#3b82f6" />
+                  <OptionCard icon="user" label="Female" selected={gender === 'female'} onPress={() => setGender('female')} accentColor="#ec4899" />
+                </View>
+                <Pressable
+                  onPress={() => setGender('other')}
+                  style={[styles.optionCard, { width: '47%', marginTop: 10 }, gender === 'other' ? { borderColor: '#A855F7', backgroundColor: 'rgba(168,85,247,0.12)' } : null]}
+                >
+                  <View style={[styles.optionCardIconWrap, { backgroundColor: 'rgba(168,85,247,0.15)' }]}>
+                    <Feather name="heart" size={22} color={gender === 'other' ? '#A855F7' : 'rgba(255,255,255,0.5)'} />
+                  </View>
+                  <Text style={[styles.optionCardLabel, gender === 'other' ? { color: '#A855F7' } : null]}>Other</Text>
+                </Pressable>
               </>
             ) : null}
-            {null}
             <View style={{ marginTop: 20 }}>
-              <ThemedText style={styles.inputLabel}>{user?.hostType === 'company' ? 'About Company *' : 'About You *'}</ThemedText>
-              <ThemedText style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 8 }}>
-                {user?.hostType === 'company' ? 'Write a short description of your company (at least 20 characters)' : 'Write a short bio to introduce yourself (at least 20 characters)'}
-              </ThemedText>
+              <Text style={styles.inputLabel}>{user?.hostType === 'company' ? 'About Company *' : 'About You *'}</Text>
+              <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 8 }}>
+                {user?.hostType === 'company' ? 'Write a short description (at least 20 characters)' : 'Write a short bio (at least 20 characters)'}
+              </Text>
               <TextInput
                 style={styles.bioInput}
                 multiline
@@ -938,50 +996,37 @@ export const ProfileQuestionnaireScreen = () => {
                 maxLength={500}
                 value={bio}
                 onChangeText={setBio}
-                placeholder={user?.hostType === 'company' ? "Tell people about your company..." : "Tell people a bit about yourself..."}
-                placeholderTextColor="rgba(255,255,255,0.3)"
+                placeholder={BIO_PLACEHOLDERS[placeholderIndex]}
+                placeholderTextColor="rgba(255,255,255,0.2)"
                 textAlignVertical="top"
               />
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
                 {bio.trim().length < 20 ? (
-                  <ThemedText style={{ fontSize: 11, color: theme.error }}>
+                  <Text style={{ fontSize: 11, color: '#ef4444' }}>
                     {20 - bio.trim().length} more chars needed
-                  </ThemedText>
+                  </Text>
                 ) : <View />}
-                <ThemedText style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>
+                <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>
                   {bio.length}/500
-                </ThemedText>
+                </Text>
               </View>
             </View>
             {isHostProfessional ? (
               <>
-                {renderSubSectionHeader(user?.hostType === 'company' ? 'Brokerage License Info' : 'Agent License Info')}
+                {renderSectionLabel(user?.hostType === 'company' ? 'Brokerage License Info' : 'Agent License Info')}
                 <View style={styles.inputGroup}>
-                  <ThemedText style={styles.inputLabel}>{user?.hostType === 'company' ? 'Brokerage Name' : 'Agency / Brokerage Name'}</ThemedText>
-                  <TextInput
-                    style={styles.textInput}
-                    value={agencyName}
-                    onChangeText={setAgencyName}
-                    placeholder="e.g. Compass, Corcoran, Keller Williams"
-                    placeholderTextColor="rgba(255,255,255,0.25)"
-                  />
+                  <Text style={styles.inputLabel}>{user?.hostType === 'company' ? 'Brokerage Name' : 'Agency / Brokerage Name'}</Text>
+                  <TextInput style={styles.textInput} value={agencyName} onChangeText={setAgencyName} placeholder="e.g. Compass, Corcoran" placeholderTextColor="rgba(255,255,255,0.25)" />
                 </View>
                 <View style={styles.inputGroup}>
-                  <ThemedText style={styles.inputLabel}>License Number</ThemedText>
-                  <TextInput
-                    style={styles.textInput}
-                    value={licenseNumber}
-                    onChangeText={setLicenseNumber}
-                    placeholder="e.g. 10401234567"
-                    placeholderTextColor="rgba(255,255,255,0.25)"
-                    autoCapitalize="characters"
-                  />
+                  <Text style={styles.inputLabel}>License Number</Text>
+                  <TextInput style={styles.textInput} value={licenseNumber} onChangeText={setLicenseNumber} placeholder="e.g. 10401234567" placeholderTextColor="rgba(255,255,255,0.25)" autoCapitalize="characters" />
                 </View>
                 <View style={styles.inputGroup}>
-                  <ThemedText style={styles.inputLabel}>License Photo</ThemedText>
-                  <ThemedText style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 8 }}>
+                  <Text style={styles.inputLabel}>License Photo</Text>
+                  <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 8 }}>
                     Upload a photo of your real estate license for verification
-                  </ThemedText>
+                  </Text>
                   {licensePhoto ? (
                     <View style={{ borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: '#2a2a2a' }}>
                       <Image source={{ uri: licensePhoto }} style={{ width: '100%', height: 180, borderRadius: 12 }} contentFit="cover" />
@@ -994,43 +1039,36 @@ export const ProfileQuestionnaireScreen = () => {
                           }}
                         >
                           <Feather name="refresh-cw" size={14} color="#a855f7" />
-                          <ThemedText style={{ fontSize: 13, color: '#a855f7', fontWeight: '600' }}>Replace</ThemedText>
+                          <Text style={{ fontSize: 13, color: '#a855f7', fontWeight: '600' }}>Replace</Text>
                         </Pressable>
                         <Pressable
                           style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#1a1a1a', borderRadius: 8, paddingVertical: 10, borderWidth: 1, borderColor: '#333' }}
                           onPress={() => { setLicensePhoto(null); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
                         >
                           <Feather name="trash-2" size={14} color="#ff6b5b" />
-                          <ThemedText style={{ fontSize: 13, color: '#ff6b5b', fontWeight: '600' }}>Remove</ThemedText>
+                          <Text style={{ fontSize: 13, color: '#ff6b5b', fontWeight: '600' }}>Remove</Text>
                         </Pressable>
                       </View>
                     </View>
                   ) : (
                     <Pressable
-                      style={{ borderWidth: 1, borderColor: '#333', borderStyle: 'dashed', borderRadius: 12, paddingVertical: 30, alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#1a1a1a' }}
+                      style={{ borderWidth: 1, borderColor: '#333', borderStyle: 'dashed', borderRadius: 12, paddingVertical: 30, alignItems: 'center', gap: 8, backgroundColor: '#1a1a1a' }}
                       onPress={async () => {
                         const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: false, quality: 0.8 });
                         if (!result.canceled && result.assets[0]) { setLicensePhoto(result.assets[0].uri); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }
                       }}
                     >
-                      <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: '#a855f7' + '15', alignItems: 'center', justifyContent: 'center' }}>
+                      <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(168,85,247,0.15)', alignItems: 'center', justifyContent: 'center' }}>
                         <Feather name="upload" size={22} color="#a855f7" />
                       </View>
-                      <ThemedText style={{ fontSize: 14, color: '#a855f7', fontWeight: '600' }}>Upload License Photo</ThemedText>
-                      <ThemedText style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)' }}>JPG, PNG supported</ThemedText>
+                      <Text style={{ fontSize: 14, color: '#a855f7', fontWeight: '600' }}>Upload License Photo</Text>
                     </Pressable>
                   )}
                 </View>
                 {user?.hostType === 'company' ? (
                   <View style={styles.inputGroup}>
-                    <ThemedText style={styles.inputLabel}>Company Name</ThemedText>
-                    <TextInput
-                      style={styles.textInput}
-                      value={companyName}
-                      onChangeText={setCompanyName}
-                      placeholder="e.g. Skyline Properties LLC"
-                      placeholderTextColor="rgba(255,255,255,0.25)"
-                    />
+                    <Text style={styles.inputLabel}>Company Name</Text>
+                    <TextInput style={styles.textInput} value={companyName} onChangeText={setCompanyName} placeholder="e.g. Skyline Properties LLC" placeholderTextColor="rgba(255,255,255,0.25)" />
                   </View>
                 ) : null}
               </>
@@ -1041,12 +1079,20 @@ export const ProfileQuestionnaireScreen = () => {
       case 'budgetLocation':
         return (
           <View style={styles.stepInner}>
-            <ThemedText style={styles.questionText}>Monthly rent budget</ThemedText>
+            <Text style={styles.questionText}>Monthly rent budget</Text>
+            <View style={styles.budgetBar}>
+              <LinearGradient
+                colors={['#27AE60', '#F1C40F', '#E67E22', '#E74C3C']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.budgetGradient}
+              />
+            </View>
             <View style={styles.budgetRangeRow}>
               <View style={{ flex: 1 }}>
-                <ThemedText style={styles.budgetRangeLabel}>Min</ThemedText>
+                <Text style={styles.budgetRangeLabel}>Min</Text>
                 <View style={styles.budgetInputRow}>
-                  <ThemedText style={styles.budgetPrefix}>$</ThemedText>
+                  <Text style={styles.budgetPrefix}>$</Text>
                   <TextInput
                     style={styles.budgetRangeInput}
                     placeholder="1,000"
@@ -1057,11 +1103,11 @@ export const ProfileQuestionnaireScreen = () => {
                   />
                 </View>
               </View>
-              <ThemedText style={styles.budgetRangeSeparator}>to</ThemedText>
+              <Text style={styles.budgetRangeSeparator}>to</Text>
               <View style={{ flex: 1 }}>
-                <ThemedText style={styles.budgetRangeLabel}>Max</ThemedText>
+                <Text style={styles.budgetRangeLabel}>Max</Text>
                 <View style={styles.budgetInputRow}>
-                  <ThemedText style={styles.budgetPrefix}>$</ThemedText>
+                  <Text style={styles.budgetPrefix}>$</Text>
                   <TextInput
                     style={styles.budgetRangeInput}
                     placeholder="2,500"
@@ -1073,8 +1119,13 @@ export const ProfileQuestionnaireScreen = () => {
                 </View>
               </View>
             </View>
+            {budget ? (
+              <Text style={styles.budgetZoneLabel}>
+                {parseInt(budget) <= 1500 ? 'Budget-friendly' : parseInt(budget) <= 2500 ? 'Mid-range' : parseInt(budget) <= 3500 ? 'Premium' : 'Luxury'}
+              </Text>
+            ) : null}
 
-            <ThemedText style={[styles.questionText, { marginTop: 24 }]}>Where are you looking?</ThemedText>
+            <Text style={[styles.questionText, { marginTop: 24 }]}>Where are you looking?</Text>
             <LocationPicker
               selectedState={selectedState}
               selectedCity={selectedCity}
@@ -1089,18 +1140,17 @@ export const ProfileQuestionnaireScreen = () => {
               }}
             />
 
-            <ThemedText style={[styles.questionText, { marginTop: 20, fontSize: 16 }]}>
+            <Text style={[styles.questionText, { marginTop: 20, fontSize: 16 }]}>
               Preferred neighborhoods (pick up to 3)
-            </ThemedText>
-            <ThemedText style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginBottom: 12 }}>
+            </Text>
+            <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginBottom: 12 }}>
               {preferredNeighborhoods.length}/3 selected
-            </ThemedText>
-
+            </Text>
             {preferredNeighborhoods.length > 0 ? (
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
                 {preferredNeighborhoods.map(hood => (
-                  <View key={hood} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,107,91,0.15)', borderRadius: 10, paddingVertical: 6, paddingHorizontal: 10, borderWidth: 1, borderColor: '#ff6b5b' }}>
-                    <ThemedText style={{ fontSize: 12, color: '#ff6b5b', marginRight: 6 }}>{hood}</ThemedText>
+                  <View key={hood} style={styles.neighborhoodChip}>
+                    <Text style={styles.neighborhoodChipText}>{hood}</Text>
                     <Pressable onPress={() => setPreferredNeighborhoods(prev => prev.filter(x => x !== hood))} hitSlop={8}>
                       <Feather name="x" size={12} color="#ff6b5b" />
                     </Pressable>
@@ -1108,28 +1158,27 @@ export const ProfileQuestionnaireScreen = () => {
                 ))}
               </View>
             ) : null}
-
             {Object.entries(BOROUGH_NEIGHBORHOODS).map(([borough, hoods]) => {
               const isExpanded = expandedBoroughs.includes(borough);
               const selectedCount = hoods.filter(h => preferredNeighborhoods.includes(h)).length;
               return (
-                <View key={borough} style={{ marginBottom: 4, backgroundColor: '#1a1a1a', borderRadius: 12, borderWidth: 1, borderColor: '#2a2a2a', overflow: 'hidden' }}>
+                <View key={borough} style={styles.boroughSection}>
                   <Pressable
                     onPress={() => setExpandedBoroughs(prev => prev.includes(borough) ? prev.filter(b => b !== borough) : [...prev, borough])}
-                    style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, paddingHorizontal: 16 }}
+                    style={styles.boroughHeader}
                   >
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                      <ThemedText style={{ fontSize: 14, fontWeight: '700', color: '#ff6b5b' }}>{borough}</ThemedText>
+                      <Text style={{ fontSize: 14, fontWeight: '700', color: '#ff6b5b' }}>{borough}</Text>
                       {selectedCount > 0 ? (
-                        <View style={{ backgroundColor: 'rgba(255,107,91,0.2)', borderRadius: 10, paddingHorizontal: 7, paddingVertical: 1 }}>
-                          <ThemedText style={{ fontSize: 11, fontWeight: '700', color: '#ff6b5b' }}>{selectedCount}</ThemedText>
+                        <View style={styles.boroughCount}>
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: '#ff6b5b' }}>{selectedCount}</Text>
                         </View>
                       ) : null}
                     </View>
                     <Feather name={isExpanded ? 'chevron-up' : 'chevron-down'} size={16} color="rgba(255,255,255,0.4)" />
                   </Pressable>
                   {isExpanded ? (
-                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingHorizontal: 12, paddingBottom: 12 }}>
+                    <View style={styles.boroughHoods}>
                       {hoods.map(hood => {
                         const isSelected = preferredNeighborhoods.includes(hood);
                         const atMax = preferredNeighborhoods.length >= 3;
@@ -1138,21 +1187,10 @@ export const ProfileQuestionnaireScreen = () => {
                           <Pressable
                             key={hood}
                             disabled={disabled}
-                            onPress={() => {
-                              setPreferredNeighborhoods(prev => {
-                                if (prev.includes(hood)) return prev.filter(x => x !== hood);
-                                if (prev.length >= 3) return prev;
-                                return [...prev, hood];
-                              });
-                            }}
-                            style={{
-                              backgroundColor: isSelected ? 'rgba(255,107,91,0.15)' : '#1c1c1c',
-                              borderRadius: 10, paddingVertical: 7, paddingHorizontal: 11,
-                              borderWidth: 1.5, borderColor: isSelected ? '#ff6b5b' : '#2a2a2a',
-                              opacity: disabled ? 0.3 : 1,
-                            }}
+                            onPress={() => setPreferredNeighborhoods(prev => prev.includes(hood) ? prev.filter(x => x !== hood) : prev.length >= 3 ? prev : [...prev, hood])}
+                            style={[styles.hoodChip, isSelected ? styles.hoodChipActive : null, disabled ? { opacity: 0.3 } : null]}
                           >
-                            <ThemedText style={{ fontSize: 12, color: isSelected ? '#ff6b5b' : '#ccc' }}>{hood}</ThemedText>
+                            <Text style={{ fontSize: 12, color: isSelected ? '#ff6b5b' : '#ccc' }}>{hood}</Text>
                           </Pressable>
                         );
                       })}
@@ -1161,15 +1199,10 @@ export const ProfileQuestionnaireScreen = () => {
                 </View>
               );
             })}
-
             <View style={{ marginTop: 16 }}>
-              <ThemedText style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginBottom: 6 }}>Zip code (optional)</ThemedText>
+              <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginBottom: 6 }}>Zip code (optional)</Text>
               <TextInput
-                style={{
-                  backgroundColor: '#1c1c1c', borderRadius: 12, borderWidth: 1.5,
-                  borderColor: '#2a2a2a', paddingVertical: 12, paddingHorizontal: 14,
-                  fontSize: 15, color: '#fff',
-                }}
+                style={styles.textInput}
                 value={zipCode}
                 onChangeText={(t) => setZipCode(t.replace(/[^0-9]/g, '').slice(0, 5))}
                 placeholder="10001"
@@ -1178,105 +1211,105 @@ export const ProfileQuestionnaireScreen = () => {
                 maxLength={5}
               />
             </View>
-
-            <ThemedText style={[styles.questionText, { marginTop: 24 }]}>What do you do for work?</ThemedText>
-            <OccupationBarSelector
-              selectedOccupation={occupation}
-              onChange={setOccupation}
-            />
+            <Text style={[styles.questionText, { marginTop: 24 }]}>What do you do for work?</Text>
+            <OccupationBarSelector selectedOccupation={occupation} onChange={setOccupation} />
           </View>
         );
 
       case 'dealbreakers': {
         const toggleDealbreaker = (value: string) => {
-          setDealbreakers(prev =>
-            prev.includes(value) ? prev.filter(d => d !== value) : [...prev, value]
-          );
+          setDealbreakers(prev => prev.includes(value) ? prev.filter(d => d !== value) : [...prev, value]);
           try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
         };
-
+        const dealbreakerOptions: { value: string; icon: keyof typeof Feather.glyphMap; label: string; desc: string }[] = [
+          { value: 'no_smokers', icon: 'slash', label: 'No smokers', desc: 'Smoking is a hard no' },
+          { value: 'no_cats', icon: 'x-circle', label: 'No cats', desc: "Can't live with cats" },
+          { value: 'no_dogs', icon: 'x-circle', label: 'No dogs', desc: "Can't live with dogs" },
+          { value: 'no_pets', icon: 'shield-off', label: 'No pets at all', desc: 'Zero pets in the home' },
+          { value: 'private_bathroom', icon: 'lock', label: 'Private bathroom', desc: 'Not sharing a bathroom' },
+          { value: 'same_sex_only', icon: 'users', label: 'Same-sex only', desc: 'Gender-matched household' },
+          { value: 'no_overnight_guests', icon: 'moon', label: 'No overnight guests', desc: 'Keep the home private at night' },
+          { value: 'quiet_hours', icon: 'volume-x', label: 'Strict quiet hours', desc: 'Silence after a set time' },
+          { value: 'no_opposite_gender', icon: 'user-x', label: 'Opposite gender roommate', desc: 'Same gender preferred' },
+          { value: 'no_wfh_all_day', icon: 'home', label: 'WFH all day (I need privacy)', desc: 'Need alone time at home' },
+        ];
         return (
           <View style={styles.stepInner}>
-            <ThemedText style={styles.dealbreakersHint}>
-              These are hard filters \u2014 people who don't match these won't appear in your deck at all.
-              Leave blank if you're flexible.
-            </ThemedText>
-            <CheckboxPills
-              options={[
-                { value: 'no_smokers', emoji: '\uD83D\uDEAD', label: 'No smokers' },
-                { value: 'no_cats', emoji: '\uD83D\uDC08', label: 'No cats' },
-                { value: 'no_dogs', emoji: '\uD83D\uDC15', label: 'No dogs' },
-                { value: 'no_pets', emoji: '\uD83D\uDC3E', label: 'No pets at all' },
-                { value: 'private_bathroom', emoji: '\uD83D\uDEBF', label: 'Private bathroom' },
-                { value: 'same_sex_only', emoji: '\uD83D\uDEBB', label: 'Same-sex only' },
-                { value: 'no_overnight_guests', emoji: '\uD83D\uDECF\uFE0F', label: 'No overnight guests' },
-                { value: 'quiet_hours', emoji: '\uD83E\uDD2B', label: 'Strict quiet hours' },
-              ]}
-              selected={dealbreakers}
-              onToggle={toggleDealbreaker}
-            />
-            <ThemedText style={styles.dealbreakersFootnote}>
-              You can update these anytime in your profile settings.
-            </ThemedText>
+            <Text style={styles.dealbreakersHint}>
+              These are hard filters. Leave blank if you're flexible.
+            </Text>
+            <View style={{ gap: 8 }}>
+              {dealbreakerOptions.map(opt => (
+                <SelectionCard
+                  key={opt.value}
+                  icon={opt.icon}
+                  label={opt.label}
+                  subtitle={opt.desc}
+                  selected={dealbreakers.includes(opt.value)}
+                  onPress={() => toggleDealbreaker(opt.value)}
+                  danger
+                />
+              ))}
+            </View>
+            {dealbreakers.length > 0 ? (
+              <Animated.View entering={FadeIn} style={styles.dealbreakerCount}>
+                <Feather name="shield" size={14} color="#E74C3C" />
+                <Text style={styles.dealbreakerCountText}>{dealbreakers.length} dealbreaker{dealbreakers.length > 1 ? 's' : ''} set</Text>
+              </Animated.View>
+            ) : null}
+            <Text style={styles.dealbreakersFootnote}>You can update these anytime in your profile settings.</Text>
           </View>
         );
       }
 
-      case 'sleepCleanliness':
+      case 'houseRules':
         return (
           <View style={styles.stepInner}>
-            {renderSubSectionHeader('Sleep Schedule')}
-            <EmojiTileGrid
-              options={[
-                { value: 'early_sleeper', emoji: '🌅', label: 'Early Bird', subtitle: 'Bed by 10pm, up by 7am' },
-                { value: 'late_sleeper', emoji: '🦉', label: 'Night Owl', subtitle: 'Bed after midnight, up late' },
-                { value: 'flexible', emoji: '😴', label: 'Flexible', subtitle: 'Adjust to roommate' },
-                { value: 'irregular', emoji: '🔄', label: 'Shift Worker', subtitle: 'Irregular hours' },
-              ]}
-              selected={sleepSchedule || ''}
-              onSelect={(v) => setSleepSchedule(v as any)}
-            />
+            {renderSectionLabel('Sleep Schedule')}
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+              <OptionCard icon="sunrise" label="Early Bird" subtitle="Bed by 10pm" selected={sleepSchedule === 'early_sleeper'} onPress={() => setSleepSchedule('early_sleeper')} accentColor="#F59E0B" />
+              <OptionCard icon="moon" label="Night Owl" subtitle="After midnight" selected={sleepSchedule === 'late_sleeper'} onPress={() => setSleepSchedule('late_sleeper')} accentColor="#6366F1" />
+              <OptionCard icon="clock" label="Flexible" subtitle="Can adjust" selected={sleepSchedule === 'flexible'} onPress={() => setSleepSchedule('flexible')} accentColor="#3ECF8E" />
+              <OptionCard icon="shuffle" label="Shift Worker" subtitle="Irregular hours" selected={sleepSchedule === 'irregular'} onPress={() => setSleepSchedule('irregular')} accentColor="#ec4899" />
+            </View>
 
-            <View style={{ height: 28 }} />
-
-            {renderSubSectionHeader('Cleanliness Standard')}
-            <IconScale
+            <View style={{ height: 24 }} />
+            {renderSectionLabel('Cleanliness Standard')}
+            <ScaleSelector
               levels={[
-                { value: 'relaxed', emoji: '😅', label: 'Pretty relaxed — organized chaos is fine' },
-                { value: 'moderately_tidy', emoji: '🙂', label: 'Fairly tidy — clean up after myself' },
-                { value: 'very_tidy', emoji: '✨', label: 'Very clean — things have a place' },
+                { value: 'relaxed', icon: 'coffee', label: 'Relaxed', desc: "Life's too short to stress about dishes" },
+                { value: 'moderately_tidy', icon: 'check-circle', label: 'Moderate', desc: 'I clean up after myself' },
+                { value: 'very_tidy', icon: 'star', label: 'Very Tidy', desc: 'Everything has a place' },
               ]}
               selected={cleanliness || ''}
               onSelect={(v) => setCleanliness(v as any)}
+              accentColor="#3b82f6"
             />
-          </View>
-        );
 
-      case 'smokingPets':
-        return (
-          <View style={styles.stepInner}>
-            {renderSubSectionHeader('Smoking')}
-            <EmojiTileGrid
-              options={[
-                { value: 'no', emoji: '🚭', label: 'Non-Smoker', subtitle: "Don't smoke, prefer no smoking" },
-                { value: 'only_outside', emoji: '🌿', label: 'Outside Only', subtitle: 'I smoke but only outside' },
-                { value: 'yes', emoji: '🚬', label: 'Smoker', subtitle: 'I smoke, roommate should be OK' },
+            <View style={{ height: 24 }} />
+            {renderSectionLabel('Smoking')}
+            <ScaleSelector
+              levels={[
+                { value: 'no', icon: 'slash', label: 'Non-Smoker', desc: "Don't smoke, prefer no smoking" },
+                { value: 'only_outside', icon: 'wind', label: 'Outside Only', desc: 'I smoke but only outside' },
+                { value: 'yes', icon: 'cloud', label: 'Smoker', desc: 'Roommate should be OK with it' },
               ]}
               selected={smoking || ''}
               onSelect={(v) => setSmoking(v as any)}
+              accentColor="#F59E0B"
             />
 
-            <View style={{ height: 28 }} />
-
-            {renderSubSectionHeader('Pets')}
-            <EmojiTileGrid
-              options={[
-                { value: 'no_pets', emoji: '🚫', label: 'No Pets', subtitle: "I don't have or want pets" },
-                { value: 'have_pets', emoji: '🐾', label: 'I Have Pets', subtitle: 'My pet will live with us' },
-                { value: 'open_to_pets', emoji: '😊', label: 'Open to Pets', subtitle: "Fine if roommate has pets" },
+            <View style={{ height: 24 }} />
+            {renderSectionLabel('Pets')}
+            <ScaleSelector
+              levels={[
+                { value: 'no_pets', icon: 'x-circle', label: 'No Pets', desc: "I don't have or want pets" },
+                { value: 'have_pets', icon: 'heart', label: 'I Have Pets', desc: 'My pet will live with us' },
+                { value: 'open_to_pets', icon: 'smile', label: 'Open to Pets', desc: "Fine if roommate has pets" },
               ]}
               selected={pets || ''}
               onSelect={(v) => setPets(v as any)}
+              accentColor="#3ECF8E"
             />
           </View>
         );
@@ -1284,70 +1317,77 @@ export const ProfileQuestionnaireScreen = () => {
       case 'lifestyle':
         return (
           <View style={styles.stepInner}>
-            {renderSubSectionHeader('Work Style')}
-            <EmojiTileGrid
-              options={[
-                { value: 'office_fulltime', emoji: '\uD83C\uDFE2', label: 'Office', subtitle: 'Out all day' },
-                { value: 'wfh_fulltime', emoji: '\uD83D\uDCBB', label: 'Remote', subtitle: 'Home most days' },
-                { value: 'hybrid', emoji: '\uD83D\uDD00', label: 'Hybrid', subtitle: 'Mix of both' },
-                { value: 'irregular', emoji: '\uD83C\uDF19', label: 'Irregular', subtitle: 'Shift work / varies' },
-              ]}
-              selected={workLocation || ''}
-              onSelect={(v) => setWorkLocation(v as any)}
-            />
+            {renderSectionLabel('Work Style')}
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+              <OptionCard icon="briefcase" label="At the Office" subtitle="Out all day" selected={workLocation === 'office_fulltime'} onPress={() => setWorkLocation('office_fulltime')} accentColor="#3b82f6" />
+              <OptionCard icon="monitor" label="Working from Home" subtitle="Home most days" selected={workLocation === 'wfh_fulltime'} onPress={() => setWorkLocation('wfh_fulltime')} accentColor="#A855F7" />
+              <OptionCard icon="repeat" label="Hybrid" subtitle="Mix of both" selected={workLocation === 'hybrid'} onPress={() => setWorkLocation('hybrid')} accentColor="#3ECF8E" />
+              <OptionCard icon="clock" label="It Varies" subtitle="Shift work / varies" selected={workLocation === 'irregular'} onPress={() => setWorkLocation('irregular')} accentColor="#F59E0B" />
+            </View>
 
-            <View style={{ height: 28 }} />
-
-            {renderSubSectionHeader('Guests at Home')}
-            <EmojiTileGrid
-              options={[
-                { value: 'prefer_no_guests', emoji: '\uD83C\uDFE0', label: 'No Guests', subtitle: 'Keep the home private' },
-                { value: 'rarely', emoji: '\uD83D\uDC4B', label: 'Rarely', subtitle: 'Guests maybe once a month' },
-                { value: 'occasionally', emoji: '\uD83D\uDE0A', label: 'Occasionally', subtitle: 'Weekends sometimes' },
-                { value: 'frequently', emoji: '\uD83C\uDF89', label: 'Often', subtitle: 'Friends over regularly' },
+            <View style={{ height: 24 }} />
+            {renderSectionLabel('Guests at Home')}
+            <ScaleSelector
+              levels={[
+                { value: 'prefer_no_guests', icon: 'lock', label: 'No Guests', desc: 'Keep the home private' },
+                { value: 'rarely', icon: 'user', label: 'Rarely', desc: 'Guests maybe once a month' },
+                { value: 'occasionally', icon: 'users', label: 'Occasionally', desc: 'Weekends sometimes' },
+                { value: 'frequently', icon: 'user-plus', label: 'Often', desc: 'Friends over regularly' },
               ]}
               selected={guestPolicy || ''}
               onSelect={(v) => setGuestPolicy(v as any)}
+              accentColor="#ec4899"
             />
 
-            <View style={{ height: 28 }} />
-
-            {renderSubSectionHeader('Noise Level')}
-            <IconScale
+            <View style={{ height: 24 }} />
+            {renderSectionLabel('Noise Level')}
+            <ScaleSelector
               levels={[
-                { value: 'prefer_quiet', emoji: '\uD83E\uDD2B', label: 'Very quiet \u2014 I need near-silence to relax' },
-                { value: 'normal_noise', emoji: '\uD83C\uDFB5', label: 'Moderate \u2014 normal household sounds' },
-                { value: 'loud_environments', emoji: '\uD83C\uDF89', label: 'Lively \u2014 love an active, buzzy home' },
+                { value: 'prefer_quiet', icon: 'volume', label: 'Very Quiet', desc: 'I need near-silence to relax' },
+                { value: 'normal_noise', icon: 'volume-1', label: 'Moderate', desc: 'Normal household sounds' },
+                { value: 'loud_environments', icon: 'volume-2', label: 'Lively', desc: 'Love an active, buzzy home' },
               ]}
               selected={noiseTolerance || ''}
               onSelect={(v) => setNoiseTolerance(v as any)}
+              accentColor="#F59E0B"
             />
           </View>
         );
 
-      case 'housing':
+      case 'yourSetup':
         return (
           <View style={styles.stepInner}>
-            <ThemedText style={[styles.inputLabel, { marginBottom: 10 }]}>Looking For</ThemedText>
-            <BinaryChoice
-              options={[
-                { value: 'room', emoji: '\uD83D\uDECF\uFE0F', label: 'A Room' },
-                { value: 'entire_apartment', emoji: '\uD83C\uDFE0', label: 'Full Apartment' },
-              ]}
-              selected={lookingFor || ''}
-              onSelect={(v) => setLookingFor(v as any)}
-            />
+            {renderSectionLabel('Looking For')}
+            <View style={{ flexDirection: 'row', gap: 14 }}>
+              <Pressable
+                onPress={() => setLookingFor('room')}
+                style={[styles.bigCard, lookingFor === 'room' ? styles.bigCardActive : null]}
+              >
+                <View style={[styles.bigCardIcon, { backgroundColor: 'rgba(255,107,91,0.12)' }]}>
+                  <Feather name="layout" size={28} color={lookingFor === 'room' ? '#ff6b5b' : 'rgba(255,255,255,0.4)'} />
+                </View>
+                <Text style={[styles.bigCardLabel, lookingFor === 'room' ? { color: '#ff6b5b' } : null]}>A Room</Text>
+                <Text style={styles.bigCardDesc}>In a shared place</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setLookingFor('entire_apartment')}
+                style={[styles.bigCard, lookingFor === 'entire_apartment' ? styles.bigCardActive : null]}
+              >
+                <View style={[styles.bigCardIcon, { backgroundColor: 'rgba(62,207,142,0.12)' }]}>
+                  <Feather name="home" size={28} color={lookingFor === 'entire_apartment' ? '#3ECF8E' : 'rgba(255,255,255,0.4)'} />
+                </View>
+                <Text style={[styles.bigCardLabel, lookingFor === 'entire_apartment' ? { color: '#3ECF8E' } : null]}>Full Apartment</Text>
+                <Text style={styles.bigCardDesc}>An entire place</Text>
+              </Pressable>
+            </View>
 
             <View style={styles.inputGroup}>
-              <ThemedText style={[styles.inputLabel, { marginTop: 12 }]}>Move-in Date</ThemedText>
-              <Pressable
-                style={styles.dateTrigger}
-                onPress={() => setShowMoveInPicker(true)}
-              >
+              <Text style={[styles.inputLabel, { marginTop: 20 }]}>Move-in Date</Text>
+              <Pressable style={styles.dateTrigger} onPress={() => setShowMoveInPicker(true)}>
                 <Feather name="calendar" size={18} color="rgba(255,255,255,0.35)" style={{ marginRight: 12 }} />
-                <ThemedText style={{ color: moveInDate ? '#fff' : 'rgba(255,255,255,0.3)', fontSize: 16, flex: 1 }}>
+                <Text style={{ color: moveInDate ? '#fff' : 'rgba(255,255,255,0.3)', fontSize: 16, flex: 1 }}>
                   {moveInDate ? formatDate(moveInDate) : 'Select move-in date'}
-                </ThemedText>
+                </Text>
                 <Feather name="chevron-right" size={16} color="rgba(255,255,255,0.2)" />
               </Pressable>
               <DatePickerModal
@@ -1364,88 +1404,67 @@ export const ProfileQuestionnaireScreen = () => {
 
             {lookingFor !== 'entire_apartment' ? (
               <>
-                <ThemedText style={[styles.inputLabel, { marginBottom: 10, marginTop: 4 }]}>Private Bathroom</ThemedText>
-                <BinaryChoice
-                  options={[
-                    { value: 'yes', emoji: '\uD83D\uDEBF', label: 'Private' },
-                    { value: 'no', emoji: '\uD83D\uDC65', label: 'Shared is fine' },
-                  ]}
-                  selected={privateBathroom === true ? 'yes' : privateBathroom === false ? 'no' : ''}
-                  onSelect={(v) => setPrivateBathroom(v === 'yes')}
-                />
+                {renderSectionLabel('Private Bathroom')}
+                <View style={{ flexDirection: 'row', gap: 14 }}>
+                  <OptionCard icon="lock" label="Private" selected={privateBathroom === true} onPress={() => setPrivateBathroom(true)} wide={false} accentColor="#3b82f6" />
+                  <OptionCard icon="users" label="Shared is fine" selected={privateBathroom === false} onPress={() => setPrivateBathroom(false)} wide={false} accentColor="#3ECF8E" />
+                </View>
               </>
             ) : null}
-          </View>
-        );
 
-      case 'roommateSetup':
-        return (
-          <View style={styles.stepInner}>
-            <ThemedText style={[styles.inputLabel, { marginBottom: 10 }]}>How many roommates?</ThemedText>
-            <EmojiTileGrid
-              options={[
-                { value: '0', emoji: '\uD83C\uDF1F', label: 'No Preference', subtitle: 'Open to any size' },
-                { value: '1', emoji: '\uD83D\uDC64', label: '1 Roommate', subtitle: '2 people total' },
-                { value: '2', emoji: '\uD83D\uDC65', label: '2 Roommates', subtitle: '3 people total' },
-                { value: '3', emoji: '\uD83D\uDC6A', label: '3 Roommates', subtitle: '4 people total' },
-                { value: '4', emoji: '\uD83C\uDFE0', label: '4+ Roommates', subtitle: '5+ people total' },
-              ]}
-              selected={String(desiredRoommateCount)}
-              onSelect={(v) => setDesiredRoommateCount(parseInt(v))}
-            />
+            <View style={{ height: 20 }} />
+            {renderSectionLabel('How many roommates?')}
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+              {[
+                { v: 0, icon: 'star' as const, label: 'No Preference' },
+                { v: 1, icon: 'user' as const, label: '1 Roommate' },
+                { v: 2, icon: 'users' as const, label: '2 Roommates' },
+                { v: 3, icon: 'users' as const, label: '3 Roommates' },
+                { v: 4, icon: 'home' as const, label: '4+' },
+              ].map(opt => (
+                <OptionCard
+                  key={opt.v}
+                  icon={opt.icon}
+                  label={opt.label}
+                  selected={desiredRoommateCount === opt.v}
+                  onPress={() => setDesiredRoommateCount(opt.v)}
+                  accentColor="#A855F7"
+                />
+              ))}
+            </View>
 
-            <View style={{ height: 28 }} />
-
-            <ThemedText style={[styles.inputLabel, { marginBottom: 10 }]}>How many bedrooms?</ThemedText>
-            <EmojiTileGrid
-              options={[
-                { value: '0', emoji: '\uD83C\uDF1F', label: 'No Preference', subtitle: 'Open to any' },
-                { value: '1', emoji: '\uD83D\uDECF\uFE0F', label: '1 Bedroom' },
-                { value: '2', emoji: '\uD83D\uDECF\uFE0F', label: '2 Bedrooms' },
-                { value: '3', emoji: '\uD83D\uDECF\uFE0F', label: '3 Bedrooms' },
-                { value: '4', emoji: '\uD83D\uDECF\uFE0F', label: '4+ Bedrooms' },
-              ]}
-              selected={String(desiredBedroomCount)}
-              onSelect={(v) => setDesiredBedroomCount(parseInt(v))}
-            />
-
-            <View style={{ height: 28 }} />
-
-            <ThemedText style={[styles.inputLabel, { marginBottom: 10 }]}>Household gender preference</ThemedText>
-            <EmojiTileGrid
-              options={[
-                { value: 'any', emoji: '\uD83C\uDF0D', label: 'No Preference', subtitle: 'Open to anyone' },
-                { value: 'male_only', emoji: '\uD83D\uDC68', label: 'Male Only' },
-                { value: 'female_only', emoji: '\uD83D\uDC69', label: 'Female Only' },
-                { value: 'same_gender', emoji: '\uD83E\uDD1D', label: 'Same Gender', subtitle: 'Match my gender' },
+            <View style={{ height: 20 }} />
+            {renderSectionLabel('Household gender preference')}
+            <ScaleSelector
+              levels={[
+                { value: 'any', icon: 'globe', label: 'No Preference', desc: 'Open to anyone' },
+                { value: 'male_only', icon: 'user', label: 'Male Only' },
+                { value: 'female_only', icon: 'user', label: 'Female Only' },
+                { value: 'same_gender', icon: 'users', label: 'Same Gender', desc: 'Match my gender' },
               ]}
               selected={householdGenderPref}
-              onSelect={(v) => setHouseholdGenderPref(v as 'any' | 'male_only' | 'female_only' | 'same_gender')}
+              onSelect={(v) => setHouseholdGenderPref(v as any)}
+              accentColor="#ec4899"
             />
 
-            <View style={{ height: 28 }} />
-
+            <View style={{ height: 20 }} />
             <Pressable
               onPress={() => setPiAutoMatchEnabled(!piAutoMatchEnabled)}
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                padding: 16,
-                backgroundColor: piAutoMatchEnabled ? theme.primary + '20' : theme.backgroundSecondary,
-                borderWidth: 2,
-                borderColor: piAutoMatchEnabled ? theme.primary : theme.border,
-                borderRadius: 14,
-                gap: 12,
-              }}
+              style={[styles.piAutoCard, piAutoMatchEnabled ? styles.piAutoCardActive : null]}
             >
-              <Feather name={piAutoMatchEnabled ? 'check-circle' : 'circle'} size={22} color={piAutoMatchEnabled ? theme.primary : theme.textSecondary} />
+              <View style={styles.piAutoIcon}>
+                <Feather name="cpu" size={22} color="#A855F7" />
+              </View>
               <View style={{ flex: 1 }}>
-                <ThemedText style={{ fontSize: 15, fontWeight: '600', color: piAutoMatchEnabled ? theme.primary : theme.text }}>
-                  Pi Auto-Match
-                </ThemedText>
-                <ThemedText style={{ fontSize: 12, color: theme.textSecondary, marginTop: 2 }}>
-                  Let Pi automatically find compatible roommates for you
-                </ThemedText>
+                <Text style={[styles.piAutoLabel, piAutoMatchEnabled ? { color: '#A855F7' } : null]}>
+                  Let Pi find your perfect group
+                </Text>
+                <Text style={styles.piAutoDesc}>
+                  Pi automatically matches you with compatible roommates
+                </Text>
+              </View>
+              <View style={[styles.piAutoToggle, piAutoMatchEnabled ? styles.piAutoToggleOn : null]}>
+                <View style={[styles.piAutoToggleDot, piAutoMatchEnabled ? styles.piAutoToggleDotOn : null]} />
               </View>
             </Pressable>
           </View>
@@ -1454,11 +1473,13 @@ export const ProfileQuestionnaireScreen = () => {
       case 'interests':
         return (
           <View style={styles.stepInner}>
-            <InterestCategoryBars
-              selectedTags={interests}
-              onChange={setInterests}
-              maxTags={10}
-            />
+            <InterestCategoryBars selectedTags={interests} onChange={setInterests} maxTags={10} />
+            {interests.length >= 3 ? (
+              <Animated.View entering={FadeInDown.duration(300)} style={styles.vibeSummary}>
+                <Feather name="zap" size={14} color="#A855F7" />
+                <Text style={styles.vibeSummaryText}>{generateVibeSummary(interests)}</Text>
+              </Animated.View>
+            ) : null}
           </View>
         );
 
@@ -1468,225 +1489,156 @@ export const ProfileQuestionnaireScreen = () => {
             id: 'q1',
             question: 'When you get home after a long day:',
             options: [
-              { value: 'alone', emoji: '\uD83D\uDECB\uFE0F', label: 'Decompress alone quietly' },
-              { value: 'music', emoji: '\uD83C\uDFB5', label: 'Put on music and unwind' },
-              { value: 'social', emoji: '\uD83D\uDCF1', label: 'Call friends or catch up' },
-              { value: 'kitchen', emoji: '\uD83C\uDF73', label: 'Cook and relax in the kitchen' },
+              { value: 'alone', icon: 'book' as const, label: 'Decompress alone quietly' },
+              { value: 'music', icon: 'music' as const, label: 'Put on music and unwind' },
+              { value: 'social', icon: 'phone' as const, label: 'Call friends or catch up' },
+              { value: 'kitchen', icon: 'coffee' as const, label: 'Cook and relax in the kitchen' },
             ],
           },
           {
             id: 'q2',
-            question: 'How do you want to handle issues with a roommate?',
+            question: 'How do you handle issues with a roommate?',
             options: [
-              { value: 'text', emoji: '\uD83D\uDCAC', label: 'Text \u2014 keeps things low pressure' },
-              { value: 'direct', emoji: '\uD83D\uDDE3\uFE0F', label: 'Face to face, direct and clear' },
-              { value: 'meeting', emoji: '\uD83D\uDCCB', label: 'Sit down together and talk it out' },
-              { value: 'flow', emoji: '\uD83D\uDE0E', label: 'Go with the flow, no drama' },
+              { value: 'text', icon: 'message-circle' as const, label: 'Text \u2014 keeps things low pressure' },
+              { value: 'direct', icon: 'message-square' as const, label: 'Face to face, direct and clear' },
+              { value: 'meeting', icon: 'clipboard' as const, label: 'Sit down together and talk it out' },
+              { value: 'flow', icon: 'smile' as const, label: 'Go with the flow, no drama' },
             ],
           },
           {
             id: 'q3',
             question: 'The kitchen after cooking:',
             options: [
-              { value: 'immediate', emoji: '\uD83E\uDDFC', label: 'Cleaned up immediately every time' },
-              { value: 'sameday', emoji: '\uD83D\uDD50', label: 'Cleaned before the end of the day' },
-              { value: 'nextday', emoji: '\uD83D\uDE34', label: 'Sometimes the next morning is fine' },
-              { value: 'flexible', emoji: '\uD83E\uDD37', label: "Doesn't bother me either way" },
+              { value: 'immediate', icon: 'zap' as const, label: 'Cleaned up immediately' },
+              { value: 'sameday', icon: 'clock' as const, label: 'Before end of day' },
+              { value: 'nextday', icon: 'moon' as const, label: 'Next morning is fine' },
+              { value: 'flexible', icon: 'meh' as const, label: "Doesn't bother me" },
             ],
           },
           {
             id: 'q4',
-            question: 'What kind of roommate relationship do you want?',
+            question: 'What kind of roommate relationship?',
             options: [
-              { value: 'friends', emoji: '\uD83E\uDD1D', label: 'Actual friends \u2014 hang out together' },
-              { value: 'friendly', emoji: '\uD83D\uDC4B', label: 'Friendly but independent lives' },
-              { value: 'respectful', emoji: '\uD83C\uDFE0', label: 'Respectful co-living, minimal interaction' },
-              { value: 'parallel', emoji: '\uD83D\uDEB6', label: 'Ships passing \u2014 barely see each other' },
+              { value: 'friends', icon: 'heart' as const, label: 'Actual friends \u2014 hang out' },
+              { value: 'friendly', icon: 'smile' as const, label: 'Friendly but independent' },
+              { value: 'respectful', icon: 'home' as const, label: 'Respectful co-living' },
+              { value: 'parallel', icon: 'arrow-right' as const, label: 'Ships passing \u2014 rarely see each other' },
             ],
           },
           {
             id: 'q5',
-            question: 'How far can you realistically commute from home?',
+            question: 'How far can you commute?',
             options: [
-              { value: 'under_20', emoji: '\uD83D\uDEB6', label: 'Under 20 minutes' },
-              { value: 'under_40', emoji: '\uD83D\uDE87', label: 'Up to 40 minutes' },
-              { value: 'under_60', emoji: '\u23F1\uFE0F', label: 'Up to an hour' },
-              { value: 'flexible', emoji: '\uD83D\uDDFA\uFE0F', label: "Flexible \u2014 I work remotely or don't mind" },
+              { value: 'under_20', icon: 'navigation' as const, label: 'Under 20 minutes' },
+              { value: 'under_40', icon: 'map' as const, label: 'Up to 40 minutes' },
+              { value: 'under_60', icon: 'clock' as const, label: 'Up to an hour' },
+              { value: 'flexible', icon: 'globe' as const, label: 'Flexible \u2014 remote or any' },
             ],
           },
         ];
 
         return (
           <View style={styles.stepInner}>
-            {PERSONALITY_QUESTIONS.map((q) => (
-              <View key={q.id} style={{ marginBottom: 24 }}>
-                <ThemedText style={styles.questionText}>{q.question}</ThemedText>
-                <EmojiTileGrid
-                  options={q.options}
-                  selected={personalityAnswers[q.id] || ''}
-                  onSelect={(value) => setPersonalityAnswers(prev => ({ ...prev, [q.id]: value }))}
-                />
-              </View>
+            {PERSONALITY_QUESTIONS.map((q, qIdx) => (
+              <Animated.View key={q.id} entering={FadeInDown.delay(qIdx * 50).duration(300)} style={styles.personalityBlock}>
+                <Text style={styles.personalityQuestion}>{q.question}</Text>
+                <View style={{ gap: 6 }}>
+                  {q.options.map((opt) => {
+                    const active = personalityAnswers[q.id] === opt.value;
+                    return (
+                      <Pressable
+                        key={opt.value}
+                        onPress={() => setPersonalityAnswers(prev => ({ ...prev, [q.id]: opt.value }))}
+                        style={[styles.personalityOption, active ? styles.personalityOptionActive : null]}
+                      >
+                        <View style={[styles.personalityOptIcon, active ? { backgroundColor: 'rgba(255,107,91,0.15)' } : null]}>
+                          <Feather name={opt.icon} size={16} color={active ? '#ff6b5b' : 'rgba(255,255,255,0.4)'} />
+                        </View>
+                        <Text style={[styles.personalityOptLabel, active ? { color: '#ff6b5b' } : null]}>{opt.label}</Text>
+                        {active ? <Feather name="check" size={14} color="#ff6b5b" /> : null}
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </Animated.View>
             ))}
           </View>
         );
       }
 
-      case 'profileNote': {
+      case 'finalWords':
         return (
-          <View style={styles.stepContainer}>
-            <View style={styles.stepHeader}>
-              <Feather name="edit-3" size={28} color={theme.primary} />
-              <Text style={[styles.stepTitle, { color: theme.text }]}>
-                In your own words
-              </Text>
-              <Text style={[styles.stepSubtitle, { color: theme.textSecondary }]}>
-                Write anything you want potential roommates to know about you — your habits, your vibe, what makes you a great roommate. This shows on your profile and helps our AI answer questions about you honestly.
-              </Text>
+          <View style={styles.stepInner}>
+            {renderSectionLabel('In your own words')}
+            <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, marginBottom: 12, lineHeight: 18 }}>
+              Write anything you want potential roommates to know about you.
+            </Text>
+            <View style={styles.snippetRow}>
+              {PROFILE_NOTE_SNIPPETS.map((s, i) => (
+                <Pressable key={i} onPress={() => setProfileNote(s.text)} style={styles.snippetChip}>
+                  <Text style={styles.snippetChipText}>{s.label}</Text>
+                </Pressable>
+              ))}
             </View>
-
-            <View style={{
-              backgroundColor: theme.backgroundSecondary,
-              borderRadius: 16,
-              borderWidth: 2,
-              borderColor: profileNote.length > 0 ? theme.primary : theme.border,
-              padding: 16,
-            }}>
+            <View style={[styles.letterInput, profileNote.length > 0 ? { borderColor: '#ff6b5b' } : null]}>
               <TextInput
-                style={{
-                  color: theme.text,
-                  fontSize: 16,
-                  lineHeight: 24,
-                  minHeight: 140,
-                  textAlignVertical: 'top',
-                }}
+                style={styles.letterTextInput}
                 value={profileNote}
                 onChangeText={(text) => setProfileNote(text.slice(0, profileNoteCharLimit))}
-                placeholder="e.g. I work from home so I'm around a lot during the day, but I wear headphones and stay in my room. I love to cook and always make extra. Very clean in shared spaces. Looking for someone chill who doesn't need a social roommate but is friendly when we cross paths."
-                placeholderTextColor={theme.textSecondary}
+                placeholder="e.g. I work from home so I'm around a lot during the day, but I wear headphones and stay in my room..."
+                placeholderTextColor="rgba(255,255,255,0.2)"
                 multiline
                 maxLength={profileNoteCharLimit}
               />
-              <Text style={{
-                color: profileNote.length > profileNoteCharLimit * 0.9 ? '#ef4444' : theme.textSecondary,
-                fontSize: 12,
-                textAlign: 'right',
-                marginTop: 8,
-              }}>
+              <Text style={[styles.charCount, profileNote.length > profileNoteCharLimit * 0.9 ? { color: '#ef4444' } : null]}>
                 {profileNote.length}/{profileNoteCharLimit}
               </Text>
             </View>
-
-            <View style={{
-              flexDirection: 'row',
-              gap: 10,
-              padding: 14,
-              backgroundColor: theme.primary + '10',
-              borderRadius: 14,
-              marginTop: 12,
-            }}>
-              <Feather name="zap" size={16} color={theme.primary} />
-              <Text style={{ color: theme.textSecondary, fontSize: 13, flex: 1, lineHeight: 18 }}>
-                When someone asks Pi about you, it reads this note to give them a real answer — not just your checklist. You control exactly what it says.
-              </Text>
+            <View style={styles.piHint}>
+              <Feather name="zap" size={14} color="#ff6b5b" />
+              <Text style={styles.piHintText}>Pi reads this when roommates ask about you</Text>
             </View>
 
-            <TouchableOpacity
-              onPress={() => goNext()}
-              style={{ alignItems: 'center', marginTop: 16 }}
-            >
-              <Text style={{ color: theme.textSecondary, fontSize: 14 }}>
-                Skip for now
-              </Text>
-            </TouchableOpacity>
-          </View>
-        );
-      }
-
-      case 'idealRoommate': {
-        return (
-          <View style={styles.stepContainer}>
-            <View style={styles.stepHeader}>
-              <Feather name="cpu" size={28} color="#a855f7" />
-              <Text style={[styles.stepTitle, { color: theme.text }]}>
-                Your ideal roommate
-              </Text>
-              <Text style={[styles.stepSubtitle, { color: theme.textSecondary }]}>
-                Describe your perfect roommate in your own words. Pi, our AI matchmaker, reads this to find people who actually fit what you're looking for — beyond just checkboxes.
-              </Text>
+            <View style={{ height: 28 }} />
+            {renderSectionLabel('Describe your dream roommate')}
+            <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, marginBottom: 12, lineHeight: 18 }}>
+              Tell Pi exactly what you're looking for. The more specific, the better your matches.
+            </Text>
+            <View style={styles.snippetRow}>
+              {IDEAL_SNIPPETS.map((s, i) => (
+                <Pressable key={i} onPress={() => setIdealRoommateText(s.text)} style={styles.snippetChip}>
+                  <Text style={styles.snippetChipText}>{s.label}</Text>
+                </Pressable>
+              ))}
             </View>
-
-            <View style={{
-              backgroundColor: theme.backgroundSecondary,
-              borderRadius: 16,
-              borderWidth: 2,
-              borderColor: idealRoommateText.length > 0 ? '#a855f7' : theme.border,
-              padding: 16,
-            }}>
+            <View style={[styles.letterInput, idealRoommateText.length > 0 ? { borderColor: '#A855F7' } : null]}>
               <TextInput
-                style={{
-                  color: theme.text,
-                  fontSize: 16,
-                  lineHeight: 24,
-                  minHeight: 140,
-                  textAlignVertical: 'top',
-                }}
+                style={styles.letterTextInput}
                 value={idealRoommateText}
                 onChangeText={(text) => setIdealRoommateText(text.slice(0, idealRoommateCharLimit))}
-                placeholder="e.g. Someone who's clean but not uptight about it. Ideally works a 9-5 so we're on similar schedules. I'd love a roommate who's down to grab dinner sometimes but also totally fine doing their own thing. No heavy partiers please — I'm an early riser."
-                placeholderTextColor={theme.textSecondary}
+                placeholder="e.g. Someone who's clean but not uptight. Ideally on a similar schedule..."
+                placeholderTextColor="rgba(255,255,255,0.2)"
                 multiline
                 maxLength={idealRoommateCharLimit}
               />
-              <Text style={{
-                color: idealRoommateText.length > idealRoommateCharLimit * 0.9 ? '#ef4444' : theme.textSecondary,
-                fontSize: 12,
-                textAlign: 'right',
-                marginTop: 8,
-              }}>
+              <Text style={[styles.charCount, idealRoommateText.length > idealRoommateCharLimit * 0.9 ? { color: '#ef4444' } : null]}>
                 {idealRoommateText.length}/{idealRoommateCharLimit}
               </Text>
             </View>
-
-            <View style={{
-              flexDirection: 'row',
-              gap: 10,
-              padding: 14,
-              backgroundColor: 'rgba(168,85,247,0.08)',
-              borderRadius: 14,
-              marginTop: 12,
-            }}>
-              <Feather name="cpu" size={16} color="#a855f7" />
-              <Text style={{ color: theme.textSecondary, fontSize: 13, flex: 1, lineHeight: 18 }}>
-                Pi reads this to understand what matters to you beyond the standard filters. The more specific you are, the better your matches.
-              </Text>
+            <View style={[styles.piHint, { backgroundColor: 'rgba(168,85,247,0.08)' }]}>
+              <Feather name="cpu" size={14} color="#A855F7" />
+              <Text style={styles.piHintText}>Pi reads this to find people who actually fit</Text>
             </View>
-
-            <TouchableOpacity
-              onPress={() => {
-                const isLastStep = currentFilteredIndex >= stepsToShow.length - 1;
-                if (isLastStep) {
-                  handleSave();
-                } else {
-                  goNext();
-                }
-              }}
-              style={{ alignItems: 'center', marginTop: 16 }}
-            >
-              <Text style={{ color: theme.textSecondary, fontSize: 14 }}>
-                Skip for now
-              </Text>
+            <TouchableOpacity onPress={() => isLastStep ? handleSave() : goNext()} style={{ alignItems: 'center', marginTop: 16 }}>
+              <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 14 }}>Skip for now</Text>
             </TouchableOpacity>
           </View>
         );
-      }
 
       default:
         return null;
     }
   };
-
-  const currentStepId = STEP_ORDER[currentStep];
 
   return (
     <KeyboardAvoidingView
@@ -1694,7 +1646,7 @@ export const ProfileQuestionnaireScreen = () => {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={0}
     >
-      <View style={{ paddingTop: insets.top + 10, backgroundColor: '#111' }}>
+      <View style={{ paddingTop: insets.top + 10, backgroundColor: '#0d0d0d' }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 10, gap: 10 }}>
           <Pressable
             onPress={() => {
@@ -1737,9 +1689,16 @@ export const ProfileQuestionnaireScreen = () => {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
+        <LinearGradient
+          colors={STEP_ACCENT_COLORS[currentStepId] || ['transparent', 'transparent']}
+          style={styles.backgroundOrb}
+        />
+
+        {milestone ? <MilestoneToast text={milestone} /> : null}
+
         <Animated.View
           key={currentStepId}
-          entering={direction === 'forward' ? SlideInRight.duration(250) : SlideInLeft.duration(250)}
+          entering={direction === 'forward' ? FadeInRight.duration(280).springify() : FadeInLeft.duration(280).springify()}
         >
           <View style={styles.stepHeader}>
             <View style={styles.stepIconWrap}>
@@ -1748,8 +1707,12 @@ export const ProfileQuestionnaireScreen = () => {
             <View style={styles.stepBadge}>
               <Text style={styles.stepBadgeText}>{currentFilteredIndex + 1} of {stepsToShow.length}</Text>
             </View>
-            <ThemedText style={styles.stepTitle}>{isPlaceSeekerUser ? (PLACE_SEEKER_TITLES[currentStepId] || STEP_TITLES[currentStepId]) : STEP_TITLES[currentStepId]}</ThemedText>
-            <ThemedText style={styles.stepSubtitle}>{isPlaceSeekerUser ? (PLACE_SEEKER_SUBTITLES[currentStepId] || STEP_SUBTITLES[currentStepId]) : STEP_SUBTITLES[currentStepId]}</ThemedText>
+            <Text style={styles.stepTitle}>
+              {isPlaceSeekerUser ? (PLACE_SEEKER_TITLES[currentStepId] || STEP_TITLES[currentStepId]) : STEP_TITLES[currentStepId]}
+            </Text>
+            <Text style={styles.stepSubtitle}>
+              {isPlaceSeekerUser ? (PLACE_SEEKER_SUBTITLES[currentStepId] || STEP_SUBTITLES[currentStepId]) : STEP_SUBTITLES[currentStepId]}
+            </Text>
           </View>
           {renderStepContent()}
         </Animated.View>
@@ -1757,25 +1720,46 @@ export const ProfileQuestionnaireScreen = () => {
 
       <View style={[styles.footer, { paddingBottom: keyboardVisible ? 8 : Math.max(insets.bottom, 16) + 80 }]}>
         {isLastStep ? (
-          <Pressable
-            style={[styles.nextButton, { opacity: isSaving ? 0.7 : 1 }]}
-            onPress={handleSave}
-            disabled={isSaving}
-          >
-            {isSaving ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : (
-              <>
-                <Feather name="check" size={20} color="#FFFFFF" />
-                <ThemedText style={styles.nextButtonText}>{isMissingMode ? 'Save' : 'Save Profile'}</ThemedText>
-              </>
-            )}
-          </Pressable>
+          <Animated.View style={pulseStyle}>
+            <Pressable
+              style={{ overflow: 'hidden', borderRadius: 16, opacity: isSaving ? 0.7 : 1 }}
+              onPress={handleSave}
+              disabled={isSaving}
+            >
+              <LinearGradient
+                colors={isStepValid ? ['#ff6b5b', '#e83a2a'] : ['#333', '#222']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.nextButton}
+              >
+                {isSaving ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <Text style={styles.nextButtonText}>Let's Go!</Text>
+                    <Feather name="check" size={20} color="#FFFFFF" />
+                  </>
+                )}
+              </LinearGradient>
+            </Pressable>
+          </Animated.View>
         ) : (
-          <Pressable style={styles.nextButton} onPress={goNext}>
-            <ThemedText style={styles.nextButtonText}>Next</ThemedText>
-            <Feather name="arrow-right" size={20} color="#FFFFFF" />
-          </Pressable>
+          <Animated.View style={pulseStyle}>
+            <Pressable
+              style={{ overflow: 'hidden', borderRadius: 16 }}
+              onPress={goNext}
+            >
+              <LinearGradient
+                colors={isStepValid ? ['#ff6b5b', '#e83a2a'] : ['#333', '#222']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.nextButton}
+              >
+                <Text style={styles.nextButtonText}>Continue</Text>
+                <Feather name="arrow-right" size={20} color="#FFFFFF" />
+              </LinearGradient>
+            </Pressable>
+          </Animated.View>
         )}
       </View>
     </KeyboardAvoidingView>
@@ -1785,13 +1769,7 @@ export const ProfileQuestionnaireScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#111',
-  },
-  navHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    backgroundColor: '#0d0d0d',
   },
   navButton: {
     width: 44,
@@ -1810,6 +1788,14 @@ const styles = StyleSheet.create({
   },
   scrollContentContainer: {
     paddingBottom: 32,
+  },
+  backgroundOrb: {
+    position: 'absolute',
+    top: -100,
+    left: -50,
+    width: SCREEN_WIDTH + 100,
+    height: 400,
+    borderRadius: 200,
   },
   stepHeader: {
     alignItems: 'center',
@@ -1860,136 +1846,72 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingBottom: 32,
   },
-  inputGroup: {
-    marginBottom: 18,
+  stepContainer: {
+    paddingHorizontal: 24,
+    paddingBottom: 32,
   },
-  inputLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.6)',
-    marginBottom: 8,
-  },
-  textInput: {
-    height: 52,
-    backgroundColor: '#1c1c1c',
-    borderWidth: 1.5,
-    borderColor: '#2a2a2a',
-    borderRadius: 14,
-    paddingHorizontal: 18,
-    fontSize: 16,
-    color: '#fff',
-  },
-  bioInput: {
-    height: 140,
-    backgroundColor: '#1c1c1c',
-    borderWidth: 1.5,
-    borderColor: '#2a2a2a',
-    borderRadius: 14,
-    paddingTop: 16,
-    paddingBottom: 16,
-    paddingHorizontal: 18,
-    fontSize: 15,
-    lineHeight: 22,
-    color: '#fff',
-    textAlignVertical: 'top',
-  },
-  dateTrigger: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#1c1c1c',
-    borderWidth: 1.5,
-    borderColor: '#2a2a2a',
-    borderRadius: 14,
-    height: 52,
-    paddingHorizontal: 18,
-  },
-  budgetInputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#1e1e1e',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    borderRadius: 12,
-    height: 52,
-    paddingHorizontal: 18,
-  },
-  budgetPrefix: {
-    fontSize: 18,
-    color: 'rgba(255,255,255,0.4)',
-    marginRight: 8,
-  },
-  budgetRangeRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 12,
-    marginBottom: 8,
-  },
-  budgetRangeLabel: {
-    fontSize: 12,
-    color: '#888',
-    marginBottom: 4,
-  },
-  budgetRangeInput: {
-    flex: 1,
-    fontSize: 16,
-    color: '#fff',
-  },
-  budgetRangeSeparator: {
-    color: '#888',
+
+  mainPhotoSlot: {
+    width: SCREEN_WIDTH * 0.55,
+    height: SCREEN_WIDTH * 0.7,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: 'rgba(255,107,91,0.4)',
+    borderStyle: 'dashed',
+    alignSelf: 'center',
+    overflow: 'hidden',
     marginBottom: 16,
   },
-  dealbreakersHint: {
-    fontSize: 14,
-    color: '#aaa',
-    lineHeight: 20,
-    marginBottom: 20,
+  mainPhotoEmpty: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
   },
-  dealbreakersFootnote: {
+  cameraIconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: 'rgba(255,107,91,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addPhotoLabel: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.4)',
+  },
+  mainRibbon: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(255,107,91,0.9)',
+    paddingVertical: 6,
+    alignItems: 'center',
+  },
+  mainRibbonText: {
+    color: '#fff',
     fontSize: 12,
-    color: '#666',
-    textAlign: 'center',
-    marginTop: 16,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
-  photoGrid: {
+  secondaryGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 10,
     justifyContent: 'center',
-    paddingTop: 8,
   },
-  photoSlot: {
-    width: 105,
-    height: 130,
-    borderRadius: 16,
-    overflow: 'hidden',
+  secondarySlot: {
+    width: (SCREEN_WIDTH - 80) / 3,
+    height: (SCREEN_WIDTH - 80) / 3,
+    borderRadius: 14,
     borderWidth: 1.5,
-    borderColor: '#2a2a2a',
-  },
-  addPhotoSlot: {
+    borderColor: 'rgba(255,255,255,0.08)',
+    borderStyle: 'dashed',
+    backgroundColor: '#1a1a1a',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#1c1c1c',
-  },
-  addPhotoIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  photoImage: {
-    width: '100%',
-    height: '100%',
-  },
-  mainBadge: {
-    position: 'absolute',
-    bottom: 8,
-    left: 8,
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    backgroundColor: '#ff6b5b',
+    overflow: 'hidden',
   },
   removeBtn: {
     position: 'absolute',
@@ -2008,20 +1930,92 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 14,
   },
-  subSectionHeader: {
+
+  inputGroup: {
+    marginBottom: 18,
+  },
+  inputLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.6)',
+    marginBottom: 8,
+  },
+  textInput: {
+    height: 52,
+    backgroundColor: '#141414',
+    borderWidth: 1.5,
+    borderColor: '#2a2a2a',
+    borderRadius: 14,
+    paddingHorizontal: 18,
+    fontSize: 16,
+    color: '#fff',
+  },
+  bioInput: {
+    height: 140,
+    backgroundColor: '#141414',
+    borderWidth: 1.5,
+    borderColor: '#2a2a2a',
+    borderRadius: 14,
+    paddingTop: 16,
+    paddingBottom: 16,
+    paddingHorizontal: 18,
+    fontSize: 15,
+    lineHeight: 22,
+    color: '#fff',
+    textAlignVertical: 'top',
+  },
+  dateTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#141414',
+    borderWidth: 1.5,
+    borderColor: '#2a2a2a',
+    borderRadius: 14,
+    height: 52,
+    paddingHorizontal: 18,
+  },
+  ageReveal: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 8,
+  },
+  ageRevealText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#3ECF8E',
+  },
+  zodiacBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(168,85,247,0.12)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(168,85,247,0.25)',
+  },
+  zodiacText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#A855F7',
+  },
+
+  sectionLabel: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     marginBottom: 12,
     marginTop: 8,
   },
-  subSectionBar: {
+  sectionBar: {
     width: 3,
     height: 16,
     borderRadius: 2,
     backgroundColor: '#ff6b5b',
   },
-  subSectionTitle: {
+  sectionLabelText: {
     fontSize: 16,
     fontWeight: '700',
     color: '#fff',
@@ -2033,6 +2027,447 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     marginTop: 4,
   },
+
+  selectionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1a1a1a',
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1.5,
+    borderColor: '#2a2a2a',
+    gap: 12,
+  },
+  selectionCardIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  selectionCardLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  selectionCardSubtitle: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.4)',
+    marginTop: 2,
+  },
+
+  optionCard: {
+    backgroundColor: '#1a1a1a',
+    borderWidth: 2,
+    borderColor: '#2a2a2a',
+    borderRadius: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    gap: 8,
+  },
+  optionCardIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  optionCardLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#fff',
+    textAlign: 'center',
+  },
+  optionCardSubtitle: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.4)',
+    textAlign: 'center',
+  },
+
+  scaleItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1.5,
+    borderColor: '#2a2a2a',
+    gap: 12,
+  },
+  scaleIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  scaleLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  scaleDesc: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.4)',
+    marginTop: 2,
+  },
+
+  budgetBar: {
+    height: 6,
+    borderRadius: 3,
+    overflow: 'hidden',
+    marginBottom: 16,
+  },
+  budgetGradient: {
+    flex: 1,
+    borderRadius: 3,
+  },
+  budgetRangeRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 12,
+    marginBottom: 8,
+  },
+  budgetRangeLabel: {
+    fontSize: 12,
+    color: '#888',
+    marginBottom: 4,
+  },
+  budgetInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#141414',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 12,
+    height: 52,
+    paddingHorizontal: 18,
+  },
+  budgetPrefix: {
+    fontSize: 18,
+    color: 'rgba(255,255,255,0.4)',
+    marginRight: 8,
+  },
+  budgetRangeInput: {
+    flex: 1,
+    fontSize: 16,
+    color: '#fff',
+  },
+  budgetRangeSeparator: {
+    color: '#888',
+    marginBottom: 16,
+  },
+  budgetZoneLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.5)',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  neighborhoodChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,107,91,0.15)',
+    borderRadius: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: '#ff6b5b',
+  },
+  neighborhoodChipText: {
+    fontSize: 12,
+    color: '#ff6b5b',
+    marginRight: 6,
+  },
+  boroughSection: {
+    marginBottom: 4,
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#2a2a2a',
+    overflow: 'hidden',
+  },
+  boroughHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  boroughCount: {
+    backgroundColor: 'rgba(255,107,91,0.2)',
+    borderRadius: 10,
+    paddingHorizontal: 7,
+    paddingVertical: 1,
+  },
+  boroughHoods: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingBottom: 12,
+  },
+  hoodChip: {
+    backgroundColor: '#1c1c1c',
+    borderRadius: 10,
+    paddingVertical: 7,
+    paddingHorizontal: 11,
+    borderWidth: 1.5,
+    borderColor: '#2a2a2a',
+  },
+  hoodChipActive: {
+    backgroundColor: 'rgba(255,107,91,0.15)',
+    borderColor: '#ff6b5b',
+  },
+
+  dealbreakersHint: {
+    fontSize: 14,
+    color: '#aaa',
+    lineHeight: 20,
+    marginBottom: 16,
+  },
+  dealbreakersFootnote: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
+    marginTop: 16,
+  },
+  dealbreakerCount: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    justifyContent: 'center',
+    marginTop: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    backgroundColor: 'rgba(231,76,60,0.08)',
+    borderRadius: 10,
+    alignSelf: 'center',
+  },
+  dealbreakerCountText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#E74C3C',
+  },
+
+  bigCard: {
+    flex: 1,
+    backgroundColor: '#1a1a1a',
+    borderWidth: 2,
+    borderColor: '#2a2a2a',
+    borderRadius: 18,
+    paddingVertical: 24,
+    alignItems: 'center',
+    gap: 10,
+  },
+  bigCardActive: {
+    borderColor: '#ff6b5b',
+    backgroundColor: 'rgba(255,107,91,0.08)',
+  },
+  bigCardIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bigCardLabel: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  bigCardDesc: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.4)',
+  },
+
+  piAutoCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: '#1a1a1a',
+    borderWidth: 2,
+    borderColor: '#2a2a2a',
+    borderRadius: 16,
+    gap: 14,
+  },
+  piAutoCardActive: {
+    borderColor: '#A855F7',
+    backgroundColor: 'rgba(168,85,247,0.08)',
+  },
+  piAutoIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: 'rgba(168,85,247,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  piAutoLabel: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  piAutoDesc: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.4)',
+    marginTop: 2,
+  },
+  piAutoToggle: {
+    width: 44,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#333',
+    padding: 2,
+    justifyContent: 'center',
+  },
+  piAutoToggleOn: {
+    backgroundColor: '#A855F7',
+  },
+  piAutoToggleDot: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#666',
+  },
+  piAutoToggleDotOn: {
+    backgroundColor: '#fff',
+    alignSelf: 'flex-end',
+  },
+
+  vibeSummary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 16,
+    padding: 14,
+    backgroundColor: 'rgba(168,85,247,0.08)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(168,85,247,0.2)',
+  },
+  vibeSummaryText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#A855F7',
+    flex: 1,
+  },
+
+  personalityBlock: {
+    marginBottom: 24,
+  },
+  personalityQuestion: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#fff',
+    marginBottom: 10,
+  },
+  personalityOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1.5,
+    borderColor: '#2a2a2a',
+    gap: 10,
+  },
+  personalityOptionActive: {
+    borderColor: '#ff6b5b',
+    backgroundColor: 'rgba(255,107,91,0.08)',
+    borderLeftWidth: 4,
+    borderLeftColor: '#ff6b5b',
+  },
+  personalityOptIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  personalityOptLabel: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#ccc',
+  },
+
+  letterInput: {
+    backgroundColor: '#141414',
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: '#2a2a2a',
+    padding: 16,
+  },
+  letterTextInput: {
+    color: '#fff',
+    fontSize: 15,
+    lineHeight: 22,
+    minHeight: 100,
+    textAlignVertical: 'top',
+  },
+  charCount: {
+    color: 'rgba(255,255,255,0.3)',
+    fontSize: 12,
+    textAlign: 'right',
+    marginTop: 8,
+  },
+  snippetRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 12,
+  },
+  snippetChip: {
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  snippetChipText: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.5)',
+  },
+  piHint: {
+    flexDirection: 'row',
+    gap: 10,
+    padding: 14,
+    backgroundColor: 'rgba(255,107,91,0.08)',
+    borderRadius: 14,
+    marginTop: 12,
+    alignItems: 'center',
+  },
+  piHintText: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 13,
+    flex: 1,
+    lineHeight: 18,
+  },
+
+  milestoneToast: {
+    marginHorizontal: 24,
+    marginBottom: 16,
+    borderRadius: 14,
+    overflow: 'hidden',
+  },
+  milestoneGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 14,
+    borderRadius: 14,
+  },
+  milestoneText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#fff',
+    flex: 1,
+  },
+
   footer: {
     paddingHorizontal: 24,
     paddingTop: 12,
@@ -2043,12 +2478,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     height: 56,
     borderRadius: 16,
-    backgroundColor: '#ff6b5b',
     gap: 8,
-    shadowColor: '#ff6b5b',
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 6,
   },
   nextButtonText: {
     fontSize: 17,

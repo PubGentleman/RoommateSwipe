@@ -3,6 +3,9 @@ import {
   View, Text, Pressable, ScrollView, StyleSheet, TextInput, ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
 import { Feather } from '../../../components/VectorIcons';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useTheme } from '../../../hooks/useTheme';
@@ -14,22 +17,22 @@ const TOTAL_STEPS = 6;
 
 type GenderPref = 'any' | 'female_only' | 'male_only' | 'same_gender';
 
-const GENDER_PREF_OPTIONS: { value: GenderPref; icon: string; label: string; desc: string }[] = [
+const GENDER_PREF_OPTIONS: { value: GenderPref; icon: keyof typeof Feather.glyphMap; label: string; desc: string }[] = [
   { value: 'any', icon: 'users', label: 'Anyone', desc: 'Open to all' },
   { value: 'female_only', icon: 'user', label: 'Women only', desc: 'Female household' },
   { value: 'male_only', icon: 'user', label: 'Men only', desc: 'Male household' },
   { value: 'same_gender', icon: 'repeat', label: 'Same gender', desc: 'Match my gender' },
 ];
 
-const ROOM_TYPES = [
-  { id: 'private', icon: 'lock' as const, label: 'Private Room', desc: 'Your own space with shared common areas' },
-  { id: 'shared', icon: 'users' as const, label: 'Shared Room', desc: 'Share a bedroom to save on rent' },
-  { id: 'apartment', icon: 'home' as const, label: 'Full Apartment', desc: 'An entire place to yourself' },
+const ROOM_TYPES: { id: string; icon: keyof typeof Feather.glyphMap; label: string; desc: string }[] = [
+  { id: 'private', icon: 'lock', label: 'Private Room', desc: 'Your own space with shared common areas' },
+  { id: 'shared', icon: 'users', label: 'Shared Room', desc: 'Share a bedroom to save on rent' },
+  { id: 'apartment', icon: 'home', label: 'Full Apartment', desc: 'An entire place to yourself' },
 ];
 
 type DealbreakerId = 'smoking' | 'pets' | 'overnight_guests' | 'drinking' | 'loud_music' | 'drugs';
 
-const DEALBREAKER_OPTIONS: { id: DealbreakerId; label: string; icon: string }[] = [
+const DEALBREAKER_OPTIONS: { id: DealbreakerId; label: string; icon: keyof typeof Feather.glyphMap }[] = [
   { id: 'smoking', label: 'Smoking indoors', icon: 'wind' },
   { id: 'pets', label: 'Pets', icon: 'heart' },
   { id: 'overnight_guests', label: 'Overnight guests', icon: 'moon' },
@@ -42,24 +45,120 @@ type SleepSchedule = 'early_sleeper' | 'late_sleeper' | 'flexible' | 'irregular'
 type Cleanliness = 'very_tidy' | 'moderately_tidy' | 'relaxed';
 type NoiseTolerance = 'prefer_quiet' | 'normal_noise' | 'loud_environments';
 
-const SLEEP_OPTIONS: { value: SleepSchedule; label: string; icon: string }[] = [
-  { value: 'early_sleeper', label: 'Early bird (before 11pm)', icon: 'sunrise' },
-  { value: 'late_sleeper', label: 'Night owl (after midnight)', icon: 'moon' },
-  { value: 'flexible', label: 'Flexible', icon: 'clock' },
-  { value: 'irregular', label: 'Irregular schedule', icon: 'shuffle' },
+const SLEEP_OPTIONS: { value: SleepSchedule; label: string; icon: keyof typeof Feather.glyphMap; desc: string }[] = [
+  { value: 'early_sleeper', label: 'Early Bird', icon: 'sunrise', desc: 'Bed by 10pm' },
+  { value: 'late_sleeper', label: 'Night Owl', icon: 'moon', desc: 'After midnight' },
+  { value: 'flexible', label: 'Flexible', icon: 'clock', desc: 'Can adjust' },
+  { value: 'irregular', label: 'Shift Worker', icon: 'shuffle', desc: 'Irregular hours' },
 ];
 
-const CLEANLINESS_OPTIONS: { value: Cleanliness; label: string }[] = [
-  { value: 'very_tidy', label: 'Very tidy — I clean regularly' },
-  { value: 'moderately_tidy', label: 'Moderate — clean but not obsessive' },
-  { value: 'relaxed', label: 'Relaxed — I have other priorities' },
+const CLEANLINESS_OPTIONS: { value: Cleanliness; label: string; icon: keyof typeof Feather.glyphMap; desc: string }[] = [
+  { value: 'very_tidy', label: 'Very Tidy', icon: 'star', desc: 'Everything has a place' },
+  { value: 'moderately_tidy', label: 'Moderate', icon: 'check-circle', desc: 'I clean up after myself' },
+  { value: 'relaxed', label: 'Relaxed', icon: 'coffee', desc: 'Life is too short to stress' },
 ];
 
-const NOISE_OPTIONS: { value: NoiseTolerance; label: string }[] = [
-  { value: 'prefer_quiet', label: 'I prefer quiet spaces' },
-  { value: 'normal_noise', label: 'Normal noise is fine' },
-  { value: 'loud_environments', label: 'I don\'t mind loud environments' },
+const NOISE_OPTIONS: { value: NoiseTolerance; label: string; icon: keyof typeof Feather.glyphMap; desc: string }[] = [
+  { value: 'prefer_quiet', label: 'Very Quiet', icon: 'volume', desc: 'Need near-silence' },
+  { value: 'normal_noise', label: 'Moderate', icon: 'volume-1', desc: 'Normal sounds fine' },
+  { value: 'loud_environments', label: 'Lively', icon: 'volume-2', desc: 'Love an active home' },
 ];
+
+const IDEAL_SNIPPETS = [
+  { label: 'Clean and quiet', text: "Someone who's clean but not uptight about it. Keeps shared spaces tidy." },
+  { label: 'Social and outgoing', text: "A social person who loves going out. Someone who's down for weekend plans." },
+  { label: 'Remote worker', text: "Another remote worker on a similar schedule. WFH buddies who respect focus time." },
+  { label: 'Chill vibes', text: "Someone laid back and easygoing. Low drama, good energy." },
+];
+
+function SelectionCard({
+  icon,
+  label,
+  subtitle,
+  selected,
+  onPress,
+  accentColor = '#ff6b5b',
+  danger = false,
+}: {
+  icon: keyof typeof Feather.glyphMap;
+  label: string;
+  subtitle?: string;
+  selected: boolean;
+  onPress: () => void;
+  accentColor?: string;
+  danger?: boolean;
+}) {
+  const borderColor = danger
+    ? (selected ? '#E74C3C' : '#2a2a2a')
+    : (selected ? accentColor : '#2a2a2a');
+  const bgColor = danger
+    ? (selected ? 'rgba(231,76,60,0.08)' : '#1a1a1a')
+    : (selected ? accentColor + '12' : '#1a1a1a');
+  return (
+    <Pressable onPress={onPress} style={[styles.selectionCard, { borderColor, backgroundColor: bgColor }]}>
+      <View style={[styles.selectionCardIcon, { backgroundColor: (danger && selected ? '#E74C3C' : accentColor) + '15' }]}>
+        <Feather name={icon} size={20} color={danger && selected ? '#E74C3C' : (selected ? accentColor : 'rgba(255,255,255,0.5)')} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.selectionCardLabel, selected ? { color: danger ? '#E74C3C' : accentColor } : null]}>{label}</Text>
+        {subtitle ? <Text style={styles.selectionCardSubtitle}>{subtitle}</Text> : null}
+      </View>
+      {selected ? <Feather name={danger ? 'x-circle' : 'check-circle'} size={18} color={danger ? '#E74C3C' : accentColor} /> : null}
+    </Pressable>
+  );
+}
+
+function OptionCard({
+  icon, label, subtitle, selected, onPress, accentColor = '#ff6b5b',
+}: {
+  icon: keyof typeof Feather.glyphMap; label: string; subtitle?: string; selected: boolean; onPress: () => void; accentColor?: string;
+}) {
+  return (
+    <Pressable onPress={onPress} style={[styles.optionCard, selected ? { borderColor: accentColor, backgroundColor: accentColor + '12' } : null]}>
+      <View style={[styles.optionCardIconWrap, { backgroundColor: accentColor + '15' }]}>
+        <Feather name={icon} size={22} color={selected ? accentColor : 'rgba(255,255,255,0.5)'} />
+      </View>
+      <Text style={[styles.optionCardLabel, selected ? { color: accentColor } : null]}>{label}</Text>
+      {subtitle ? <Text style={styles.optionCardSubtitle}>{subtitle}</Text> : null}
+    </Pressable>
+  );
+}
+
+function ScaleSelector({
+  levels, selected, onSelect, accentColor = '#ff6b5b',
+}: {
+  levels: { value: string; icon: keyof typeof Feather.glyphMap; label: string; desc?: string }[];
+  selected: string; onSelect: (v: string) => void; accentColor?: string;
+}) {
+  return (
+    <View style={{ gap: 8 }}>
+      {levels.map((level) => {
+        const active = selected === level.value;
+        return (
+          <Pressable key={level.value} onPress={() => onSelect(level.value)} style={[styles.scaleItem, active ? { borderColor: accentColor, backgroundColor: accentColor + '10' } : null]}>
+            <View style={[styles.scaleIcon, { backgroundColor: accentColor + '15' }]}>
+              <Feather name={level.icon} size={18} color={active ? accentColor : 'rgba(255,255,255,0.4)'} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.scaleLabel, active ? { color: accentColor } : null]}>{level.label}</Text>
+              {level.desc ? <Text style={styles.scaleDesc}>{level.desc}</Text> : null}
+            </View>
+            {active ? <Feather name="check" size={16} color={accentColor} /> : null}
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+function SectionLabel({ text }: { text: string }) {
+  return (
+    <View style={styles.sectionLabelRow}>
+      <View style={styles.sectionBar} />
+      <Text style={styles.sectionLabelText}>{text}</Text>
+    </View>
+  );
+}
 
 export default function RoommateOnboardingScreen() {
   const { user, updateUser } = useAuth();
@@ -90,27 +189,39 @@ export default function RoommateOnboardingScreen() {
   }, [listingPref]);
 
   const toggleDealbreaker = (id: DealbreakerId) => {
-    setDealbreakers(prev =>
-      prev.includes(id)
-        ? prev.filter(d => d !== id)
-        : [...prev, id]
-    );
+    setDealbreakers(prev => prev.includes(id) ? prev.filter(d => d !== id) : [...prev, id]);
+    try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
   };
 
   const toggleRoomType = (id: string) => {
-    setRoomTypes(prev =>
-      prev.includes(id) ? prev.filter(t => t !== id) : [...prev, id]
-    );
+    setRoomTypes(prev => prev.includes(id) ? prev.filter(t => t !== id) : [...prev, id]);
   };
+
+  const STEP_TITLES = [
+    "What's your budget?",
+    'How many roommates?',
+    'Any dealbreakers?',
+    'Your lifestyle',
+    'Gender preference',
+    'Your ideal roommate',
+  ];
+
+  const STEP_SUBTITLES = [
+    'Set your range and room type preferences',
+    'This helps us find the right matches',
+    'These are hard filters \u2014 we\'ll remove incompatible matches',
+    'Sleep, cleanliness, and noise \u2014 the make-or-break stuff',
+    'Who are you comfortable living with?',
+    'Tell Pi what you\'re looking for in your own words',
+  ];
+
+  const STEP_ICONS: (keyof typeof Feather.glyphMap)[] = [
+    'dollar-sign', 'users', 'shield', 'home', 'heart', 'edit-3',
+  ];
 
   const renderBudgetStep = () => (
     <View>
-      <Text style={[styles.stepTitle, { color: theme.text }]}>What's your budget?</Text>
-      <Text style={[styles.stepSubtitle, { color: theme.textSecondary }]}>
-        Set your monthly rent range to find compatible roommates
-      </Text>
-
-      <Text style={[styles.sectionLabel, { color: theme.text }]}>Monthly Budget</Text>
+      <SectionLabel text="Monthly Budget" />
       <PricePickerPair
         minValue={budgetMin}
         maxValue={budgetMax}
@@ -118,38 +229,22 @@ export default function RoommateOnboardingScreen() {
         onMaxChange={setBudgetMax}
         height={160}
       />
-
       {!roomTypeKnown ? (
         <>
-          <Text style={[styles.sectionLabel, { color: theme.text, marginTop: 28 }]}>Room Type</Text>
-          <View style={{ gap: 10 }}>
-            {ROOM_TYPES.map(rt => {
-              const isActive = roomTypes.includes(rt.id);
-              return (
-                <Pressable
-                  key={rt.id}
-                  style={[
-                    styles.roomCard,
-                    { borderColor: isActive ? theme.primary : 'rgba(255,255,255,0.15)' },
-                    isActive && { backgroundColor: `${theme.primary}15` },
-                  ]}
-                  onPress={() => toggleRoomType(rt.id)}
-                >
-                  <View style={[styles.roomIconWrap, isActive && { backgroundColor: `${theme.primary}20` }]}>
-                    <Feather name={rt.icon} size={20} color={isActive ? theme.primary : theme.textSecondary} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.roomLabel, { color: isActive ? theme.primary : theme.text }]}>
-                      {rt.label}
-                    </Text>
-                    <Text style={[styles.roomDesc, { color: theme.textSecondary }]}>{rt.desc}</Text>
-                  </View>
-                  {isActive ? (
-                    <Feather name="check-circle" size={20} color={theme.primary} />
-                  ) : null}
-                </Pressable>
-              );
-            })}
+          <View style={{ height: 20 }} />
+          <SectionLabel text="Room Type" />
+          <View style={{ gap: 8 }}>
+            {ROOM_TYPES.map(rt => (
+              <SelectionCard
+                key={rt.id}
+                icon={rt.icon}
+                label={rt.label}
+                subtitle={rt.desc}
+                selected={roomTypes.includes(rt.id)}
+                onPress={() => toggleRoomType(rt.id)}
+                accentColor="#ff6b5b"
+              />
+            ))}
           </View>
         </>
       ) : null}
@@ -158,32 +253,21 @@ export default function RoommateOnboardingScreen() {
 
   const renderRoommateCountStep = () => (
     <View>
-      <Text style={[styles.stepTitle, { color: theme.text }]}>How many roommates are you open to living with?</Text>
-      <Text style={[styles.stepSubtitle, { color: theme.textSecondary }]}>
-        This helps us find the right matches for you
-      </Text>
-
       <View style={styles.stepperContainer}>
         <Pressable
           style={[styles.stepperButton, maxRoommates <= 1 && styles.stepperButtonDisabled]}
-          onPress={() => setMaxRoommates(prev => Math.max(1, prev - 1))}
+          onPress={() => { setMaxRoommates(prev => Math.max(1, prev - 1)); try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {} }}
           disabled={maxRoommates <= 1}
         >
           <Feather name="minus" size={24} color={maxRoommates <= 1 ? 'rgba(255,255,255,0.2)' : '#fff'} />
         </Pressable>
-
         <View style={styles.stepperValueWrap}>
-          <Text style={[styles.stepperValue, { color: theme.primary }]}>
-            {maxRoommates === 4 ? '4+' : maxRoommates}
-          </Text>
-          <Text style={[styles.stepperLabel, { color: theme.textSecondary }]}>
-            {maxRoommates === 1 ? 'roommate' : 'roommates'}
-          </Text>
+          <Text style={styles.stepperValue}>{maxRoommates === 4 ? '4+' : maxRoommates}</Text>
+          <Text style={styles.stepperLabel}>{maxRoommates === 1 ? 'roommate' : 'roommates'}</Text>
         </View>
-
         <Pressable
           style={[styles.stepperButton, maxRoommates >= 4 && styles.stepperButtonDisabled]}
-          onPress={() => setMaxRoommates(prev => Math.min(4, prev + 1))}
+          onPress={() => { setMaxRoommates(prev => Math.min(4, prev + 1)); try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {} }}
           disabled={maxRoommates >= 4}
         >
           <Feather name="plus" size={24} color={maxRoommates >= 4 ? 'rgba(255,255,255,0.2)' : '#fff'} />
@@ -192,220 +276,105 @@ export default function RoommateOnboardingScreen() {
     </View>
   );
 
-  const renderStep1 = () => (
+  const renderDealbreakerStep = () => (
     <View>
-      <Text style={[styles.stepTitle, { color: theme.text }]}>Any dealbreakers?</Text>
-      <Text style={[styles.stepSubtitle, { color: theme.textSecondary }]}>
-        Select anything you absolutely can't live with. We'll filter out incompatible matches.
-      </Text>
-
-      <View style={styles.optionList}>
-        {DEALBREAKER_OPTIONS.map(item => {
-          const isActive = dealbreakers.includes(item.id);
-          return (
-            <Pressable
-              key={item.id}
-              style={[
-                styles.optionRow,
-                { borderColor: isActive ? '#ef4444' : 'rgba(255,255,255,0.1)' },
-                isActive && { backgroundColor: 'rgba(239,68,68,0.1)' },
-              ]}
-              onPress={() => toggleDealbreaker(item.id)}
-            >
-              <View style={styles.optionLeft}>
-                <Feather
-                  name={item.icon as any}
-                  size={18}
-                  color={isActive ? '#ef4444' : theme.textSecondary}
-                />
-                <Text style={[
-                  styles.optionText,
-                  { color: isActive ? '#ef4444' : theme.text },
-                ]}>
-                  {item.label}
-                </Text>
-              </View>
-              {isActive ? (
-                <Feather name="x-circle" size={20} color="#ef4444" />
-              ) : null}
-            </Pressable>
-          );
-        })}
+      <View style={{ gap: 8 }}>
+        {DEALBREAKER_OPTIONS.map(item => (
+          <SelectionCard
+            key={item.id}
+            icon={item.icon}
+            label={item.label}
+            selected={dealbreakers.includes(item.id)}
+            onPress={() => toggleDealbreaker(item.id)}
+            danger
+          />
+        ))}
       </View>
-
-      <Text style={[styles.chipHint, { color: theme.textSecondary }]}>
-        {dealbreakers.length === 0 ? 'None selected — all good!' : `${dealbreakers.length} dealbreaker${dealbreakers.length > 1 ? 's' : ''} set`}
-      </Text>
+      {dealbreakers.length > 0 ? (
+        <Animated.View entering={FadeIn} style={styles.dealbreakerCount}>
+          <Feather name="shield" size={14} color="#E74C3C" />
+          <Text style={styles.dealbreakerCountText}>{dealbreakers.length} dealbreaker{dealbreakers.length > 1 ? 's' : ''} set</Text>
+        </Animated.View>
+      ) : (
+        <Text style={styles.chipHint}>None selected \u2014 all good!</Text>
+      )}
     </View>
   );
 
-  const renderStep2 = () => (
+  const renderLifestyleStep = () => (
     <View>
-      <Text style={[styles.stepTitle, { color: theme.text }]}>Your lifestyle</Text>
-      <Text style={[styles.stepSubtitle, { color: theme.textSecondary }]}>
-        Help us match you with compatible roommates
-      </Text>
-
-      <Text style={[styles.sectionLabel, { color: theme.text }]}>Sleep schedule</Text>
-      <View style={styles.optionList}>
-        {SLEEP_OPTIONS.map(option => {
-          const isActive = sleepSchedule === option.value;
-          return (
-            <Pressable
-              key={option.value}
-              style={[
-                styles.optionRow,
-                { borderColor: isActive ? theme.primary : 'rgba(255,255,255,0.1)' },
-                isActive && { backgroundColor: `${theme.primary}15` },
-              ]}
-              onPress={() => setSleepSchedule(option.value)}
-            >
-              <View style={styles.optionLeft}>
-                <Feather
-                  name={option.icon as any}
-                  size={18}
-                  color={isActive ? theme.primary : theme.textSecondary}
-                />
-                <Text style={[
-                  styles.optionText,
-                  { color: isActive ? theme.primary : theme.text },
-                ]}>
-                  {option.label}
-                </Text>
-              </View>
-              {isActive ? (
-                <Feather name="check-circle" size={20} color={theme.primary} />
-              ) : null}
-            </Pressable>
-          );
-        })}
+      <SectionLabel text="Sleep schedule" />
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+        {SLEEP_OPTIONS.map(opt => (
+          <OptionCard key={opt.value} icon={opt.icon} label={opt.label} subtitle={opt.desc} selected={sleepSchedule === opt.value} onPress={() => setSleepSchedule(opt.value)} accentColor="#F59E0B" />
+        ))}
       </View>
 
-      <Text style={[styles.sectionLabel, { color: theme.text, marginTop: 24 }]}>Cleanliness</Text>
-      <View style={styles.optionList}>
-        {CLEANLINESS_OPTIONS.map(option => {
-          const isActive = cleanliness === option.value;
-          return (
-            <Pressable
-              key={option.value}
-              style={[
-                styles.optionRow,
-                { borderColor: isActive ? theme.primary : 'rgba(255,255,255,0.1)' },
-                isActive && { backgroundColor: `${theme.primary}15` },
-              ]}
-              onPress={() => setCleanliness(option.value)}
-            >
-              <Text style={[
-                styles.optionText,
-                { color: isActive ? theme.primary : theme.text, marginLeft: 8 },
-              ]}>
-                {option.label}
-              </Text>
-              {isActive ? (
-                <Feather name="check-circle" size={20} color={theme.primary} />
-              ) : null}
-            </Pressable>
-          );
-        })}
-      </View>
+      <View style={{ height: 20 }} />
+      <SectionLabel text="Cleanliness" />
+      <ScaleSelector
+        levels={CLEANLINESS_OPTIONS}
+        selected={cleanliness || ''}
+        onSelect={(v) => setCleanliness(v as Cleanliness)}
+        accentColor="#3b82f6"
+      />
 
-      <Text style={[styles.sectionLabel, { color: theme.text, marginTop: 24 }]}>Noise tolerance</Text>
-      <View style={styles.optionList}>
-        {NOISE_OPTIONS.map(option => {
-          const isActive = noiseTolerance === option.value;
-          return (
-            <Pressable
-              key={option.value}
-              style={[
-                styles.optionRow,
-                { borderColor: isActive ? theme.primary : 'rgba(255,255,255,0.1)' },
-                isActive && { backgroundColor: `${theme.primary}15` },
-              ]}
-              onPress={() => setNoiseTolerance(option.value)}
-            >
-              <Text style={[
-                styles.optionText,
-                { color: isActive ? theme.primary : theme.text, marginLeft: 8 },
-              ]}>
-                {option.label}
-              </Text>
-              {isActive ? (
-                <Feather name="check-circle" size={20} color={theme.primary} />
-              ) : null}
-            </Pressable>
-          );
-        })}
-      </View>
+      <View style={{ height: 20 }} />
+      <SectionLabel text="Noise tolerance" />
+      <ScaleSelector
+        levels={NOISE_OPTIONS}
+        selected={noiseTolerance || ''}
+        onSelect={(v) => setNoiseTolerance(v as NoiseTolerance)}
+        accentColor="#F59E0B"
+      />
     </View>
   );
 
   const renderGenderPrefStep = () => (
     <View>
-      <Text style={[styles.stepTitle, { color: theme.text }]}>Who are you comfortable living with?</Text>
-      <Text style={[styles.stepSubtitle, { color: theme.textSecondary }]}>
-        This helps us find roommates you'll feel at home with
-      </Text>
-
-      <View style={{ gap: 10 }}>
-        {GENDER_PREF_OPTIONS.map(opt => {
-          const isActive = genderPreference === opt.value;
-          return (
-            <Pressable
-              key={opt.value}
-              style={[
-                styles.roomCard,
-                { borderColor: isActive ? theme.primary : 'rgba(255,255,255,0.15)' },
-                isActive && { backgroundColor: `${theme.primary}15` },
-              ]}
-              onPress={() => setGenderPreference(opt.value)}
-            >
-              <View style={[styles.roomIconWrap, isActive && { backgroundColor: `${theme.primary}20` }]}>
-                <Feather name={opt.icon as any} size={20} color={isActive ? theme.primary : theme.textSecondary} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.roomLabel, { color: isActive ? theme.primary : theme.text }]}>
-                  {opt.label}
-                </Text>
-                <Text style={[styles.roomDesc, { color: theme.textSecondary }]}>{opt.desc}</Text>
-              </View>
-              {isActive ? (
-                <Feather name="check-circle" size={20} color={theme.primary} />
-              ) : null}
-            </Pressable>
-          );
-        })}
+      <View style={{ gap: 8 }}>
+        {GENDER_PREF_OPTIONS.map(opt => (
+          <SelectionCard
+            key={opt.value}
+            icon={opt.icon}
+            label={opt.label}
+            subtitle={opt.desc}
+            selected={genderPreference === opt.value}
+            onPress={() => setGenderPreference(opt.value)}
+            accentColor="#ec4899"
+          />
+        ))}
       </View>
     </View>
   );
 
-  const renderStep3 = () => (
+  const renderIdealStep = () => (
     <View>
-      <Text style={[styles.stepTitle, { color: theme.text }]}>Your ideal roommate</Text>
-      <Text style={[styles.stepSubtitle, { color: theme.textSecondary }]}>
-        Describe who you'd love to live with. Pi uses this to find better matches for you.
-      </Text>
-
-      <TextInput
-        style={[
-          styles.textArea,
-          {
-            color: theme.text,
-            borderColor: idealRoommate.length > 0 ? theme.primary : 'rgba(255,255,255,0.15)',
-            backgroundColor: 'rgba(255,255,255,0.05)',
-          },
-        ]}
-        placeholder="e.g. Someone who's tidy, respectful of quiet hours, and enjoys cooking together occasionally..."
-        placeholderTextColor={theme.textTertiary}
-        multiline
-        numberOfLines={6}
-        textAlignVertical="top"
-        value={idealRoommate}
-        onChangeText={setIdealRoommate}
-        maxLength={500}
-      />
-      <Text style={[styles.charCount, { color: theme.textSecondary }]}>
-        {idealRoommate.length}/500
-      </Text>
+      <View style={styles.snippetRow}>
+        {IDEAL_SNIPPETS.map((s, i) => (
+          <Pressable key={i} onPress={() => setIdealRoommate(s.text)} style={styles.snippetChip}>
+            <Text style={styles.snippetChipText}>{s.label}</Text>
+          </Pressable>
+        ))}
+      </View>
+      <View style={[styles.letterInput, idealRoommate.length > 0 ? { borderColor: '#A855F7' } : null]}>
+        <TextInput
+          style={styles.letterTextInput}
+          placeholder="e.g. Someone who's tidy, respectful of quiet hours, and enjoys cooking together occasionally..."
+          placeholderTextColor="rgba(255,255,255,0.2)"
+          multiline
+          numberOfLines={6}
+          textAlignVertical="top"
+          value={idealRoommate}
+          onChangeText={setIdealRoommate}
+          maxLength={500}
+        />
+        <Text style={styles.charCount}>{idealRoommate.length}/500</Text>
+      </View>
+      <View style={styles.piHint}>
+        <Feather name="cpu" size={14} color="#A855F7" />
+        <Text style={styles.piHintText}>Pi reads this to find people who actually fit your vibe</Text>
+      </View>
     </View>
   );
 
@@ -429,7 +398,6 @@ export default function RoommateOnboardingScreen() {
         .from('users')
         .update({ type_onboarding_complete: true })
         .eq('id', user.id);
-
       if (userError) throw userError;
 
       const profileFields: Record<string, any> = {};
@@ -456,10 +424,7 @@ export default function RoommateOnboardingScreen() {
         const { error: profileError } = await supabase
           .from('profiles')
           .upsert({ user_id: user.id, ...cleanFields }, { onConflict: 'user_id' });
-
-        if (profileError) {
-          console.error('Error saving profile preferences:', profileError);
-        }
+        if (profileError) console.error('Error saving profile preferences:', profileError);
       }
 
       const userUpdates: Record<string, any> = {
@@ -482,20 +447,16 @@ export default function RoommateOnboardingScreen() {
           },
         },
       };
-
       userUpdates.max_roommates = maxRoommates;
       userUpdates.profileData.max_roommates = maxRoommates;
-
       if (genderPreference) {
         userUpdates.household_gender_preference = genderPreference;
         userUpdates.profileData.household_gender_preference = genderPreference;
       }
-
       if (idealRoommate.trim()) {
         userUpdates.ideal_roommate_text = idealRoommate.trim();
         userUpdates.profileData.ideal_roommate_text = idealRoommate.trim();
       }
-
       await updateUser(userUpdates);
 
       try {
@@ -518,11 +479,7 @@ export default function RoommateOnboardingScreen() {
     if (!user) return;
     setLoading(true);
     try {
-      await supabase
-        .from('users')
-        .update({ type_onboarding_complete: true })
-        .eq('id', user.id);
-
+      await supabase.from('users').update({ type_onboarding_complete: true }).eq('id', user.id);
       await updateUser({ typeOnboardingComplete: true });
     } catch (err) {
       console.error('Error skipping:', err);
@@ -542,8 +499,20 @@ export default function RoommateOnboardingScreen() {
     }
   };
 
+  const renderCurrentStep = () => {
+    switch (step) {
+      case 1: return renderBudgetStep();
+      case 2: return renderRoommateCountStep();
+      case 3: return renderDealbreakerStep();
+      case 4: return renderLifestyleStep();
+      case 5: return renderGenderPrefStep();
+      case 6: return renderIdealStep();
+      default: return null;
+    }
+  };
+
   return (
-    <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
+    <View style={styles.container}>
       <OnboardingHeader
         showBack
         onBack={handleBack}
@@ -563,39 +532,56 @@ export default function RoommateOnboardingScreen() {
       />
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {step === 1 ? renderBudgetStep() : step === 2 ? renderRoommateCountStep() : step === 3 ? renderStep1() : step === 4 ? renderStep2() : step === 5 ? renderGenderPrefStep() : renderStep3()}
+        <Animated.View entering={FadeInDown.duration(250)} key={step}>
+          <View style={styles.stepHeader}>
+            <View style={styles.stepIconWrap}>
+              <Feather name={STEP_ICONS[step - 1]} size={24} color="#ff6b5b" />
+            </View>
+            <Text style={styles.stepTitle}>{STEP_TITLES[step - 1]}</Text>
+            <Text style={styles.stepSubtitle}>{STEP_SUBTITLES[step - 1]}</Text>
+          </View>
+          {renderCurrentStep()}
+        </Animated.View>
       </ScrollView>
 
       <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 8 }]}>
         {step > 1 ? (
           <Pressable style={styles.backButton} onPress={() => setStep(s => s - 1)}>
-            <Text style={[styles.backButtonText, { color: theme.textSecondary }]}>Back</Text>
+            <Feather name="arrow-left" size={18} color="rgba(255,255,255,0.6)" />
+            <Text style={styles.backButtonText}>Back</Text>
           </Pressable>
         ) : (
           <View style={{ width: 80 }} />
         )}
 
         <Pressable
-          style={[styles.nextButton, { backgroundColor: theme.primary, opacity: loading ? 0.6 : 1 }]}
+          style={{ borderRadius: 14, overflow: 'hidden', opacity: loading ? 0.6 : 1 }}
           onPress={() => {
             if (step < TOTAL_STEPS) {
-              if (step === 5 && !genderPreference) {
-                setGenderPreference('any');
-              }
+              if (step === 5 && !genderPreference) setGenderPreference('any');
               setStep(s => s + 1);
+              try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
             } else {
               handleComplete();
             }
           }}
           disabled={loading}
         >
-          {loading ? (
-            <ActivityIndicator color="#fff" size="small" />
-          ) : (
-            <Text style={styles.nextButtonText}>
-              {step === TOTAL_STEPS ? "Let's Go" : 'Next'}
-            </Text>
-          )}
+          <LinearGradient
+            colors={['#ff6b5b', '#e83a2a']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.nextButton}
+          >
+            {loading ? (
+              <ActivityIndicator color="#fff" size="small" />
+            ) : (
+              <>
+                <Text style={styles.nextButtonText}>{step === TOTAL_STEPS ? "Let's Go" : 'Continue'}</Text>
+                <Feather name={step === TOTAL_STEPS ? 'check' : 'arrow-right'} size={18} color="#fff" />
+              </>
+            )}
+          </LinearGradient>
         </Pressable>
       </View>
     </View>
@@ -605,65 +591,164 @@ export default function RoommateOnboardingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#0d0d0d',
   },
   scrollContent: {
     padding: 24,
     paddingBottom: 120,
   },
+  stepHeader: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  stepIconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,107,91,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,91,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
   stepTitle: {
-    fontSize: 26,
-    fontWeight: '700',
-    marginBottom: 8,
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#fff',
+    textAlign: 'center',
+    letterSpacing: -0.5,
+    marginBottom: 6,
   },
   stepSubtitle: {
-    fontSize: 15,
-    marginBottom: 24,
-    lineHeight: 22,
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.5)',
+    textAlign: 'center',
+    lineHeight: 20,
   },
-  sectionLabel: {
-    fontSize: 16,
-    fontWeight: '600',
+  sectionLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
     marginBottom: 12,
+    marginTop: 8,
+  },
+  sectionBar: {
+    width: 3,
+    height: 16,
+    borderRadius: 2,
+    backgroundColor: '#ff6b5b',
+  },
+  sectionLabelText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#fff',
   },
   chipHint: {
     fontSize: 12,
     marginTop: 16,
     textAlign: 'center',
+    color: 'rgba(255,255,255,0.4)',
   },
-  optionList: {
-    gap: 10,
-  },
-  optionRow: {
+  selectionCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    backgroundColor: 'rgba(255,255,255,0.03)',
-  },
-  optionLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    backgroundColor: '#1a1a1a',
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1.5,
+    borderColor: '#2a2a2a',
     gap: 12,
   },
-  optionText: {
-    fontSize: 15,
-    fontWeight: '500',
-  },
-  textArea: {
-    borderWidth: 1,
+  selectionCardIcon: {
+    width: 40,
+    height: 40,
     borderRadius: 12,
-    padding: 16,
-    fontSize: 15,
-    lineHeight: 22,
-    minHeight: 160,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  charCount: {
+  selectionCardLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  selectionCardSubtitle: {
     fontSize: 12,
-    textAlign: 'right',
-    marginTop: 6,
+    color: 'rgba(255,255,255,0.4)',
+    marginTop: 2,
+  },
+  optionCard: {
+    backgroundColor: '#1a1a1a',
+    borderWidth: 2,
+    borderColor: '#2a2a2a',
+    borderRadius: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    gap: 8,
+    width: '47%',
+  },
+  optionCardIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  optionCardLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#fff',
+    textAlign: 'center',
+  },
+  optionCardSubtitle: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.4)',
+    textAlign: 'center',
+  },
+  scaleItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1.5,
+    borderColor: '#2a2a2a',
+    gap: 12,
+  },
+  scaleIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  scaleLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  scaleDesc: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.4)',
+    marginTop: 2,
+  },
+  dealbreakerCount: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    justifyContent: 'center',
+    marginTop: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    backgroundColor: 'rgba(231,76,60,0.08)',
+    borderRadius: 10,
+    alignSelf: 'center',
+  },
+  dealbreakerCountText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#E74C3C',
   },
   stepperContainer: {
     flexDirection: 'row',
@@ -677,15 +762,15 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.15)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   stepperButtonDisabled: {
     opacity: 0.4,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: 'rgba(255,255,255,0.06)',
   },
   stepperValueWrap: {
     alignItems: 'center',
@@ -694,36 +779,66 @@ const styles = StyleSheet.create({
   stepperValue: {
     fontSize: 64,
     fontWeight: '700',
+    color: '#ff6b5b',
   },
   stepperLabel: {
     fontSize: 14,
     fontWeight: '500',
     marginTop: -4,
+    color: 'rgba(255,255,255,0.5)',
   },
-  roomCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    backgroundColor: 'rgba(255,255,255,0.03)',
-    gap: 12,
+  letterInput: {
+    backgroundColor: '#141414',
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: '#2a2a2a',
+    padding: 16,
   },
-  roomIconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  roomLabel: {
+  letterTextInput: {
+    color: '#fff',
     fontSize: 15,
-    fontWeight: '600',
+    lineHeight: 22,
+    minHeight: 120,
+    textAlignVertical: 'top',
   },
-  roomDesc: {
+  charCount: {
+    color: 'rgba(255,255,255,0.3)',
     fontSize: 12,
-    marginTop: 2,
+    textAlign: 'right',
+    marginTop: 8,
+  },
+  snippetRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 12,
+  },
+  snippetChip: {
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  snippetChipText: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.5)',
+  },
+  piHint: {
+    flexDirection: 'row',
+    gap: 10,
+    padding: 14,
+    backgroundColor: 'rgba(168,85,247,0.08)',
+    borderRadius: 14,
+    marginTop: 12,
+    alignItems: 'center',
+  },
+  piHintText: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 13,
+    flex: 1,
+    lineHeight: 18,
   },
   bottomBar: {
     flexDirection: 'row',
@@ -732,22 +847,28 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingVertical: 16,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(255,255,255,0.1)',
+    borderTopColor: 'rgba(255,255,255,0.08)',
   },
   backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     paddingVertical: 12,
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
   },
   backButtonText: {
     fontSize: 15,
     fontWeight: '500',
+    color: 'rgba(255,255,255,0.6)',
   },
   nextButton: {
-    borderRadius: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 32,
-    minWidth: 100,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 28,
+    gap: 8,
   },
   nextButtonText: {
     fontSize: 15,

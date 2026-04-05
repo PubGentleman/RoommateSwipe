@@ -3,6 +3,9 @@ import {
   View, Text, Pressable, ScrollView, StyleSheet, ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Animated, { FadeInDown } from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
 import { Feather } from '../../../components/VectorIcons';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useTheme } from '../../../hooks/useTheme';
@@ -14,21 +17,21 @@ import { PricePickerPair } from '../../../components/PricePicker';
 
 const TOTAL_STEPS = 3;
 
-const ROOM_TYPES = [
-  { id: 'private', icon: 'lock' as const, label: 'Private Room', desc: 'Your own space with shared common areas' },
-  { id: 'shared', icon: 'users' as const, label: 'Shared Room', desc: 'Share a bedroom to save on rent' },
-  { id: 'apartment', icon: 'home' as const, label: 'Full Apartment', desc: 'An entire place to yourself' },
+const ROOM_TYPES: { id: string; icon: keyof typeof Feather.glyphMap; label: string; desc: string }[] = [
+  { id: 'private', icon: 'lock', label: 'Private Room', desc: 'Your own space with shared common areas' },
+  { id: 'shared', icon: 'users', label: 'Shared Room', desc: 'Share a bedroom to save on rent' },
+  { id: 'apartment', icon: 'home', label: 'Full Apartment', desc: 'An entire place to yourself' },
 ];
 
-const NICE_TO_HAVE_ITEMS = [
-  { id: 'natural_light', label: 'Natural Light', icon: 'sun' as const },
-  { id: 'high_ceilings', label: 'High Ceilings', icon: 'arrow-up' as const },
-  { id: 'rooftop', label: 'Rooftop', icon: 'layers' as const },
-  { id: 'gym', label: 'Gym', icon: 'zap' as const },
-  { id: 'pool', label: 'Pool', icon: 'droplet' as const },
-  { id: 'doorman', label: 'Doorman', icon: 'shield' as const },
-  { id: 'coworking_space', label: 'Co-Working', icon: 'monitor' as const },
-  { id: 'ev_charging', label: 'EV Charging', icon: 'battery-charging' as const },
+const NICE_TO_HAVE_ITEMS: { id: string; label: string; icon: keyof typeof Feather.glyphMap }[] = [
+  { id: 'natural_light', label: 'Natural Light', icon: 'sun' },
+  { id: 'high_ceilings', label: 'High Ceilings', icon: 'arrow-up' },
+  { id: 'rooftop', label: 'Rooftop', icon: 'layers' },
+  { id: 'gym', label: 'Gym', icon: 'zap' },
+  { id: 'pool', label: 'Pool', icon: 'droplet' },
+  { id: 'doorman', label: 'Doorman', icon: 'shield' },
+  { id: 'coworking_space', label: 'Co-Working', icon: 'monitor' },
+  { id: 'ev_charging', label: 'EV Charging', icon: 'battery-charging' },
 ];
 
 const BEDROOM_OPTIONS = [
@@ -40,12 +43,40 @@ const BEDROOM_OPTIONS = [
 ];
 
 const TIMELINE_OPTIONS = [
-  { value: 'asap', label: 'ASAP' },
-  { value: '1_month', label: 'Within 1 month' },
-  { value: '2_months', label: '1-2 months' },
-  { value: '3_months', label: '2-3 months' },
-  { value: 'flexible', label: 'Flexible' },
+  { value: 'asap', label: 'ASAP', icon: 'zap' as const },
+  { value: '1_month', label: 'Within 1 month', icon: 'calendar' as const },
+  { value: '2_months', label: '1-2 months', icon: 'calendar' as const },
+  { value: '3_months', label: '2-3 months', icon: 'calendar' as const },
+  { value: 'flexible', label: 'Flexible', icon: 'clock' as const },
 ];
+
+function SectionLabel({ text }: { text: string }) {
+  return (
+    <View style={styles.sectionLabelRow}>
+      <View style={styles.sectionBar} />
+      <Text style={styles.sectionLabelText}>{text}</Text>
+    </View>
+  );
+}
+
+function SelectionCard({
+  icon, label, subtitle, selected, onPress, accentColor = '#ff6b5b',
+}: {
+  icon: keyof typeof Feather.glyphMap; label: string; subtitle?: string; selected: boolean; onPress: () => void; accentColor?: string;
+}) {
+  return (
+    <Pressable onPress={onPress} style={[styles.selectionCard, selected ? { borderColor: accentColor, backgroundColor: accentColor + '12' } : null]}>
+      <View style={[styles.selectionCardIcon, { backgroundColor: accentColor + '15' }]}>
+        <Feather name={icon} size={20} color={selected ? accentColor : 'rgba(255,255,255,0.5)'} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.selectionCardLabel, selected ? { color: accentColor } : null]}>{label}</Text>
+        {subtitle ? <Text style={styles.selectionCardSubtitle}>{subtitle}</Text> : null}
+      </View>
+      {selected ? <Feather name="check-circle" size={18} color={accentColor} /> : null}
+    </Pressable>
+  );
+}
 
 export default function PlaceSeekerOnboardingScreen() {
   const { user, updateUser } = useAuth();
@@ -85,42 +116,46 @@ export default function PlaceSeekerOnboardingScreen() {
 
   const toggleNeighborhood = (id: string) => {
     setSelectedNeighborhoods(prev =>
-      prev.includes(id)
-        ? prev.filter(n => n !== id)
-        : prev.length < 5 ? [...prev, id] : prev
+      prev.includes(id) ? prev.filter(n => n !== id) : prev.length < 5 ? [...prev, id] : prev
     );
+    try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
   };
 
   const toggleAmenity = (id: string) => {
     setSelectedAmenities(prev =>
-      prev.includes(id)
-        ? prev.filter(a => a !== id)
-        : [...prev, id]
-    );
-  };
-
-  const toggleNiceToHave = (id: string) => {
-    setNiceToHaves(prev =>
-      prev.includes(id)
-        ? prev.filter(a => a !== id)
-        : [...prev, id]
+      prev.includes(id) ? prev.filter(a => a !== id) : [...prev, id]
     );
   };
 
   const toggleRoomType = (id: string) => {
-    setRoomTypes(prev =>
-      prev.includes(id) ? prev.filter(t => t !== id) : [...prev, id]
+    setRoomTypes(prev => prev.includes(id) ? prev.filter(t => t !== id) : [...prev, id]);
+  };
+
+  const toggleNiceToHave = (id: string) => {
+    setNiceToHaves(prev =>
+      prev.includes(id) ? prev.filter(a => a !== id) : [...prev, id]
     );
   };
 
+  const STEP_TITLES = [
+    'Budget & Neighborhoods',
+    'What are you looking for?',
+    'Almost done!',
+  ];
+
+  const STEP_SUBTITLES = [
+    'Set your range and pick where you want to live',
+    'Bedrooms and must-have amenities',
+    'Timeline and nice-to-haves',
+  ];
+
+  const STEP_ICONS: (keyof typeof Feather.glyphMap)[] = [
+    'dollar-sign', 'search', 'check-circle',
+  ];
+
   const renderBudgetAndNeighborhoodsStep = () => (
     <View>
-      <Text style={[styles.stepTitle, { color: theme.text }]}>Budget & Neighborhoods</Text>
-      <Text style={[styles.stepSubtitle, { color: theme.textSecondary }]}>
-        Set your rent range and pick where you want to live
-      </Text>
-
-      <Text style={[styles.sectionLabel, { color: theme.text }]}>Monthly Budget</Text>
+      <SectionLabel text="Monthly Budget" />
       <PricePickerPair
         minValue={budgetMin}
         maxValue={budgetMax}
@@ -131,87 +166,71 @@ export default function PlaceSeekerOnboardingScreen() {
 
       {!roomTypeKnown ? (
         <>
-          <Text style={[styles.sectionLabel, { color: theme.text, marginTop: 28 }]}>Room Type</Text>
-          <Text style={[styles.sectionHint, { color: theme.textSecondary }]}>
-            Select all that apply
-          </Text>
-          <View style={{ gap: 10 }}>
-            {ROOM_TYPES.map(rt => {
-              const isActive = roomTypes.includes(rt.id);
-              return (
-                <Pressable
-                  key={rt.id}
-                  style={[
-                    styles.roomCard,
-                    { borderColor: isActive ? theme.primary : 'rgba(255,255,255,0.15)' },
-                    isActive && { backgroundColor: `${theme.primary}15` },
-                  ]}
-                  onPress={() => toggleRoomType(rt.id)}
-                >
-                  <View style={[styles.roomIconWrap, isActive && { backgroundColor: `${theme.primary}20` }]}>
-                    <Feather name={rt.icon} size={20} color={isActive ? theme.primary : theme.textSecondary} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.roomLabel, { color: isActive ? theme.primary : theme.text }]}>
-                      {rt.label}
-                    </Text>
-                    <Text style={[styles.roomDesc, { color: theme.textSecondary }]}>{rt.desc}</Text>
-                  </View>
-                  {isActive ? (
-                    <Feather name="check-circle" size={20} color={theme.primary} />
-                  ) : null}
-                </Pressable>
-              );
-            })}
+          <View style={{ height: 20 }} />
+          <SectionLabel text="Room Type" />
+          <View style={{ gap: 8 }}>
+            {ROOM_TYPES.map(rt => (
+              <SelectionCard
+                key={rt.id}
+                icon={rt.icon}
+                label={rt.label}
+                subtitle={rt.desc}
+                selected={roomTypes.includes(rt.id)}
+                onPress={() => toggleRoomType(rt.id)}
+              />
+            ))}
           </View>
         </>
       ) : null}
 
       {hasBoroughs ? (
         <>
-          <Text style={[styles.sectionLabel, { color: theme.text, marginTop: 28 }]}>Neighborhoods</Text>
-          <Text style={[styles.sectionHint, { color: theme.textSecondary }]}>
-            Pick up to 5 — we'll prioritize listings in these areas
-          </Text>
+          <View style={{ height: 20 }} />
+          <SectionLabel text="Neighborhoods" />
+          <Text style={styles.sectionHint}>Pick up to 5 \u2014 we'll prioritize listings in these areas</Text>
+
+          {selectedNeighborhoods.length > 0 ? (
+            <View style={styles.selectedChipsRow}>
+              {selectedNeighborhoods.map(hood => (
+                <View key={hood} style={styles.selectedChip}>
+                  <Text style={styles.selectedChipText}>{hood}</Text>
+                  <Pressable onPress={() => setSelectedNeighborhoods(prev => prev.filter(n => n !== hood))} hitSlop={8}>
+                    <Feather name="x" size={12} color="#ff6b5b" />
+                  </Pressable>
+                </View>
+              ))}
+            </View>
+          ) : null}
+
           {boroughEntries.map(([borough, hoods]) => {
             const isExpanded = expandedBoroughs.includes(borough);
             const selectedCount = hoods.filter(h => selectedNeighborhoods.includes(h)).length;
             return (
-              <View key={borough} style={styles.boroughDropdown}>
-                <Pressable
-                  style={styles.boroughHeader}
-                  onPress={() => toggleBorough(borough)}
-                >
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
-                    <Text style={[styles.boroughLabel, { color: theme.text, marginBottom: 0 }]}>{borough}</Text>
+              <View key={borough} style={styles.boroughSection}>
+                <Pressable style={styles.boroughHeader} onPress={() => toggleBorough(borough)}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Text style={styles.boroughLabel}>{borough}</Text>
                     {selectedCount > 0 ? (
-                      <View style={[styles.boroughBadge, { backgroundColor: `${theme.primary}30` }]}>
-                        <Text style={[styles.boroughBadgeText, { color: theme.primary }]}>{selectedCount}</Text>
+                      <View style={styles.boroughBadge}>
+                        <Text style={styles.boroughBadgeText}>{selectedCount}</Text>
                       </View>
                     ) : null}
                   </View>
-                  <Feather name={isExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={theme.textSecondary} />
+                  <Feather name={isExpanded ? 'chevron-up' : 'chevron-down'} size={16} color="rgba(255,255,255,0.4)" />
                 </Pressable>
                 {isExpanded ? (
                   <View style={styles.boroughChips}>
                     {hoods.map(hood => {
                       const isActive = selectedNeighborhoods.includes(hood);
+                      const disabled = !isActive && selectedNeighborhoods.length >= 5;
                       return (
                         <Pressable
                           key={hood}
-                          style={[
-                            styles.chip,
-                            { borderColor: isActive ? theme.primary : 'rgba(255,255,255,0.15)' },
-                            isActive && { backgroundColor: `${theme.primary}20` },
-                          ]}
+                          disabled={disabled}
                           onPress={() => toggleNeighborhood(hood)}
+                          style={[styles.hoodChip, isActive ? styles.hoodChipActive : null, disabled ? { opacity: 0.3 } : null]}
                         >
-                          <Text style={[
-                            styles.chipText,
-                            { color: isActive ? theme.primary : theme.textSecondary },
-                          ]}>
-                            {hood}
-                          </Text>
+                          <Text style={{ fontSize: 12, color: isActive ? '#ff6b5b' : '#ccc' }}>{hood}</Text>
                         </Pressable>
                       );
                     })}
@@ -220,9 +239,7 @@ export default function PlaceSeekerOnboardingScreen() {
               </View>
             );
           })}
-          <Text style={[styles.chipHint, { color: theme.textSecondary }]}>
-            {selectedNeighborhoods.length}/5 selected
-          </Text>
+          <Text style={styles.chipHint}>{selectedNeighborhoods.length}/5 selected</Text>
         </>
       ) : null}
     </View>
@@ -232,61 +249,36 @@ export default function PlaceSeekerOnboardingScreen() {
     const amenities = getRenterPreferenceAmenities();
     return (
       <View>
-        <Text style={[styles.stepTitle, { color: theme.text }]}>What are you looking for?</Text>
-
-        <Text style={[styles.sectionLabel, { color: theme.text }]}>Bedrooms</Text>
+        <SectionLabel text="Bedrooms" />
         <View style={styles.bedroomRow}>
           {BEDROOM_OPTIONS.map(option => {
             const isActive = bedrooms === option.value;
             return (
               <Pressable
                 key={option.value}
-                style={[
-                  styles.bedroomChip,
-                  { borderColor: isActive ? theme.primary : 'rgba(255,255,255,0.15)' },
-                  isActive && { backgroundColor: `${theme.primary}20` },
-                ]}
-                onPress={() => setBedrooms(option.value)}
+                style={[styles.bedroomChip, isActive ? { borderColor: '#ff6b5b', backgroundColor: 'rgba(255,107,91,0.12)' } : null]}
+                onPress={() => { setBedrooms(option.value); try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {} }}
               >
-                <Text style={[
-                  styles.bedroomChipText,
-                  { color: isActive ? theme.primary : theme.textSecondary },
-                ]}>
-                  {option.label}
-                </Text>
+                <Text style={[styles.bedroomChipText, isActive ? { color: '#ff6b5b' } : null]}>{option.label}</Text>
               </Pressable>
             );
           })}
         </View>
 
-        <Text style={[styles.sectionLabel, { color: theme.text, marginTop: 28 }]}>Must-haves</Text>
-        <Text style={[styles.sectionHint, { color: theme.textSecondary }]}>
-          What can't you live without?
-        </Text>
+        <View style={{ height: 20 }} />
+        <SectionLabel text="Must-haves" />
+        <Text style={styles.sectionHint}>What can't you live without?</Text>
         <View style={styles.chipsWrap}>
           {amenities.map(amenity => {
             const isSelected = selectedAmenities.includes(amenity.id);
             return (
               <Pressable
                 key={amenity.id}
-                style={[
-                  styles.amenityChip,
-                  { borderColor: isSelected ? theme.primary : 'rgba(255,255,255,0.15)' },
-                  isSelected && { backgroundColor: `${theme.primary}20` },
-                ]}
+                style={[styles.amenityChip, isSelected ? { borderColor: '#ff6b5b', backgroundColor: 'rgba(255,107,91,0.12)' } : null]}
                 onPress={() => toggleAmenity(amenity.id)}
               >
-                <Feather
-                  name={amenity.icon as any}
-                  size={14}
-                  color={isSelected ? theme.primary : theme.textSecondary}
-                />
-                <Text style={[
-                  styles.amenityChipText,
-                  { color: isSelected ? '#fff' : theme.textSecondary },
-                ]}>
-                  {amenity.label}
-                </Text>
+                <Feather name={amenity.icon as any} size={14} color={isSelected ? '#ff6b5b' : 'rgba(255,255,255,0.5)'} />
+                <Text style={[styles.amenityChipText, isSelected ? { color: '#fff' } : null]}>{amenity.label}</Text>
               </Pressable>
             );
           })}
@@ -302,28 +294,21 @@ export default function PlaceSeekerOnboardingScreen() {
 
     return (
       <View>
-        <Text style={[styles.stepTitle, { color: theme.text }]}>Almost done!</Text>
-
-        <Text style={[styles.sectionLabel, { color: theme.text }]}>When do you need to move?</Text>
-        <View style={styles.chipsWrap}>
+        <SectionLabel text="When do you need to move?" />
+        <View style={{ gap: 8 }}>
           {TIMELINE_OPTIONS.map(option => {
             const isActive = moveInDate === option.value;
             return (
               <Pressable
                 key={option.value}
-                style={[
-                  styles.chip,
-                  { borderColor: isActive ? theme.primary : 'rgba(255,255,255,0.15)' },
-                  isActive && { backgroundColor: `${theme.primary}20` },
-                ]}
-                onPress={() => setMoveInDate(option.value)}
+                onPress={() => { setMoveInDate(option.value); try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {} }}
+                style={[styles.timelineCard, isActive ? styles.timelineCardActive : null]}
               >
-                <Text style={[
-                  styles.chipText,
-                  { color: isActive ? theme.primary : theme.textSecondary },
-                ]}>
-                  {option.label}
-                </Text>
+                <View style={[styles.timelineIcon, isActive ? { backgroundColor: 'rgba(255,107,91,0.15)' } : null]}>
+                  <Feather name={option.icon} size={16} color={isActive ? '#ff6b5b' : 'rgba(255,255,255,0.4)'} />
+                </View>
+                <Text style={[styles.timelineLabel, isActive ? { color: '#ff6b5b' } : null]}>{option.label}</Text>
+                {isActive ? <Feather name="check" size={16} color="#ff6b5b" /> : null}
               </Pressable>
             );
           })}
@@ -331,36 +316,20 @@ export default function PlaceSeekerOnboardingScreen() {
 
         {filteredNiceToHaves.length > 0 ? (
           <>
-            <Text style={[styles.sectionLabel, { color: theme.text, marginTop: 28 }]}>
-              Nice to have
-            </Text>
-            <Text style={[styles.sectionHint, { color: theme.textSecondary }]}>
-              Optional — helps us find better matches
-            </Text>
+            <View style={{ height: 20 }} />
+            <SectionLabel text="Nice to have" />
+            <Text style={styles.sectionHint}>Optional \u2014 helps us find better matches</Text>
             <View style={styles.chipsWrap}>
               {filteredNiceToHaves.map(item => {
                 const isSelected = niceToHaves.includes(item.id);
                 return (
                   <Pressable
                     key={item.id}
-                    style={[
-                      styles.amenityChip,
-                      { borderColor: isSelected ? '#4a9eff' : 'rgba(255,255,255,0.15)' },
-                      isSelected && { backgroundColor: 'rgba(74,158,255,0.2)' },
-                    ]}
+                    style={[styles.amenityChip, isSelected ? { borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.12)' } : null]}
                     onPress={() => toggleNiceToHave(item.id)}
                   >
-                    <Feather
-                      name={item.icon}
-                      size={14}
-                      color={isSelected ? '#fff' : theme.textSecondary}
-                    />
-                    <Text style={[
-                      styles.amenityChipText,
-                      { color: isSelected ? '#fff' : theme.textSecondary },
-                    ]}>
-                      {item.label}
-                    </Text>
+                    <Feather name={item.icon} size={14} color={isSelected ? '#3b82f6' : 'rgba(255,255,255,0.5)'} />
+                    <Text style={[styles.amenityChipText, isSelected ? { color: '#fff' } : null]}>{item.label}</Text>
                   </Pressable>
                 );
               })}
@@ -399,7 +368,6 @@ export default function PlaceSeekerOnboardingScreen() {
           type_onboarding_complete: true,
         })
         .eq('id', user.id);
-
       if (error) throw error;
 
       const roomTypeVal = roomTypes.join(',') || (listingPref === 'entire_apartment' ? 'apartment' : listingPref === 'room' ? 'private' : undefined);
@@ -424,18 +392,16 @@ export default function PlaceSeekerOnboardingScreen() {
       });
 
       try {
-        await supabase
-          .from('profiles')
-          .upsert({
-            user_id: user.id,
-            budget_min: budgetMin,
-            budget_max: budgetMax,
-            preferred_neighborhoods: selectedNeighborhoods,
-            desired_bedrooms: bedrooms,
-            amenity_must_haves: selectedAmenities,
-            room_type: roomTypeVal || null,
-            move_in_date: convertTimelineToDate(moveInDate),
-          }, { onConflict: 'user_id' });
+        await supabase.from('profiles').upsert({
+          user_id: user.id,
+          budget_min: budgetMin,
+          budget_max: budgetMax,
+          preferred_neighborhoods: selectedNeighborhoods,
+          desired_bedrooms: bedrooms,
+          amenity_must_haves: selectedAmenities,
+          room_type: roomTypeVal || null,
+          move_in_date: convertTimelineToDate(moveInDate),
+        }, { onConflict: 'user_id' });
       } catch (syncErr) {
         console.warn('Profiles sync failed:', syncErr);
       }
@@ -463,11 +429,7 @@ export default function PlaceSeekerOnboardingScreen() {
     if (!user) return;
     setLoading(true);
     try {
-      await supabase
-        .from('users')
-        .update({ type_onboarding_complete: true })
-        .eq('id', user.id);
-
+      await supabase.from('users').update({ type_onboarding_complete: true }).eq('id', user.id);
       await updateUser({ typeOnboardingComplete: true });
     } catch (err) {
       console.error('Error skipping:', err);
@@ -487,8 +449,17 @@ export default function PlaceSeekerOnboardingScreen() {
     }
   };
 
+  const renderCurrentStep = () => {
+    switch (step) {
+      case 1: return renderBudgetAndNeighborhoodsStep();
+      case 2: return renderStep2();
+      case 3: return renderStep3();
+      default: return null;
+    }
+  };
+
   return (
-    <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
+    <View style={styles.container}>
       <OnboardingHeader
         showBack
         onBack={handleBack}
@@ -504,36 +475,55 @@ export default function PlaceSeekerOnboardingScreen() {
       />
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {step === 1 ? renderBudgetAndNeighborhoodsStep() : step === 2 ? renderStep2() : renderStep3()}
+        <Animated.View entering={FadeInDown.duration(250)} key={step}>
+          <View style={styles.stepHeader}>
+            <View style={styles.stepIconWrap}>
+              <Feather name={STEP_ICONS[step - 1]} size={24} color="#ff6b5b" />
+            </View>
+            <Text style={styles.stepTitle}>{STEP_TITLES[step - 1]}</Text>
+            <Text style={styles.stepSubtitle}>{STEP_SUBTITLES[step - 1]}</Text>
+          </View>
+          {renderCurrentStep()}
+        </Animated.View>
       </ScrollView>
 
       <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 8 }]}>
         {step > 1 ? (
           <Pressable style={styles.backButton} onPress={() => setStep(s => s - 1)}>
-            <Text style={[styles.backButtonText, { color: theme.textSecondary }]}>Back</Text>
+            <Feather name="arrow-left" size={18} color="rgba(255,255,255,0.6)" />
+            <Text style={styles.backButtonText}>Back</Text>
           </Pressable>
         ) : (
           <View style={{ width: 80 }} />
         )}
 
         <Pressable
-          style={[styles.nextButton, { backgroundColor: theme.primary, opacity: loading ? 0.6 : 1 }]}
+          style={{ borderRadius: 14, overflow: 'hidden', opacity: loading ? 0.6 : 1 }}
           onPress={() => {
             if (step < TOTAL_STEPS) {
               setStep(s => s + 1);
+              try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
             } else {
               handleComplete();
             }
           }}
           disabled={loading}
         >
-          {loading ? (
-            <ActivityIndicator color="#fff" size="small" />
-          ) : (
-            <Text style={styles.nextButtonText}>
-              {step === TOTAL_STEPS ? "Let's Go" : 'Next'}
-            </Text>
-          )}
+          <LinearGradient
+            colors={['#ff6b5b', '#e83a2a']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.nextBtn}
+          >
+            {loading ? (
+              <ActivityIndicator color="#fff" size="small" />
+            ) : (
+              <>
+                <Text style={styles.nextBtnText}>{step === TOTAL_STEPS ? "Let's Go" : 'Continue'}</Text>
+                <Feather name={step === TOTAL_STEPS ? 'check' : 'arrow-right'} size={18} color="#fff" />
+              </>
+            )}
+          </LinearGradient>
         </Pressable>
       </View>
     </View>
@@ -543,88 +533,167 @@ export default function PlaceSeekerOnboardingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#0d0d0d',
   },
   scrollContent: {
     padding: 24,
     paddingBottom: 120,
   },
+  stepHeader: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  stepIconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,107,91,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,91,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
   stepTitle: {
-    fontSize: 26,
-    fontWeight: '700',
-    marginBottom: 8,
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#fff',
+    textAlign: 'center',
+    letterSpacing: -0.5,
+    marginBottom: 6,
   },
   stepSubtitle: {
-    fontSize: 15,
-    marginBottom: 24,
-    lineHeight: 22,
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.5)',
+    textAlign: 'center',
+    lineHeight: 20,
   },
-  boroughDropdown: {
-    marginBottom: 8,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    backgroundColor: 'rgba(255,255,255,0.03)',
-    overflow: 'hidden',
-  },
-  boroughHeader: {
+  sectionLabelRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-  },
-  boroughLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  boroughBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
-  },
-  boroughBadgeText: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  boroughChips: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: 8,
-    paddingHorizontal: 16,
-    paddingBottom: 14,
+    marginBottom: 12,
+    marginTop: 8,
   },
-  sectionLabel: {
+  sectionBar: {
+    width: 3,
+    height: 16,
+    borderRadius: 2,
+    backgroundColor: '#ff6b5b',
+  },
+  sectionLabelText: {
     fontSize: 16,
-    fontWeight: '600',
-    marginTop: 24,
-    marginBottom: 8,
+    fontWeight: '700',
+    color: '#fff',
   },
   sectionHint: {
     fontSize: 13,
+    color: 'rgba(255,255,255,0.4)',
     marginBottom: 12,
   },
   chipHint: {
     fontSize: 12,
     marginTop: 12,
     textAlign: 'center',
+    color: 'rgba(255,255,255,0.4)',
   },
-  chipsWrap: {
+  selectionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1a1a1a',
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1.5,
+    borderColor: '#2a2a2a',
+    gap: 12,
+  },
+  selectionCardIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  selectionCardLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  selectionCardSubtitle: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.4)',
+    marginTop: 2,
+  },
+  selectedChipsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
+    marginBottom: 12,
   },
-  chip: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
+  selectedChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,107,91,0.15)',
+    borderRadius: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
     borderWidth: 1,
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderColor: '#ff6b5b',
+    gap: 6,
   },
-  chipText: {
+  selectedChipText: {
+    fontSize: 12,
+    color: '#ff6b5b',
+  },
+  boroughSection: {
+    marginBottom: 4,
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#2a2a2a',
+    overflow: 'hidden',
+  },
+  boroughHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  boroughLabel: {
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '700',
+    color: '#ff6b5b',
+  },
+  boroughBadge: {
+    backgroundColor: 'rgba(255,107,91,0.2)',
+    borderRadius: 10,
+    paddingHorizontal: 7,
+    paddingVertical: 1,
+  },
+  boroughBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#ff6b5b',
+  },
+  boroughChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingBottom: 12,
+  },
+  hoodChip: {
+    backgroundColor: '#1c1c1c',
+    borderRadius: 10,
+    paddingVertical: 7,
+    paddingHorizontal: 11,
+    borderWidth: 1.5,
+    borderColor: '#2a2a2a',
+  },
+  hoodChipActive: {
+    backgroundColor: 'rgba(255,107,91,0.15)',
+    borderColor: '#ff6b5b',
   },
   bedroomRow: {
     flexDirection: 'row',
@@ -635,12 +704,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 12,
-    borderWidth: 1,
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1.5,
+    borderColor: '#2a2a2a',
+    backgroundColor: '#1a1a1a',
   },
   bedroomChipText: {
     fontSize: 14,
     fontWeight: '600',
+    color: 'rgba(255,255,255,0.5)',
+  },
+  chipsWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
   },
   amenityChip: {
     flexDirection: 'row',
@@ -649,37 +725,42 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 20,
-    borderWidth: 1,
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1.5,
+    borderColor: '#2a2a2a',
+    backgroundColor: '#1a1a1a',
   },
   amenityChipText: {
     fontSize: 13,
     fontWeight: '500',
+    color: 'rgba(255,255,255,0.5)',
   },
-  roomCard: {
+  timelineCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 14,
+    backgroundColor: '#1a1a1a',
     borderRadius: 12,
-    borderWidth: 1,
-    backgroundColor: 'rgba(255,255,255,0.03)',
+    padding: 14,
+    borderWidth: 1.5,
+    borderColor: '#2a2a2a',
     gap: 12,
   },
-  roomIconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+  timelineCardActive: {
+    borderColor: '#ff6b5b',
+    backgroundColor: 'rgba(255,107,91,0.08)',
+  },
+  timelineIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.05)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  roomLabel: {
-    fontSize: 15,
+  timelineLabel: {
+    flex: 1,
+    fontSize: 14,
     fontWeight: '600',
-  },
-  roomDesc: {
-    fontSize: 12,
-    marginTop: 2,
+    color: '#ccc',
   },
   bottomBar: {
     flexDirection: 'row',
@@ -688,24 +769,30 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingVertical: 16,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(255,255,255,0.1)',
+    borderTopColor: 'rgba(255,255,255,0.08)',
   },
   backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     paddingVertical: 12,
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
   },
   backButtonText: {
     fontSize: 15,
     fontWeight: '500',
+    color: 'rgba(255,255,255,0.6)',
   },
-  nextButton: {
-    borderRadius: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 32,
-    minWidth: 100,
+  nextBtn: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 28,
+    gap: 8,
   },
-  nextButtonText: {
+  nextBtnText: {
     fontSize: 15,
     fontWeight: '700',
     color: '#fff',

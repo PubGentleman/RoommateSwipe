@@ -3,6 +3,7 @@ import { View, Pressable, Text, StyleSheet, Platform, StatusBar } from 'react-na
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from './VectorIcons';
 import { RhomeLogo } from './RhomeLogo';
+import { ProgressBar } from './questionnaire/ProgressBar';
 
 interface OnboardingHeaderProps {
   title?: string;
@@ -47,17 +48,8 @@ export default function OnboardingHeader({
       </View>
 
       {step && totalSteps ? (
-        <View style={styles.progressRow}>
-          {Array.from({ length: totalSteps }, (_, i) => (
-            <View
-              key={i}
-              style={[
-                styles.progressDot,
-                i < step ? styles.progressDotActive : styles.progressDotInactive,
-                i === step - 1 ? styles.progressDotCurrent : null,
-              ]}
-            />
-          ))}
+        <View style={styles.progressWrap}>
+          <ProgressBar currentStep={step - 1} totalSteps={totalSteps} showLabel={false} />
         </View>
       ) : title ? (
         <Text style={styles.title} numberOfLines={1}>{title}</Text>
@@ -106,26 +98,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 2,
   },
-  progressRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingTop: 4,
-  },
-  progressDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  progressDotActive: {
-    backgroundColor: '#FF6B6B',
-  },
-  progressDotInactive: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-  },
-  progressDotCurrent: {
-    width: 24,
-    borderRadius: 4,
+  progressWrap: {
+    paddingHorizontal: 8,
+    paddingTop: 2,
   },
 });
