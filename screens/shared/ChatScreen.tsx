@@ -20,6 +20,7 @@ import { getMessages as getSupabaseMessages, sendMessage as sendSupabaseMessage,
 import { joinConversationTyping, leaveConversationTyping, sendTypingIndicator, isUserOnline, subscribeToPresence, getTypingUsers, getLastSeen, formatLastSeen } from '../../services/presenceService';
 import { OnlineDot } from '../../components/OnlineDot';
 import { recordMessageActivity } from '../../utils/aiMemory';
+import { requireVerification } from '../../utils/verificationGating';
 import { acceptInquiry, declineInquiry, linkListingToGroup, leaveGroup, removeMember, getGroupMessages, sendGroupMessage, subscribeToGroupMessages, sendGroupMessageWithMentions, pinMessage, unpinMessage, getPinnedMessages, deleteGroupMessage, editGroupMessage, adminDeleteGroupMessage, muteGroup, unmuteGroup, updateLastRead, markMentionsRead, getGroupMemberMuteStatus, getGroupSettings } from '../../services/groupService';
 import { MentionInput } from '../../components/MentionInput';
 import { PinnedMessageBar } from '../../components/PinnedMessageBar';
@@ -1357,6 +1358,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
 
   const sendMessage = async () => {
     if (!inputText.trim() || !user) return;
+
+    if (!requireVerification(user.emailVerified, 'messaging')) return;
 
     const isRenterChat = user.role !== 'host' && !isInquiryChat;
     if (isRenterChat && !gateStatus.canMessage) {

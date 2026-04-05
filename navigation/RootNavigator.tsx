@@ -3,7 +3,6 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth, getInitialRoute } from '../contexts/AuthContext';
 import { LoginScreen } from '../screens/auth/LoginScreen';
 import { NewPasswordScreen } from '../screens/auth/NewPasswordScreen';
-import { VerificationPendingScreen } from '../screens/auth/VerificationPendingScreen';
 import { ProfileQuestionnaireScreen } from '../screens/shared/ProfileQuestionnaireScreen';
 import { PlanSelectionScreen } from '../screens/shared/PlanSelectionScreen';
 import { HostTypeSelectScreen } from '../screens/host/onboarding/HostTypeSelectScreen';
@@ -24,7 +23,6 @@ import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../hooks/useTheme';
 import { StorageService } from '../utils/storage';
-import { supabase } from '../lib/supabase';
 
 export type RootStackParamList = {
   Login: undefined;
@@ -136,25 +134,6 @@ export const RootNavigator = () => {
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="Login" component={LoginScreen} />
       </Stack.Navigator>
-    );
-  }
-
-  if (user.emailVerified === false) {
-    return (
-      <VerificationPendingScreen
-        email={user.email}
-        onVerified={async () => {
-          try {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (session) {
-              await refreshSession(session);
-            }
-          } catch (err) {
-            console.error('[Verification] Failed to refresh session after verification:', err);
-          }
-        }}
-        onBackToLogin={async () => { try { await logout(); } catch {} }}
-      />
     );
   }
 

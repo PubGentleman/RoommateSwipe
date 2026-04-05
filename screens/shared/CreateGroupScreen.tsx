@@ -10,6 +10,7 @@ import { useConfirm } from '../../contexts/ConfirmContext';
 import { Spacing, Typography } from '../../constants/theme';
 import { createGroup as createGroupSupabase, getGroupLimit, getMemberLimit, sendGroupInvites, GroupInviteInput } from '../../services/groupService';
 import { StorageService } from '../../utils/storage';
+import { requireVerification } from '../../utils/verificationGating';
 import { supabase } from '../../lib/supabase';
 import { ScreenKeyboardAwareScrollView } from '../../components/ScreenKeyboardAwareScrollView';
 import { Image } from 'expo-image';
@@ -73,6 +74,8 @@ export const CreateGroupScreen = ({ navigation, route }: any) => {
 
   const handleCreate = async () => {
     if (!user) return;
+
+    if (!requireVerification(user.emailVerified, 'creating groups')) return;
 
     if (!name.trim()) {
       await alert({ title: 'Name Required', message: 'Please enter a name for your group.', variant: 'warning' });
