@@ -1292,7 +1292,35 @@ export const ExploreScreen = () => {
       seen.add(p.id);
       return true;
     });
-    setFilteredProperties(deduped);
+
+    const boosted = deduped.filter(p => isPropertyBoosted(p) || isFeaturedBoosted(p));
+    const organic = deduped.filter(p => !isPropertyBoosted(p) && !isFeaturedBoosted(p));
+
+    const interleaved: Property[] = [];
+    let boostIdx = 0;
+    let organicIdx = 0;
+
+    for (let i = 0; organicIdx < organic.length || boostIdx < boosted.length; i++) {
+      if ((i + 1) % 3 === 0 && boostIdx < boosted.length) {
+        interleaved.push(boosted[boostIdx]);
+        boostIdx++;
+      } else if (organicIdx < organic.length) {
+        interleaved.push(organic[organicIdx]);
+        organicIdx++;
+      } else if (boostIdx < boosted.length) {
+        interleaved.push(boosted[boostIdx]);
+        boostIdx++;
+      }
+    }
+
+    const finalSeen = new Set<string>();
+    const finalFeed = interleaved.filter(p => {
+      if (finalSeen.has(p.id)) return false;
+      finalSeen.add(p.id);
+      return true;
+    });
+
+    setFilteredProperties(finalFeed);
   };
 
   const renterPlan = normalizeRenterPlan(user?.subscription?.plan);
@@ -1645,6 +1673,22 @@ export const ExploreScreen = () => {
               <View style={styles.quickBoostBadge}>
                 <Feather name="zap" size={9} color="#fff" />
                 <Text style={[styles.tagText, { color: '#fff', marginLeft: 2 }]}>BOOSTED</Text>
+              </View>
+            ) : null}
+            {item.listingBoost?.isActive &&
+             item.listingBoost?.includesTopPicks &&
+             new Date(item.listingBoost.expiresAt) > new Date() ? (
+              <View style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: '#a855f7',
+                paddingHorizontal: 7,
+                paddingVertical: 3,
+                borderRadius: 5,
+                gap: 3,
+              }}>
+                <Feather name="award" size={9} color="#fff" />
+                <Text style={[styles.tagText, { color: '#fff' }]}>TOP PICK</Text>
               </View>
             ) : null}
           </View>
@@ -2272,25 +2316,9 @@ export const ExploreScreen = () => {
           onScroll={exploreScrollHandler}
           scrollEventThrottle={16}
           ListHeaderComponent={() => {
-            const topHostListings = filteredProperties.filter(p => {
-              const host = p.hostProfileId ? hostProfiles.get(p.hostProfileId) : null;
-              return host && (host as any).hostPlan === 'business';
-            });
-            const topPicksListings = filteredProperties.filter(p =>
-              p.listingBoost?.isActive &&
-              p.listingBoost?.includesTopPicks &&
-              new Date(p.listingBoost.expiresAt) > new Date()
-            );
-            const boostedListings = filteredProperties.filter(p =>
-              p.listingBoost?.isActive &&
-              p.listingBoost?.includesFeaturedBadge &&
-              new Date(p.listingBoost.expiresAt) > new Date()
-            );
-            const showTopHosts = topHostListings.length > 0 && viewMode !== 'saved';
-            const showTopPicks = topPicksListings.length > 0 && viewMode !== 'saved';
-            const showBoosted = boostedListings.length > 0 && viewMode !== 'saved';
             const showProfileNudge = user && profileCompletion < 60 && !profileNudgeDismissed && viewMode !== 'saved';
-            if (!showTopHosts && !showTopPicks && !showBoosted && !showProfileNudge) return null;
+            const showRecommendations = viewMode === 'all' && displayMode !== 'map' && recommendations.length > 0;
+            if (!showProfileNudge && !showRecommendations) return null;
             return (
               <View>
                 {showProfileNudge ? (
@@ -2346,131 +2374,7 @@ export const ExploreScreen = () => {
                     </Pressable>
                   </Pressable>
                 ) : null}
-                {showTopPicks ? (
-                  <View style={styles.topPicksSection}>
-                    <View style={styles.featuredHeader}>
-                      <Feather name="award" size={14} color="#a855f7" />
-                      <Text style={[styles.featuredTitle, { color: '#a855f7' }]}>Top Picks</Text>
-                    </View>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.featuredScroll}>
-                      {topPicksListings.slice(0, 5).map(item => (
-                        <Pressable
-                          key={`topPick-${item.id}`}
-                          style={styles.topPickCard}
-                          onPress={() => {
-                            const viewCheck = canViewListing();
-                            if (!viewCheck.canView) {
-                              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-                              setPaywallFeature('Unlimited Listing Views');
-                              setPaywallPlan('plus');
-                              setShowPaywall(true);
-                              return;
-                            }
-                            useListingView();
-                            setSelectedProperty(item);
-                            setPhotoIndex(0);
-                            setShowPropertyDetail(true);
-                          }}
-                        >
-                          <Image source={{ uri: item.photos[0] }} style={styles.featuredPhoto} />
-                          <LinearGradient colors={['transparent', 'rgba(80,20,120,0.9)']} style={styles.featuredGradient}>
-                            <Text style={styles.featuredPrice}>${item.price?.toLocaleString()}/mo</Text>
-                            <Text style={styles.featuredName} numberOfLines={1}>{item.title}</Text>
-                            <View style={styles.topPickBadge}>
-                              <Feather name="award" size={8} color="#fff" />
-                              <Text style={[styles.featuredBadgeText, { color: '#fff' }]}>TOP PICK</Text>
-                            </View>
-                          </LinearGradient>
-                        </Pressable>
-                      ))}
-                    </ScrollView>
-                  </View>
-                ) : null}
-                {showBoosted ? (
-                  <View style={styles.boostedSection}>
-                    <View style={styles.featuredHeader}>
-                      <Feather name="zap" size={14} color="#60a5fa" />
-                      <Text style={[styles.featuredTitle, { color: '#60a5fa' }]}>Boosted Listings</Text>
-                    </View>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.featuredScroll}>
-                      {boostedListings.slice(0, 5).map(item => (
-                        <Pressable
-                          key={`boosted-${item.id}`}
-                          style={styles.boostedCard}
-                          onPress={() => {
-                            const viewCheck = canViewListing();
-                            if (!viewCheck.canView) {
-                              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-                              setPaywallFeature('Unlimited Listing Views');
-                              setPaywallPlan('plus');
-                              setShowPaywall(true);
-                              return;
-                            }
-                            trackImpression(item.id, 'detail_view', { section: 'boosted_carousel' });
-                            useListingView();
-                            setSelectedProperty(item);
-                            setPhotoIndex(0);
-                            setShowPropertyDetail(true);
-                          }}
-                          onLayout={() => {
-                            trackImpression(item.id, 'carousel_view', { section: 'boosted_carousel' });
-                          }}
-                        >
-                          <Image source={{ uri: item.photos[0] }} style={styles.featuredPhoto} />
-                          <LinearGradient colors={['transparent', 'rgba(20,50,100,0.9)']} style={styles.featuredGradient}>
-                            <Text style={styles.featuredPrice}>${item.price?.toLocaleString()}/mo</Text>
-                            <Text style={styles.featuredName} numberOfLines={1}>{item.title}</Text>
-                            <View style={styles.boostedBadge}>
-                              <Feather name="star" size={8} color="#1a1200" />
-                              <Text style={styles.featuredBadgeText}>FEATURED</Text>
-                            </View>
-                          </LinearGradient>
-                        </Pressable>
-                      ))}
-                    </ScrollView>
-                  </View>
-                ) : null}
-                {showTopHosts ? (
-                  <View style={styles.featuredSection}>
-                    <View style={styles.featuredHeader}>
-                      <Feather name="shield" size={14} color="#ffd700" />
-                      <Text style={styles.featuredTitle}>Top Hosts</Text>
-                    </View>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.featuredScroll}>
-                      {topHostListings.slice(0, 5).map(item => (
-                        <Pressable
-                          key={`tophost-${item.id}`}
-                          style={styles.featuredCard}
-                          onPress={() => {
-                            const viewCheck = canViewListing();
-                            if (!viewCheck.canView) {
-                              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-                              setPaywallFeature('Unlimited Listing Views');
-                              setPaywallPlan('plus');
-                              setShowPaywall(true);
-                              return;
-                            }
-                            useListingView();
-                            setSelectedProperty(item);
-                            setPhotoIndex(0);
-                            setShowPropertyDetail(true);
-                          }}
-                        >
-                          <Image source={{ uri: item.photos[0] }} style={styles.featuredPhoto} />
-                          <LinearGradient colors={['transparent', 'rgba(0,0,0,0.85)']} style={styles.featuredGradient}>
-                            <Text style={styles.featuredPrice}>${item.price?.toLocaleString()}/mo</Text>
-                            <Text style={styles.featuredName} numberOfLines={1}>{item.title}</Text>
-                            <View style={styles.featuredBadge}>
-                              <Feather name="shield" size={8} color="#1a1200" />
-                              <Text style={styles.featuredBadgeText}>TOP HOST</Text>
-                            </View>
-                          </LinearGradient>
-                        </Pressable>
-                      ))}
-                    </ScrollView>
-                  </View>
-                ) : null}
-                {viewMode === 'all' && displayMode !== 'map' && recommendations.length > 0 ? (
+                {showRecommendations ? (
                   <View style={{ marginTop: 16 }}>
                     {recommendations.map((section) => (
                       <RecommendationSectionComponent
@@ -4953,115 +4857,6 @@ const styles = StyleSheet.create({
   },
   featuredSection: {
     marginBottom: Spacing.lg,
-  },
-  featuredHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: Spacing.sm,
-  },
-  featuredTitle: {
-    color: '#ffd700',
-    fontSize: 14,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  featuredScroll: {
-    gap: 12,
-  },
-  featuredCard: {
-    width: 200,
-    height: 140,
-    borderRadius: 12,
-    overflow: 'hidden',
-    backgroundColor: '#1a1a1a',
-  },
-  featuredPhoto: {
-    width: '100%',
-    height: '100%',
-    position: 'absolute',
-  },
-  featuredGradient: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: 10,
-    justifyContent: 'flex-end',
-  },
-  featuredPrice: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  featuredName: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 12,
-    marginTop: 2,
-  },
-  featuredBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    marginTop: 4,
-    backgroundColor: '#f5c518',
-    borderRadius: 20,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    alignSelf: 'flex-start',
-  },
-  featuredBadgeText: {
-    color: '#1a1200',
-    fontSize: 9,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  topPicksSection: {
-    marginBottom: Spacing.lg,
-  },
-  topPickCard: {
-    width: 200,
-    height: 140,
-    borderRadius: 12,
-    overflow: 'hidden',
-    backgroundColor: '#1a1a1a',
-    borderWidth: 1,
-    borderColor: 'rgba(168,85,247,0.3)',
-  },
-  topPickBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    marginTop: 4,
-    backgroundColor: 'rgba(168,85,247,0.85)',
-    borderRadius: 20,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    alignSelf: 'flex-start',
-  },
-  boostedSection: {
-    marginBottom: Spacing.lg,
-  },
-  boostedCard: {
-    width: 200,
-    height: 140,
-    borderRadius: 12,
-    overflow: 'hidden',
-    backgroundColor: '#1a1a1a',
-    borderWidth: 1,
-    borderColor: 'rgba(96,165,250,0.3)',
-  },
-  boostedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    marginTop: 4,
-    backgroundColor: '#f5c518',
-    borderRadius: 20,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    alignSelf: 'flex-start',
   },
   retryButton: {
     flexDirection: 'row',
