@@ -840,6 +840,17 @@ export const ProfileScreen = () => {
                 onPress={() => navigation.navigate('SearchIntent')}
               />
             ) : null}
+            {!isHost ? (
+              <SettingsItem
+                iconName="sliders"
+                iconColor="#6C5CE7"
+                iconBgColor="rgba(108,92,231,0.12)"
+                iconBorderColor="rgba(108,92,231,0.18)"
+                title="Match Priorities"
+                subtitle="Adjust what matters most in matches"
+                onPress={() => navigation.navigate('MatchPriorities')}
+              />
+            ) : null}
             <SettingsItem
               iconName="check-circle"
               iconColor="#3ECF8E"

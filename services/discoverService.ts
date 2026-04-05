@@ -4,6 +4,8 @@ import { getRecencyMultiplier, isWithinActivityCutoff } from '../utils/activityD
 import { getClosestNeighborhoodDistance } from '../utils/locationData';
 import { getCachedDeckRanking, generateDeckReranking } from './piMatchingService';
 import { RENTER_PLAN_LIMITS, normalizeRenterPlan } from '../constants/renterPlanLimits';
+import { getWeightProfile, recordSwipeWithScores, recalculateLearnedWeights } from './matchWeightService';
+import { calculateWeightedCompatibility } from '../utils/matchingAlgorithm';
 
 export async function getSwipeDeck(userId: string, city?: string, filters?: {
   budgetMin?: number;
@@ -174,7 +176,12 @@ export async function getSwipeDeck(userId: string, city?: string, filters?: {
   return finalDeck;
 }
 
-export async function sendLike(userId: string, recipientId: string) {
+export async function sendLike(
+  userId: string,
+  recipientId: string,
+  matchScore?: number,
+  matchBreakdown?: Record<string, number>
+) {
   if (!userId) throw new Error('Not authenticated');
 
   const { data, error } = await supabase
@@ -191,6 +198,11 @@ export async function sendLike(userId: string, recipientId: string) {
     body: { userId },
   }).catch(() => {});
 
+  if (matchBreakdown && matchScore !== undefined) {
+    recordSwipeWithScores(userId, recipientId, 'like', matchScore, matchBreakdown).catch(() => {});
+    triggerWeightRecalculation(userId);
+  }
+
   const matchPromise = supabase
     .from('matches')
     .select('*')
@@ -203,7 +215,12 @@ export async function sendLike(userId: string, recipientId: string) {
   return { interestCard: data, matchPromise };
 }
 
-export async function sendPass(userId: string, recipientId: string) {
+export async function sendPass(
+  userId: string,
+  recipientId: string,
+  matchScore?: number,
+  matchBreakdown?: Record<string, number>
+) {
   if (!userId) throw new Error('Not authenticated');
 
   const { error } = await supabase
@@ -211,6 +228,20 @@ export async function sendPass(userId: string, recipientId: string) {
     .insert({ sender_id: userId, recipient_id: recipientId, action: 'pass' });
 
   if (error) throw error;
+
+  if (matchBreakdown && matchScore !== undefined) {
+    recordSwipeWithScores(userId, recipientId, 'pass', matchScore, matchBreakdown).catch(() => {});
+    triggerWeightRecalculation(userId);
+  }
+}
+
+const swipeCounters: Record<string, number> = {};
+
+function triggerWeightRecalculation(userId: string) {
+  swipeCounters[userId] = (swipeCounters[userId] || 0) + 1;
+  if (swipeCounters[userId] % 10 === 0) {
+    recalculateLearnedWeights(userId).catch(() => {});
+  }
 }
 
 export async function undoLastAction(userId: string) {

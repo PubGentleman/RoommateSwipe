@@ -1,6 +1,7 @@
 import { User, RoommateProfile, PiParsedPreferences } from '../types/models';
 import { isNearbyNeighborhood, isSameCity, getClosestNeighborhoodDistance, getZipCodeDistance } from './locationData';
 import { getZodiacCompatibilityScore } from './zodiacUtils';
+import { computeEffectiveWeights, MatchWeightProfile } from '../services/matchWeightService';
 
 /**
  * Format location for display with privacy in mind
@@ -143,6 +144,105 @@ export const calculateCompatibility = (
   const score = calculateDetailedCompatibility(currentUser, roommateProfile);
   return Math.round(score.totalScore);
 };
+
+const FACTOR_MAX_POINTS: Record<string, number> = {
+  age: 8,
+  location: 16,
+  budget: 12,
+  sleepSchedule: 12,
+  cleanliness: 12,
+  smoking: 10,
+  moveInTimeline: 4,
+  workLocation: 6,
+  guestPolicy: 6,
+  noiseTolerance: 4,
+  pets: 4,
+  roommateRelationship: 2,
+  sharedExpenses: 2,
+  lifestyle: 2,
+  zodiac: 2,
+  personality: 2,
+};
+
+const BREAKDOWN_TO_WEIGHT_KEY: Record<string, string> = {
+  location: 'location',
+  budget: 'budget',
+  sleepSchedule: 'sleep',
+  cleanliness: 'cleanliness',
+  smoking: 'smoking',
+  pets: 'pets',
+  lifestyle: 'lifestyle',
+  guestPolicy: 'social',
+  noiseTolerance: 'social',
+  roommateRelationship: 'social',
+};
+
+export interface WeightedMatchResult {
+  total: number;
+  breakdown: Record<string, { raw: number; weighted: number; maxRaw: number }>;
+  reasons: { strengths: string[]; concerns: string[]; notes: string[] };
+}
+
+export function calculateWeightedCompatibility(
+  currentUser: User,
+  roommateProfile: RoommateProfile,
+  weightProfile?: MatchWeightProfile
+): WeightedMatchResult {
+  const rawScores = calculateDetailedCompatibility(currentUser, roommateProfile);
+
+  const breakdownEntries = Object.entries(rawScores.breakdown).filter(([k]) => k !== 'piPreference');
+  const piScore = rawScores.breakdown.piPreference || 0;
+
+  if (!weightProfile) {
+    return {
+      total: rawScores.totalScore,
+      breakdown: Object.fromEntries(
+        breakdownEntries.map(([k, v]) => [k, { raw: v, weighted: v, maxRaw: FACTOR_MAX_POINTS[k] || 0 }])
+      ),
+      reasons: rawScores.reasons,
+    };
+  }
+
+  const weights = computeEffectiveWeights(weightProfile);
+
+  let weightedTotal = 0;
+  let maxWeightedTotal = 0;
+  const breakdown: Record<string, { raw: number; weighted: number; maxRaw: number }> = {};
+
+  for (const [factor, rawScore] of breakdownEntries) {
+    const weightKey = BREAKDOWN_TO_WEIGHT_KEY[factor];
+    const multiplier = weightKey ? (weights[weightKey] ?? 1.0) : 1.0;
+    const maxRaw = FACTOR_MAX_POINTS[factor] || 0;
+    const weightedScore = rawScore * multiplier;
+    const weightedMax = maxRaw * multiplier;
+
+    breakdown[factor] = {
+      raw: rawScore,
+      weighted: Math.round(weightedScore * 10) / 10,
+      maxRaw,
+    };
+
+    weightedTotal += weightedScore;
+    maxWeightedTotal += weightedMax;
+  }
+
+  let normalizedTotal: number;
+  if (maxWeightedTotal > 0) {
+    normalizedTotal = Math.round((weightedTotal / maxWeightedTotal) * 100);
+  } else {
+    normalizedTotal = 0;
+  }
+
+  if (piScore !== 0) {
+    normalizedTotal = Math.round(normalizedTotal + (piScore * (100 / (maxWeightedTotal || 100))));
+  }
+
+  return {
+    total: Math.min(100, Math.max(0, normalizedTotal)),
+    breakdown,
+    reasons: rawScores.reasons,
+  };
+}
 
 /**
  * Calculate detailed compatibility with breakdown and reasoning
