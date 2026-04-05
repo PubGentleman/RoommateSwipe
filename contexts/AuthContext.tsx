@@ -301,6 +301,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         city: supabaseUser.city || 'New York',
         state: supabaseUser.state || 'NY',
         coordinates: { lat: 40.7081, lng: -73.9571 },
+        apartment_search_type: null,
+        listing_type_preference: 'any',
       },
       messageCount: 0,
       photos: profile?.photos || [],
@@ -519,6 +521,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             ...mappedUser,
             profileData: { ...mappedUser.profileData, ...intentOverrides },
           };
+
+          if (session?.user?.id) {
+            supabase
+              .from('profiles')
+              .update(intentOverrides)
+              .eq('user_id', session.user.id)
+              .then(({ error }) => {
+                if (error) {
+                  console.warn('[Auth] Failed to sync intent overrides to Supabase:', error);
+                } else {
+                  console.log('[Auth] Synced intent overrides to Supabase:', Object.keys(intentOverrides));
+                }
+              });
+          }
         }
       }
 

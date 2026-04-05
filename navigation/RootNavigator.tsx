@@ -57,6 +57,21 @@ export const RootNavigator = () => {
   const [pendingInviteChecked, setPendingInviteChecked] = useState(false);
 
   useEffect(() => {
+    if (user?.id && user.role === 'renter' && !user.profileData?.apartment_search_type) {
+      AsyncStorage.getItem('@rhome/renter_intent').then(saved => {
+        if (saved) {
+          try {
+            const parsed = JSON.parse(saved);
+            if (parsed.apartment_search_type) {
+              setIntentCompletedForUserId(user.id);
+            }
+          } catch (_) {}
+        }
+      });
+    }
+  }, [user?.id, user?.profileData?.apartment_search_type]);
+
+  useEffect(() => {
     StorageService.isOnboardingCompleted().then((completed) => {
       if (!completed) {
         StorageService.setOnboardingCompleted(true);

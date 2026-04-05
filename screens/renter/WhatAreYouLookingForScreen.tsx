@@ -76,9 +76,16 @@ export default function WhatAreYouLookingForScreen({ onComplete, isSettings, ini
       listing_type_preference: path.listingPref,
     };
 
-    updateProfile(user.id, updates).catch(err => {
-      console.warn('[Intent] Profile update failed:', err);
-    });
+    try {
+      await updateProfile(user.id, updates);
+    } catch (err) {
+      console.warn('[Intent] Profile update failed, retrying once:', err);
+      try {
+        await updateProfile(user.id, updates);
+      } catch (retryErr) {
+        console.warn('[Intent] Profile update retry also failed:', retryErr);
+      }
+    }
 
     try {
       await AsyncStorage.setItem('@rhome/renter_intent', JSON.stringify(updates));
