@@ -52,6 +52,7 @@ import { NeighborhoodAISheet } from '../../components/NeighborhoodAISheet';
 import { PropertyReviewsScreen } from '../shared/PropertyReviewsScreen';
 import { WriteReviewSheet } from '../../components/WriteReviewSheet';
 import { HostReviewsScreen } from '../shared/HostReviewsScreen';
+import CompatibilityBreakdownSheet from '../../components/CompatibilityBreakdownSheet';
 import { getReviewSummary, submitReview, checkReviewEligibility, ReviewSummary } from '../../services/reviewService';
 import { ReportBlockModal } from '../../components/ReportBlockModal';
 import { InquiryModal } from '../../components/InquiryModal';
@@ -3425,108 +3426,18 @@ export const ExploreScreen = () => {
         }}
       />
 
-      <Modal
+      <CompatibilityBreakdownSheet
         visible={showMatchBreakdown && selectedProperty != null}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setShowMatchBreakdown(false)}
-      >
-        <View style={styles.breakdownOverlay}>
-          <View style={[styles.breakdownContainer, { backgroundColor: theme.background }]}>
-            <View style={[styles.breakdownHeader, { borderBottomColor: theme.border }]}>
-              <ThemedText style={[Typography.h3]}>Match Breakdown</ThemedText>
-              <Pressable onPress={() => setShowMatchBreakdown(false)}>
-                <Feather name="x" size={24} color={theme.text} />
-              </Pressable>
-            </View>
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
-              {(() => {
-                if (!selectedProperty || !user) return null;
-                const bHostUser = selectedProperty.hostProfileId ? hostProfiles.get(selectedProperty.hostProfileId) : null;
-                const bHostProfile = bHostUser ? getUserAsRoommateProfile(bHostUser) : null;
-                const totalScore = bHostProfile ? calculateCompatibility(user, bHostProfile) : 0;
-
-                const budgetScore = (() => {
-                  if (!user.profileData?.budget || !selectedProperty.price) return 70;
-                  return user.profileData.budget >= selectedProperty.price
-                    ? 100
-                    : Math.max(0, Math.round(100 - ((selectedProperty.price - user.profileData.budget) / selectedProperty.price) * 100));
-                })();
-
-                const locationScore = (() => {
-                  if (user.profileData?.neighborhood === selectedProperty.neighborhood) return 100;
-                  if (user.profileData?.city === selectedProperty.city) return 60;
-                  return 30;
-                })();
-
-                const moveInScore = (() => {
-                  if (!user.profileData?.moveInDate || !selectedProperty.availableDate) return 70;
-                  const diffDays = Math.abs(
-                    (new Date(user.profileData.moveInDate).getTime() - new Date(selectedProperty.availableDate).getTime()) / (1000 * 60 * 60 * 24)
-                  );
-                  if (diffDays <= 7) return 100;
-                  if (diffDays <= 14) return 85;
-                  if (diffDays <= 30) return 65;
-                  if (diffDays <= 60) return 40;
-                  return 10;
-                })();
-
-                const lifestyleScore = bHostProfile ? Math.min(100, Math.max(0, 70 + Math.floor(Math.random() * 30))) : 70;
-                const zodiacScore = bHostUser?.zodiacSign && user.zodiacSign ? 75 : 50;
-                const verifiedScore = user.verification?.phoneVerified ? 100 : 50;
-
-                const factors = [
-                  { label: 'Budget Match', score: budgetScore, icon: 'dollar-sign', weight: '30%' },
-                  { label: 'Location', score: locationScore, icon: 'map-pin', weight: '20%' },
-                  { label: 'Move-in Date', score: moveInScore, icon: 'calendar', weight: '20%' },
-                  { label: 'Lifestyle', score: lifestyleScore, icon: 'home', weight: '15%' },
-                  { label: 'Zodiac', score: zodiacScore, icon: 'star', weight: '10%' },
-                  { label: 'Verified', score: verifiedScore, icon: 'check-circle', weight: '5%' },
-                ];
-
-                return (
-                  <>
-                    <View style={[styles.breakdownHero, { backgroundColor: theme.primary + '15', borderColor: theme.primary + '30' }]}>
-                      <Feather name="heart" size={24} color={theme.primary} />
-                      <ThemedText style={[Typography.h1, { color: theme.primary, marginTop: 4 }]}>
-                        {totalScore}%
-                      </ThemedText>
-                      <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>
-                        Overall Match Score
-                      </ThemedText>
-                    </View>
-
-                    {factors.map(factor => (
-                      <View key={factor.label} style={[styles.breakdownFactorRow, { backgroundColor: theme.card, borderColor: theme.border }]}>
-                        <View style={[styles.breakdownFactorIcon, { backgroundColor: theme.primary + '20' }]}>
-                          <Feather name={factor.icon} size={15} color={theme.primary} />
-                        </View>
-                        <View style={{ flex: 1 }}>
-                          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                            <ThemedText style={[Typography.body, { fontWeight: '600' }]}>{factor.label}</ThemedText>
-                            <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>{factor.weight}</ThemedText>
-                          </View>
-                          <View style={[styles.breakdownBarTrack, { backgroundColor: theme.border }]}>
-                            <View
-                              style={[styles.breakdownBarFill, {
-                                width: `${factor.score}%`,
-                                backgroundColor: factor.score >= 80 ? '#22C55E' : factor.score >= 50 ? theme.primary : '#FF6B6B',
-                              }]}
-                            />
-                          </View>
-                        </View>
-                        <ThemedText style={[Typography.body, { fontWeight: '700', width: 38, textAlign: 'right' }]}>
-                          {factor.score}%
-                        </ThemedText>
-                      </View>
-                    ))}
-                  </>
-                );
-              })()}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
+        onClose={() => setShowMatchBreakdown(false)}
+        currentUser={user}
+        targetProfile={(() => {
+          if (!selectedProperty) return null;
+          const bHostUser = selectedProperty.hostProfileId ? hostProfiles.get(selectedProperty.hostProfileId) : null;
+          return bHostUser ? getUserAsRoommateProfile(bHostUser) : null;
+        })()}
+        userId={user?.id || ''}
+        isPremium={renterLimits.hasMatchBreakdown}
+      />
 
       <Modal
         visible={showLocationSheet}
@@ -5841,57 +5752,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     gap: 4,
-  },
-  breakdownOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end' as const,
-  },
-  breakdownContainer: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: '85%' as any,
-  },
-  breakdownHeader: {
-    flexDirection: 'row' as const,
-    justifyContent: 'space-between' as const,
-    alignItems: 'center' as const,
-    padding: 16,
-    borderBottomWidth: 1,
-  },
-  breakdownHero: {
-    alignItems: 'center' as const,
-    padding: 24,
-    borderRadius: 20,
-    borderWidth: 1,
-    margin: 16,
-  },
-  breakdownFactorRow: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    padding: 10,
-    borderRadius: 14,
-    borderWidth: 1,
-    marginBottom: 8,
-    marginHorizontal: 16,
-    gap: 10,
-  },
-  breakdownFactorIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    alignItems: 'center' as const,
-    justifyContent: 'center' as const,
-  },
-  breakdownBarTrack: {
-    height: 6,
-    borderRadius: 3,
-    marginTop: 5,
-    overflow: 'hidden' as const,
-  },
-  breakdownBarFill: {
-    height: '100%' as any,
-    borderRadius: 3,
   },
   ratingBadge: {
     flexDirection: 'row',
