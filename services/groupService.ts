@@ -1848,3 +1848,204 @@ export async function transferGroupLead(userId: string, groupId: string, newLead
     .eq('id', groupId)
     .eq('group_lead_id', userId);
 }
+
+export async function sendGroupMessageWithMentions(
+  userId: string,
+  groupId: string,
+  content: string,
+  mentionedUserIds: string[],
+  replyToId?: string
+) {
+  const { data: message, error } = await supabase
+    .from('group_messages')
+    .insert({
+      group_id: groupId,
+      sender_id: userId,
+      content,
+      reply_to_id: replyToId || null,
+      metadata: mentionedUserIds.length > 0 ? { mentions: mentionedUserIds } : null,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+
+  if (mentionedUserIds.length > 0) {
+    const mentionRows = mentionedUserIds.map(uid => ({
+      message_id: message.id,
+      mentioned_user_id: uid,
+      group_id: groupId,
+    }));
+    await supabase.from('message_mentions').insert(mentionRows);
+  }
+
+  return message;
+}
+
+export async function pinMessage(groupId: string, messageId: string, userId: string) {
+  const { error } = await supabase
+    .from('pinned_messages')
+    .insert({ group_id: groupId, message_id: messageId, pinned_by: userId });
+  if (error) throw error;
+}
+
+export async function unpinMessage(groupId: string, messageId: string) {
+  const { error } = await supabase
+    .from('pinned_messages')
+    .delete()
+    .eq('group_id', groupId)
+    .eq('message_id', messageId);
+  if (error) throw error;
+}
+
+export async function getPinnedMessages(groupId: string) {
+  const { data, error } = await supabase
+    .from('pinned_messages')
+    .select(`
+      id, pinned_at, pinned_by,
+      message:group_messages!message_id(id, content, sender_id, created_at)
+    `)
+    .eq('group_id', groupId)
+    .order('pinned_at', { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
+export async function deleteGroupMessage(messageId: string, userId: string) {
+  const { error } = await supabase
+    .from('group_messages')
+    .update({ deleted_at: new Date().toISOString(), content: 'This message was deleted' })
+    .eq('id', messageId)
+    .eq('sender_id', userId);
+  if (error) throw error;
+}
+
+export async function editGroupMessage(messageId: string, userId: string, newContent: string) {
+  const { error } = await supabase
+    .from('group_messages')
+    .update({ content: newContent, edited_at: new Date().toISOString() })
+    .eq('id', messageId)
+    .eq('sender_id', userId);
+  if (error) throw error;
+}
+
+export async function adminDeleteGroupMessage(messageId: string, groupId: string, adminId: string) {
+  const { data: member } = await supabase
+    .from('group_members')
+    .select('is_admin')
+    .eq('group_id', groupId)
+    .eq('user_id', adminId)
+    .single();
+
+  if (!member?.is_admin) throw new Error('Not an admin');
+
+  const { error } = await supabase
+    .from('group_messages')
+    .update({ deleted_at: new Date().toISOString(), content: 'This message was removed by an admin' })
+    .eq('id', messageId);
+  if (error) throw error;
+}
+
+export async function muteGroup(groupId: string, userId: string) {
+  const { error } = await supabase
+    .from('group_members')
+    .update({ muted: true })
+    .eq('group_id', groupId)
+    .eq('user_id', userId);
+  if (error) throw error;
+}
+
+export async function unmuteGroup(groupId: string, userId: string) {
+  const { error } = await supabase
+    .from('group_members')
+    .update({ muted: false })
+    .eq('group_id', groupId)
+    .eq('user_id', userId);
+  if (error) throw error;
+}
+
+export async function updateLastRead(groupId: string, userId: string, messageId: string) {
+  const { error } = await supabase
+    .from('group_members')
+    .update({ last_read_message_id: messageId })
+    .eq('group_id', groupId)
+    .eq('user_id', userId);
+  if (error) throw error;
+}
+
+export async function getUnreadMentionCount(userId: string): Promise<number> {
+  const { count, error } = await supabase
+    .from('message_mentions')
+    .select('id', { count: 'exact', head: true })
+    .eq('mentioned_user_id', userId)
+    .eq('read', false);
+  if (error) return 0;
+  return count || 0;
+}
+
+export async function markMentionsRead(groupId: string, userId: string) {
+  await supabase
+    .from('message_mentions')
+    .update({ read: true })
+    .eq('group_id', groupId)
+    .eq('mentioned_user_id', userId)
+    .eq('read', false);
+}
+
+export async function updateGroupSettings(groupId: string, settings: Record<string, any>) {
+  const { data: group } = await supabase
+    .from('groups')
+    .select('settings')
+    .eq('id', groupId)
+    .single();
+
+  const merged = { ...(group?.settings || {}), ...settings };
+
+  const { error } = await supabase
+    .from('groups')
+    .update({ settings: merged })
+    .eq('id', groupId);
+  if (error) throw error;
+}
+
+export async function getGroupMessagesEnhanced(groupId: string, limit = 50, offset = 0) {
+  const { data, error } = await supabase
+    .from('group_messages')
+    .select(`
+      *,
+      sender:users!sender_id(id, full_name, avatar_url)
+    `)
+    .eq('group_id', groupId)
+    .order('created_at', { ascending: true })
+    .range(offset, offset + limit - 1);
+  if (error) throw error;
+  return data || [];
+}
+
+export async function getGroupMemberMuteStatus(groupId: string, userId: string): Promise<boolean> {
+  const { data } = await supabase
+    .from('group_members')
+    .select('muted')
+    .eq('group_id', groupId)
+    .eq('user_id', userId)
+    .single();
+  return data?.muted || false;
+}
+
+export async function getGroupSettings(groupId: string): Promise<Record<string, any>> {
+  const { data } = await supabase
+    .from('groups')
+    .select('settings')
+    .eq('id', groupId)
+    .single();
+  return data?.settings || {};
+}
+
+export async function getReadStatusForMessage(groupId: string, messageId: string) {
+  const { data } = await supabase
+    .from('group_members')
+    .select('user_id, last_read_message_id')
+    .eq('group_id', groupId);
+
+  if (!data) return [];
+  return data.filter(m => m.last_read_message_id === messageId).map(m => m.user_id);
+}

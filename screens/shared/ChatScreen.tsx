@@ -20,7 +20,10 @@ import { getMessages as getSupabaseMessages, sendMessage as sendSupabaseMessage,
 import { joinConversationTyping, leaveConversationTyping, sendTypingIndicator, isUserOnline, subscribeToPresence, getTypingUsers, getLastSeen, formatLastSeen } from '../../services/presenceService';
 import { OnlineDot } from '../../components/OnlineDot';
 import { recordMessageActivity } from '../../utils/aiMemory';
-import { acceptInquiry, declineInquiry, linkListingToGroup, leaveGroup, removeMember, getGroupMessages, sendGroupMessage, subscribeToGroupMessages } from '../../services/groupService';
+import { acceptInquiry, declineInquiry, linkListingToGroup, leaveGroup, removeMember, getGroupMessages, sendGroupMessage, subscribeToGroupMessages, sendGroupMessageWithMentions, pinMessage, unpinMessage, getPinnedMessages, deleteGroupMessage, editGroupMessage, adminDeleteGroupMessage, muteGroup, unmuteGroup, updateLastRead, markMentionsRead, getGroupMemberMuteStatus, getGroupSettings } from '../../services/groupService';
+import { MentionInput } from '../../components/MentionInput';
+import { PinnedMessageBar } from '../../components/PinnedMessageBar';
+import { PinnedMessagesSheet } from '../../components/PinnedMessagesSheet';
 import { supabase } from '../../lib/supabase';
 import { SafeMessageText } from '../../components/SafeMessageText';
 import { normalizeRenterPlan, getRenterPlanLimits } from '../../constants/renterPlanLimits';
@@ -81,6 +84,20 @@ const EXTENDED_EMOJIS = [
 
 type DateSeparatorItem = { type: 'date_separator'; id: string; date: string };
 type ChatListItem = (Message & { type?: 'message'; isLastInCluster?: boolean; isFirstInCluster?: boolean }) | DateSeparatorItem;
+
+const GROUP_NAME_COLORS = [
+  '#ff6b5b', '#3ECF8E', '#3b82f6', '#F59E0B', '#8B5CF6',
+  '#EC4899', '#14B8A6', '#F97316', '#6366F1', '#EF4444',
+  '#06B6D4', '#84CC16', '#A855F7', '#FB923C', '#2DD4BF',
+];
+function getNameColor(userId: string): string {
+  let hash = 0;
+  for (let i = 0; i < userId.length; i++) {
+    hash = ((hash << 5) - hash) + userId.charCodeAt(i);
+    hash |= 0;
+  }
+  return GROUP_NAME_COLORS[Math.abs(hash) % GROUP_NAME_COLORS.length];
+}
 
 function formatDateLabel(date: Date): string {
   const now = new Date();
@@ -244,6 +261,12 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
   const [reactionsMap, setReactionsMap] = useState<Record<string, { emoji: string; userIds: string[]; count: number }[]>>({});
+  const [pinnedMessages, setPinnedMessages] = useState<any[]>([]);
+  const [showPinnedSheet, setShowPinnedSheet] = useState(false);
+  const [isGroupMuted, setIsGroupMuted] = useState(false);
+  const [mentionedUserIds, setMentionedUserIds] = useState<string[]>([]);
+  const [groupOnlineCount, setGroupOnlineCount] = useState(0);
+  const [groupChatSettings, setGroupChatSettings] = useState<Record<string, any>>({});
   const { isRecording, recordingDuration, startRecording, stopRecording, cancelRecording } = useVoiceRecording();
 
   const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -443,7 +466,47 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
           .then(({ data }) => { if (data?.role) setMyGroupRole(data.role as 'admin' | 'member'); });
       }
     }
-  }, [conversationId, isInquiryChat]);
+
+    if (isGroupChat && !isInquiryChat && user?.id) {
+      const groupId = conversationId.replace('group-', '');
+      getPinnedMessages(groupId).then(data => setPinnedMessages(data)).catch(() => {});
+      getGroupMemberMuteStatus(groupId, user.id).then(muted => setIsGroupMuted(muted)).catch(() => {});
+      getGroupSettings(groupId).then(s => setGroupChatSettings(s || {})).catch(() => {});
+    }
+  }, [conversationId, isInquiryChat, user?.id]);
+
+  useEffect(() => {
+    const isGroupChat = conversationId.startsWith('group-') && !isInquiryChat;
+    if (!isGroupChat || groupMembers.length === 0) {
+      setGroupOnlineCount(0);
+      return;
+    }
+    let cancelled = false;
+    const checkOnline = async () => {
+      let count = 0;
+      for (const m of groupMembers) {
+        if (m.id === user?.id) { count++; continue; }
+        try {
+          const online = await isUserOnline(m.id);
+          if (online) count++;
+        } catch {}
+      }
+      if (!cancelled) setGroupOnlineCount(count);
+    };
+    checkOnline();
+    const interval = setInterval(checkOnline, 30000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [conversationId, isInquiryChat, groupMembers.length]);
+
+  useEffect(() => {
+    const isGroupChat = conversationId.startsWith('group-') && !isInquiryChat;
+    if (!isGroupChat || !user?.id || messages.length === 0) return;
+    const groupId = conversationId.replace('group-', '');
+    const lastMsg = messages[messages.length - 1];
+    if (lastMsg?.id) {
+      updateLastRead(groupId, user.id, lastMsg.id).catch(() => {});
+    }
+  }, [conversationId, isInquiryChat, user?.id, messages.length]);
 
   const reloadGroupListing = () => {
     const isGroupChat = conversationId.startsWith('group-');
@@ -467,7 +530,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
     try {
       const { data, error } = await supabase
         .from('group_members')
-        .select('user_id, role, users ( id, name, profile_picture, role )')
+        .select('user_id, role, is_admin, users ( id, name, profile_picture, role, avatar_url )')
         .eq('group_id', groupId);
       if (!error && data && data.length > 0) {
         const members = data.map((m: any) => {
@@ -475,9 +538,10 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
           return {
             id: m.user_id,
             name: u?.name || 'Member',
-            photo: u?.profile_picture || null,
+            photo: u?.profile_picture || u?.avatar_url || null,
             role: u?.role || 'renter',
             groupRole: m.role,
+            is_admin: m.is_admin || m.role === 'admin',
           };
         });
         setGroupMembers(members);
@@ -690,7 +754,12 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
     });
     if (!confirmed) return;
     try {
-      await deleteMessageService(msg.id, user.id);
+      const isGroupSend = conversationId.startsWith('group-') && !isInquiryChat;
+      if (isGroupSend) {
+        await deleteGroupMessage(msg.id, user.id);
+      } else {
+        await deleteMessageService(msg.id, user.id);
+      }
       setMessages(prev => prev.map(m =>
         m.id === msg.id ? { ...m, text: 'This message was deleted', content: 'This message was deleted', deleted_at: new Date().toISOString() } : m
       ));
@@ -698,7 +767,78 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
       console.error('Delete failed:', err);
     }
     setActiveMessageActions(null);
-  }, [user?.id, confirm]);
+  }, [user?.id, confirm, conversationId, isInquiryChat]);
+
+  const handlePinAction = useCallback(async (msg: Message) => {
+    if (!user?.id) return;
+    const isGroupSend = conversationId.startsWith('group-') && !isInquiryChat;
+    if (!isGroupSend) return;
+    const groupId = conversationId.replace('group-', '');
+    try {
+      await pinMessage(groupId, msg.id, user.id);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      const updated = await getPinnedMessages(groupId);
+      setPinnedMessages(updated);
+    } catch (err) {
+      console.error('Pin failed:', err);
+    }
+    setActiveMessageActions(null);
+  }, [user?.id, conversationId, isInquiryChat]);
+
+  const handleUnpinAction = useCallback(async (messageId: string) => {
+    const isGroupSend = conversationId.startsWith('group-') && !isInquiryChat;
+    if (!isGroupSend) return;
+    const groupId = conversationId.replace('group-', '');
+    try {
+      await unpinMessage(groupId, messageId);
+      const updated = await getPinnedMessages(groupId);
+      setPinnedMessages(updated);
+    } catch (err) {
+      console.error('Unpin failed:', err);
+    }
+  }, [conversationId, isInquiryChat]);
+
+  const handleAdminDeleteAction = useCallback(async (msg: Message) => {
+    if (!user?.id) return;
+    const isGroupSend = conversationId.startsWith('group-') && !isInquiryChat;
+    if (!isGroupSend) return;
+    const confirmed = await confirm({
+      title: 'Remove Message',
+      message: 'This message will be removed by an admin. This action cannot be undone.',
+      confirmText: 'Remove',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
+    const groupId = conversationId.replace('group-', '');
+    try {
+      await adminDeleteGroupMessage(msg.id, groupId, user.id);
+      setMessages(prev => prev.map(m =>
+        m.id === msg.id ? { ...m, text: 'This message was removed by an admin', content: 'This message was removed by an admin', deleted_at: new Date().toISOString() } : m
+      ));
+    } catch (err) {
+      console.error('Admin delete failed:', err);
+    }
+    setActiveMessageActions(null);
+  }, [user?.id, confirm, conversationId, isInquiryChat]);
+
+  const handleGroupMuteToggle = useCallback(async () => {
+    if (!user?.id) return;
+    const isGroupSend = conversationId.startsWith('group-') && !isInquiryChat;
+    if (!isGroupSend) return;
+    const groupId = conversationId.replace('group-', '');
+    try {
+      if (isGroupMuted) {
+        await unmuteGroup(groupId, user.id);
+        setIsGroupMuted(false);
+      } else {
+        await muteGroup(groupId, user.id);
+        setIsGroupMuted(true);
+      }
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (err) {
+      console.error('Mute toggle failed:', err);
+    }
+  }, [user?.id, conversationId, isInquiryChat, isGroupMuted]);
 
   const handleEditAction = useCallback((msg: Message) => {
     setEditingMessageId(msg.id);
@@ -709,7 +849,12 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   const handleSaveEdit = useCallback(async () => {
     if (!editingMessageId || !user?.id || !editText.trim()) return;
     try {
-      await editMessageService(editingMessageId, user.id, editText.trim());
+      const isGroupSend = conversationId.startsWith('group-') && !isInquiryChat;
+      if (isGroupSend) {
+        await editGroupMessage(editingMessageId, user.id, editText.trim());
+      } else {
+        await editMessageService(editingMessageId, user.id, editText.trim());
+      }
       setMessages(prev => prev.map(m =>
         m.id === editingMessageId ? { ...m, text: editText.trim(), content: editText.trim(), edited_at: new Date().toISOString() } : m
       ));
@@ -718,7 +863,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
     }
     setEditingMessageId(null);
     setEditText('');
-  }, [editingMessageId, user?.id, editText]);
+  }, [editingMessageId, user?.id, editText, conversationId, isInquiryChat]);
 
   const handleStartRecording = useCallback(async () => {
     if (userPlan === 'basic') {
@@ -771,18 +916,26 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
 
   const getMessageActions = useCallback((msg: Message) => {
     const isOwn = msg.senderId === user?.id;
+    const isGroupChat = conversationId.startsWith('group-') && !isInquiryChat;
+    const isAdmin = myGroupRole === 'admin' || groupMembers.find(m => m.id === user?.id)?.is_admin;
     const actions: { label: string; icon: string; onPress: () => void; destructive?: boolean }[] = [];
     actions.push({ label: 'Reply', icon: 'corner-up-left', onPress: () => handleReplyAction(msg) });
     actions.push({ label: 'Copy', icon: 'copy', onPress: () => handleCopyAction(msg) });
+    if (isGroupChat && isAdmin && groupChatSettings.allowPinning !== false) {
+      actions.push({ label: 'Pin', icon: 'bookmark', onPress: () => handlePinAction(msg) });
+    }
     if (isOwn && canEditMessage(msg)) {
       actions.push({ label: 'Edit', icon: 'edit-2', onPress: () => handleEditAction(msg) });
     }
     if (isOwn) {
       actions.push({ label: 'Delete', icon: 'trash-2', onPress: () => handleDeleteAction(msg), destructive: true });
     }
+    if (isGroupChat && isAdmin && !isOwn) {
+      actions.push({ label: 'Remove', icon: 'shield-off', onPress: () => handleAdminDeleteAction(msg), destructive: true });
+    }
     actions.push({ label: 'React', icon: 'smile', onPress: () => { setShowReactionBar(msg.id); setActiveMessageActions(null); } });
     return actions;
-  }, [user?.id, userPlan, handleReplyAction, handleCopyAction, handleEditAction, handleDeleteAction]);
+  }, [user?.id, userPlan, conversationId, isInquiryChat, myGroupRole, groupMembers, groupChatSettings, handleReplyAction, handleCopyAction, handleEditAction, handleDeleteAction, handlePinAction, handleAdminDeleteAction]);
 
   const handleTextChange = (text: string) => {
     setInputText(text);
@@ -1300,7 +1453,12 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
     try {
       if (isGroupSend) {
         const groupId = conversationId.replace('group-', '');
-        await sendGroupMessage(user!.id, groupId, inputText.trim());
+        if (mentionedUserIds.length > 0 || replyToMessage) {
+          await sendGroupMessageWithMentions(user!.id, groupId, inputText.trim(), mentionedUserIds, replyToMessage?.id);
+        } else {
+          await sendGroupMessage(user!.id, groupId, inputText.trim());
+        }
+        setMentionedUserIds([]);
         newMessage = {
           id: `msg_${Date.now()}`,
           senderId: user.id,
@@ -1788,6 +1946,11 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
             <ThemedText style={styles.hostBadgeText}>Host</ThemedText>
           </View>
         ) : null}
+        {isGroupChat && !isInquiryChat && !isOwnMessage && isFirstInCluster ? (
+          <Text style={{ fontSize: 12, fontWeight: '700', color: getNameColor(msg.senderId), marginBottom: 2 }}>
+            {msg.senderName || groupMembers.find(m => m.id === msg.senderId)?.name || 'Member'}
+          </Text>
+        ) : null}
 
         {replyTo && !isDeleted ? (
           <Pressable
@@ -2184,14 +2347,34 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
                 >
                   <ThemedText style={[Typography.h3]}>{groupName}</ThemedText>
                   <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>
-                    {groupMembers.length > 0 ? `${groupMembers.length} member${groupMembers.length > 1 ? 's' : ''}` : 'Tap for group info'}
+                    {groupMembers.length > 0
+                      ? `${groupMembers.length} member${groupMembers.length > 1 ? 's' : ''}${groupOnlineCount > 0 ? ` · ${groupOnlineCount} online` : ''}`
+                      : 'Tap for group info'}
                   </ThemedText>
                 </Pressable>
               </View>
             )}
           </View>
           <AIFloatingButton onPress={() => setShowAISheet(true)} position="inline" size="sm" />
-          {conversationId.startsWith('group-') ? (
+          {conversationId.startsWith('group-') && !isInquiryChat ? (
+            <>
+              <Pressable onPress={handleGroupMuteToggle} style={styles.moreButton}>
+                <Feather name={isGroupMuted ? 'bell-off' : 'bell'} size={18} color={isGroupMuted ? '#ef4444' : theme.textSecondary} />
+              </Pressable>
+              <Pressable
+                onPress={() => {
+                  const groupId = conversationId.replace('group-', '');
+                  navigation.navigate('GroupInfo' as any, {
+                    groupId,
+                    groupName: groupName,
+                  });
+                }}
+                style={styles.moreButton}
+              >
+                <Feather name="settings" size={20} color={theme.textSecondary} />
+              </Pressable>
+            </>
+          ) : conversationId.startsWith('group-') ? (
             <Pressable
               onPress={() => {
                 const groupId = conversationId.replace('group-', '');
@@ -2227,6 +2410,13 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
           )}
         </View>
       )}
+
+      {conversationId.startsWith('group-') && !isInquiryChat && pinnedMessages.length > 0 ? (
+        <PinnedMessageBar
+          pinnedMessages={pinnedMessages}
+          onPress={() => setShowPinnedSheet(true)}
+        />
+      ) : null}
 
       <Modal
         visible={showOptionsMenu}
@@ -2672,25 +2862,46 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
                 <Feather name="plus" size={22} color="#ff6b5b" />
               </Pressable>
             ) : null}
-            <TextInput
-              style={[
-                styles.input,
-                {
-                  backgroundColor: theme.backgroundSecondary,
-                  color: theme.text,
-                },
-              ]}
-              placeholder={inquiryGroup?.isArchived ? 'This inquiry is archived' : 'Type a message...'}
-              placeholderTextColor={theme.textSecondary}
-              value={inputText}
-              onChangeText={handleTextChange}
-              onSubmitEditing={sendMessage}
-              blurOnSubmit={false}
-              returnKeyType="send"
-              multiline
-              maxLength={500}
-              editable={!inquiryGroup?.isArchived && canSendMessage()}
-            />
+            {conversationId.startsWith('group-') && !isInquiryChat && groupChatSettings.adminOnlyMessages && myGroupRole !== 'admin' ? (
+              <View style={[styles.input, { backgroundColor: theme.backgroundSecondary, justifyContent: 'center' }]}>
+                <Text style={{ color: theme.textSecondary, fontSize: 14 }}>Only admins can send messages</Text>
+              </View>
+            ) : conversationId.startsWith('group-') && !isInquiryChat ? (
+              <MentionInput
+                value={inputText}
+                onChangeText={handleTextChange}
+                onMentionsChanged={setMentionedUserIds}
+                members={groupMembers.map(m => ({ id: m.id, name: m.name }))}
+                placeholder="Type a message..."
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: theme.backgroundSecondary,
+                    color: theme.text,
+                  },
+                ]}
+              />
+            ) : (
+              <TextInput
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: theme.backgroundSecondary,
+                    color: theme.text,
+                  },
+                ]}
+                placeholder={inquiryGroup?.isArchived ? 'This inquiry is archived' : 'Type a message...'}
+                placeholderTextColor={theme.textSecondary}
+                value={inputText}
+                onChangeText={handleTextChange}
+                onSubmitEditing={sendMessage}
+                blurOnSubmit={false}
+                returnKeyType="send"
+                multiline
+                maxLength={500}
+                editable={!inquiryGroup?.isArchived && canSendMessage()}
+              />
+            )}
             {inputText.trim() ? (
               <Pressable
                 onPress={sendMessage}
@@ -2849,6 +3060,25 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
         address={inquiryGroup?.listingAddress || 'Property'}
         defaultRent={inquiryGroup?.listingPrice || 0}
       />
+
+      {conversationId.startsWith('group-') && !isInquiryChat ? (
+        <PinnedMessagesSheet
+          visible={showPinnedSheet}
+          onClose={() => setShowPinnedSheet(false)}
+          pinnedMessages={pinnedMessages}
+          onJumpToMessage={(messageId) => {
+            setShowPinnedSheet(false);
+            const idx = messages.findIndex(m => m.id === messageId);
+            if (idx >= 0) {
+              setHighlightedId(messageId);
+              flatListRef.current?.scrollToIndex({ index: idx, animated: true, viewPosition: 0.5 });
+              setTimeout(() => setHighlightedId(null), 3000);
+            }
+          }}
+          onUnpin={handleUnpinAction}
+          isAdmin={myGroupRole === 'admin'}
+        />
+      ) : null}
 
       <MessageActionsSheet
         visible={!!activeMessageActions}

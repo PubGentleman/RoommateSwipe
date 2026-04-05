@@ -125,6 +125,7 @@ export function GroupInfoScreen({ route, navigation }: Props) {
   const [showGroupReport, setShowGroupReport] = useState(false);
   const [showMemberReport, setShowMemberReport] = useState(false);
   const [reportMemberTarget, setReportMemberTarget] = useState<{ id: string; name: string } | null>(null);
+  const [groupChatSettings, setGroupChatSettings] = useState<Record<string, any>>({});
 
   const isAdmin = group?.adminId === user?.id;
   const memberCount = group?.members?.length || 0;
@@ -159,6 +160,15 @@ export function GroupInfoScreen({ route, navigation }: Props) {
       getGroupHealth(groupId, user.id).then(setHealth).catch(() => {});
     }
   }, [groupId, group?.id]);
+
+  useEffect(() => {
+    if (groupId && user?.id) {
+      import('../../services/groupService').then(({ getGroupSettings, getGroupMemberMuteStatus }) => {
+        getGroupSettings(groupId).then(setGroupChatSettings).catch(() => {});
+        getGroupMemberMuteStatus(groupId, user.id).then(setMuted).catch(() => {});
+      });
+    }
+  }, [groupId, user?.id]);
 
   useEffect(() => {
     if (group && isAdmin) {
@@ -771,6 +781,48 @@ export function GroupInfoScreen({ route, navigation }: Props) {
               </View>
             ) : null}
           </View>
+
+          <View style={styles.quickActions}>
+            <Pressable style={[styles.quickAction, { backgroundColor: theme.card, borderColor: theme.border }]} onPress={handleShareCode}>
+              <Feather name="share-2" size={18} color={theme.primary} />
+              <ThemedText style={[Typography.small, { marginTop: 4 }]}>Share</ThemedText>
+            </Pressable>
+            <Pressable
+              style={[styles.quickAction, { backgroundColor: theme.card, borderColor: theme.border }]}
+              onPress={async () => {
+                try {
+                  const { muteGroup: muteGrp, unmuteGroup: unmuteGrp, getGroupMemberMuteStatus: getMuteStatus } = await import('../../services/groupService');
+                  if (muted) {
+                    await unmuteGrp(groupId, user!.id);
+                    setMuted(false);
+                  } else {
+                    await muteGrp(groupId, user!.id);
+                    setMuted(true);
+                  }
+                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                } catch {}
+              }}
+            >
+              <Feather name={muted ? 'bell-off' : 'bell'} size={18} color={muted ? '#ef4444' : theme.primary} />
+              <ThemedText style={[Typography.small, { marginTop: 4 }]}>{muted ? 'Unmute' : 'Mute'}</ThemedText>
+            </Pressable>
+            <Pressable
+              style={[styles.quickAction, { backgroundColor: theme.card, borderColor: theme.border }]}
+              onPress={() => {
+                navigation.goBack();
+              }}
+            >
+              <Feather name="message-circle" size={18} color={theme.primary} />
+              <ThemedText style={[Typography.small, { marginTop: 4 }]}>Chat</ThemedText>
+            </Pressable>
+            <Pressable
+              style={[styles.quickAction, { backgroundColor: theme.card, borderColor: theme.border }]}
+              onPress={() => setShowPropertySearch(true)}
+            >
+              <Feather name="search" size={18} color={theme.primary} />
+              <ThemedText style={[Typography.small, { marginTop: 4 }]}>Search</ThemedText>
+            </Pressable>
+          </View>
         </LinearGradient>
 
         <Section label="LINKED PROPERTY" theme={theme}>
@@ -1214,10 +1266,70 @@ export function GroupInfoScreen({ route, navigation }: Props) {
             label="Mute Notifications"
             description="Silence messages from this group"
             value={muted}
-            onChange={setMuted}
+            onChange={async (val) => {
+              setMuted(val);
+              try {
+                const { muteGroup: muteGrp, unmuteGroup: unmuteGrp } = await import('../../services/groupService');
+                if (val) {
+                  await muteGrp(groupId, user!.id);
+                } else {
+                  await unmuteGrp(groupId, user!.id);
+                }
+              } catch {}
+            }}
             theme={theme}
           />
         </Section>
+
+        {isAdmin ? (
+          <Section label="CHAT SETTINGS" theme={theme}>
+            <SettingRow
+              icon="at-sign"
+              label="Allow @everyone"
+              description="Let members notify all group members"
+              value={groupChatSettings.allowEveryoneMention !== false}
+              onChange={async (val) => {
+                const updated = { ...groupChatSettings, allowEveryoneMention: val };
+                setGroupChatSettings(updated);
+                try {
+                  const { updateGroupSettings: updateSettings } = await import('../../services/groupService');
+                  await updateSettings(groupId, updated);
+                } catch {}
+              }}
+              theme={theme}
+            />
+            <SettingRow
+              icon="bookmark"
+              label="Allow Pinning"
+              description="Let admins pin messages in the chat"
+              value={groupChatSettings.allowPinning !== false}
+              onChange={async (val) => {
+                const updated = { ...groupChatSettings, allowPinning: val };
+                setGroupChatSettings(updated);
+                try {
+                  const { updateGroupSettings: updateSettings } = await import('../../services/groupService');
+                  await updateSettings(groupId, updated);
+                } catch {}
+              }}
+              theme={theme}
+            />
+            <SettingRow
+              icon="lock"
+              label="Admin Only Messages"
+              description="Only admins can send messages"
+              value={groupChatSettings.adminOnlyMessages === true}
+              onChange={async (val) => {
+                const updated = { ...groupChatSettings, adminOnlyMessages: val };
+                setGroupChatSettings(updated);
+                try {
+                  const { updateGroupSettings: updateSettings } = await import('../../services/groupService');
+                  await updateSettings(groupId, updated);
+                } catch {}
+              }}
+              theme={theme}
+            />
+          </Section>
+        ) : null}
 
         {isRenter && spotsNeeded > 0 ? (
           canSeeAI ? (
@@ -1812,5 +1924,22 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 14,
     fontWeight: '700',
+  },
+  quickActions: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 12,
+    marginTop: 16,
+    marginBottom: 8,
+    paddingHorizontal: Spacing.md,
+  },
+  quickAction: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    minWidth: 72,
   },
 });
