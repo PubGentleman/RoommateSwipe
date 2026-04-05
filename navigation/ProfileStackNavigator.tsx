@@ -41,6 +41,8 @@ import { PiAutoMatchSettingsScreen } from '../screens/renter/PiAutoMatchSettings
 import WhatAreYouLookingForScreen from '../screens/renter/WhatAreYouLookingForScreen';
 import { HostPublicProfileScreen } from '../screens/renter/HostPublicProfileScreen';
 import { AssignListingsScreen } from '../screens/host/AssignListingsScreen';
+import { PlanComparisonScreen } from '../screens/shared/PlanComparisonScreen';
+import { BillingHistoryScreen } from '../screens/shared/BillingHistoryScreen';
 
 export type ProfileStackParamList = {
   ProfileMain: undefined;
@@ -81,6 +83,8 @@ export type ProfileStackParamList = {
   MoveInSuccess: undefined;
   PiAutoMatchSettings: undefined;
   SearchIntent: undefined;
+  PlanComparison: undefined;
+  BillingHistory: undefined;
 };
 
 const Stack = createNativeStackNavigator<ProfileStackParamList>();
@@ -156,6 +160,16 @@ export const ProfileStackNavigator = () => {
       <Stack.Screen 
         name="ManageSubscription" 
         component={ManageSubscriptionScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen 
+        name="PlanComparison" 
+        component={PlanComparisonScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen 
+        name="BillingHistory" 
+        component={BillingHistoryScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen 

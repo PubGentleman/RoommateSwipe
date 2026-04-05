@@ -690,6 +690,12 @@ export const HostSubscriptionScreen = () => {
           <Text style={styles.restoreBtnText}>Restore Purchases</Text>
         </Pressable>
 
+        <Pressable style={styles.compareLink} onPress={() => navigation.navigate('PlanComparison')}>
+          <Feather name="columns" size={16} color="#6C5CE7" />
+          <Text style={styles.compareLinkText}>Compare All Plans Side-by-Side</Text>
+          <Feather name="chevron-right" size={14} color="rgba(255,255,255,0.25)" />
+        </Pressable>
+
         <View style={{ height: insets.bottom + 100 }} />
       </ScrollView>
 
@@ -1078,6 +1084,24 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: 'rgba(255,255,255,0.4)',
     textDecorationLine: 'underline' as const,
+  },
+  compareLink: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 10,
+    backgroundColor: '#1a1a1a',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.07)',
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    marginTop: 12,
+  },
+  compareLinkText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600' as const,
+    color: 'rgba(255,255,255,0.8)',
   },
 
   cancelOverlay: {

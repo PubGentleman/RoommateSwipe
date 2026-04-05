@@ -125,7 +125,20 @@ export const ManageSubscriptionScreen = () => {
           </View>
         ) : null}
 
-        <Text style={s.sectionLabel}>BILLING HISTORY</Text>
+        <View style={s.quickLinksRow}>
+          <Pressable style={s.quickLinkBtn} onPress={() => navigation.navigate('PlanComparison')}>
+            <Feather name="columns" size={16} color="#6C5CE7" />
+            <Text style={s.quickLinkText}>Compare All Plans</Text>
+            <Feather name="chevron-right" size={14} color="rgba(255,255,255,0.25)" />
+          </Pressable>
+          <Pressable style={s.quickLinkBtn} onPress={() => navigation.navigate('BillingHistory')}>
+            <Feather name="file-text" size={16} color="#3b82f6" />
+            <Text style={s.quickLinkText}>Full Billing History</Text>
+            <Feather name="chevron-right" size={14} color="rgba(255,255,255,0.25)" />
+          </Pressable>
+        </View>
+
+        <Text style={s.sectionLabel}>RECENT BILLING</Text>
         <View style={s.historyCard}>
           {details.billingHistory.length > 0 ? (
             details.billingHistory.slice(0, 3).map((entry, i) => (
@@ -233,6 +246,21 @@ const s = StyleSheet.create({
   keepBtnText: { fontSize: 15, fontWeight: '700', color: '#fff' },
   cancelAnyway: { height: 44, borderRadius: 13, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.11)', marginBottom: 8 },
   cancelAnywayText: { fontSize: 14, fontWeight: '600', color: 'rgba(255,255,255,0.4)' },
+
+  quickLinksRow: { gap: 8, marginBottom: 16 },
+  quickLinkBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#1a1a1a',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.07)',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    marginBottom: 2,
+  },
+  quickLinkText: { flex: 1, fontSize: 14, fontWeight: '600', color: 'rgba(255,255,255,0.8)' },
 
   bundleRow: {
     flexDirection: 'row',

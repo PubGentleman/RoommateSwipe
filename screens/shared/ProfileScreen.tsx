@@ -880,9 +880,27 @@ export const ProfileScreen = () => {
                 title="Payment"
                 subtitle="Manage payment methods"
                 onPress={() => navigation.navigate(isHost ? 'HostSubscription' : 'Plans')}
-                isLast
               />
             )}
+            <SettingsItem
+              iconName="columns"
+              iconColor="#6C5CE7"
+              iconBgColor="rgba(108,92,231,0.12)"
+              iconBorderColor="rgba(108,92,231,0.18)"
+              title="Compare Plans"
+              subtitle="Side-by-side feature comparison"
+              onPress={() => navigation.navigate('PlanComparison')}
+            />
+            <SettingsItem
+              iconName="file-text"
+              iconColor="#3b82f6"
+              iconBgColor="rgba(59,130,246,0.12)"
+              iconBorderColor="rgba(59,130,246,0.18)"
+              title="Billing History"
+              subtitle="Payments, receipts, invoices"
+              onPress={() => navigation.navigate('BillingHistory')}
+              isLast
+            />
           </View>
         </View>
 
