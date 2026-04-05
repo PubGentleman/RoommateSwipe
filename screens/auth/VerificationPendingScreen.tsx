@@ -21,8 +21,18 @@ export const VerificationPendingScreen: React.FC<Props> = ({ email, onVerified, 
   useEffect(() => {
     const interval = setInterval(async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user?.email_confirmed_at) {
+        const { data: { session }, error: refreshError } = await supabase.auth.refreshSession();
+
+        if (refreshError) {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user?.email_confirmed_at) {
+            clearInterval(interval);
+            onVerified();
+          }
+          return;
+        }
+
+        if (session?.user?.email_confirmed_at) {
           clearInterval(interval);
           onVerified();
         }

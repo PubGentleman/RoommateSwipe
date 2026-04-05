@@ -6,6 +6,7 @@ import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
 import { Feather } from '../components/VectorIcons';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { VerificationBanner } from '../components/VerificationBanner';
 import { HostDashboardScreen } from '../screens/host/HostDashboardScreen';
 import { MyListingsScreen } from '../screens/host/MyListingsScreen';
 import { CreateEditListingScreen } from '../screens/host/CreateEditListingScreen';
@@ -336,6 +337,8 @@ export const HostTabNavigator = () => {
 
   if (hostType === 'agent') {
     return (
+      <>
+      <VerificationBanner />
       <Tab.Navigator
         initialRouteName="Dashboard"
         tabBar={(props) => <HostCustomTabBar {...props} />}
@@ -352,11 +355,14 @@ export const HostTabNavigator = () => {
         <Tab.Screen name="Messages" component={HostMessagesStackNavigator} initialParams={{ role: 'agent' }} />
         <Tab.Screen name="Profile" component={ProfileStackNavigator} />
       </Tab.Navigator>
+      </>
     );
   }
 
   if (hostType === 'company') {
     return (
+      <>
+      <VerificationBanner />
       <Tab.Navigator
         initialRouteName="Dashboard"
         tabBar={(props) => <HostCustomTabBar {...props} />}
@@ -373,10 +379,13 @@ export const HostTabNavigator = () => {
         <Tab.Screen name="Messages" component={HostMessagesStackNavigator} initialParams={{ role: 'company' }} />
         <Tab.Screen name="Profile" component={ProfileStackNavigator} />
       </Tab.Navigator>
+      </>
     );
   }
 
   return (
+    <>
+    <VerificationBanner />
     <Tab.Navigator
       initialRouteName="Dashboard"
       tabBar={(props) => <HostCustomTabBar {...props} />}
@@ -394,5 +403,6 @@ export const HostTabNavigator = () => {
       <Tab.Screen name="Messages" component={HostMessagesStackNavigator} />
       <Tab.Screen name="Profile" component={ProfileStackNavigator} />
     </Tab.Navigator>
+    </>
   );
 };

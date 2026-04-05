@@ -15,6 +15,7 @@ import { useTheme } from '../hooks/useTheme';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotificationContext } from '../contexts/NotificationContext';
 import { needsRoommates, isPreformedGroup, isFastLane } from '../utils/renterIntentUtils';
+import { VerificationBanner } from '../components/VerificationBanner';
 
 export type RenterTabParamList = {
   Explore: { viewListingId?: string } | undefined;
@@ -152,6 +153,8 @@ export const RenterTabNavigator = () => {
   const tabKey = showRoommates ? 'full' : showMyGroup ? 'group' : 'lite';
 
   return (
+    <>
+    <VerificationBanner />
     <Tab.Navigator
       key={tabKey}
       initialRouteName={showRoommates ? 'Roommates' : 'Explore'}
@@ -179,5 +182,6 @@ export const RenterTabNavigator = () => {
       <Tab.Screen name="Messages" component={MessagesStackNavigator} />
       <Tab.Screen name="Profile" component={ProfileStackNavigator} />
     </Tab.Navigator>
+    </>
   );
 };

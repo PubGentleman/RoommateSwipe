@@ -1060,6 +1060,22 @@ export const ProfileScreen = () => {
           </View>
           <View style={styles.settingsCard}>
             <SettingsItem
+              iconName={user?.emailVerified ? 'check-circle' : 'alert-circle'}
+              iconColor={user?.emailVerified ? '#22c55e' : '#ff6b5b'}
+              iconBgColor={user?.emailVerified ? 'rgba(34,197,94,0.12)' : 'rgba(255,107,91,0.12)'}
+              iconBorderColor={user?.emailVerified ? 'rgba(34,197,94,0.18)' : 'rgba(255,107,91,0.18)'}
+              title="Email Verification"
+              subtitle={user?.emailVerified ? 'Verified' : 'Not verified - some features are locked'}
+              onPress={async () => {
+                if (!user?.emailVerified) {
+                  try {
+                    const { supabase } = await import('../../lib/supabase');
+                    await supabase.auth.resend({ type: 'signup', email: user?.email ?? '' });
+                  } catch {}
+                }
+              }}
+            />
+            <SettingsItem
               iconName="lock"
               iconColor="orange"
               iconBgColor="rgba(255,165,0,0.12)"

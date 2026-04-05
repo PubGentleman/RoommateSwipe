@@ -7,6 +7,8 @@ import { ThemedText } from '../../components/ThemedText';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../contexts/AuthContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
+import { checkVerificationGate } from '../../utils/verificationGating';
+import { supabase } from '../../lib/supabase';
 import { StorageService } from '../../utils/storage';
 import { Property, HostSubscriptionData } from '../../types/models';
 import { ListingLimitModal, OverageModal } from '../../components/ListingLimitModal';
@@ -550,6 +552,22 @@ export const CreateEditListingScreen = () => {
   };
 
   const handleSave = async () => {
+    const verificationCheck = checkVerificationGate(user, 'create_listing');
+    if (!verificationCheck.allowed) {
+      await showAlert({
+        title: 'Email Verification Required',
+        message: 'Please verify your email to publish listings. This helps renters trust your listings.',
+        variant: 'warning',
+        confirmText: 'Resend Email',
+        onConfirm: async () => {
+          try {
+            await supabase.auth.resend({ type: 'signup', email: user?.email ?? '' });
+            await showAlert({ title: 'Sent', message: 'Verification email sent! Check your inbox.', variant: 'info' });
+          } catch {}
+        },
+      });
+      return;
+    }
     if (!title.trim()) {
       await showAlert({ title: 'Required', message: 'Please enter a title', variant: 'warning' });
       return;

@@ -192,8 +192,17 @@ export async function getMyInquiryGroups(userId: string) {
   return getMyGroups(userId, 'listing_inquiry');
 }
 
+async function checkEmailVerifiedForGroups() {
+  const { data: { user: authUser } } = await supabase.auth.getUser();
+  if (authUser && !authUser.email_confirmed_at) {
+    throw new Error('Please verify your email to create or join groups.');
+  }
+}
+
 export async function createGroup(userId: string, group: GroupData) {
   if (!userId) throw new Error('Not authenticated');
+
+  await checkEmailVerifiedForGroups();
 
   const { data, error } = await supabase
     .from('groups')
@@ -388,6 +397,8 @@ export async function updateGroup(id: string, updates: Partial<GroupData>) {
 
 export async function joinGroup(userId: string, groupId: string) {
   if (!userId) throw new Error('Not authenticated');
+
+  await checkEmailVerifiedForGroups();
 
   const { data, error } = await supabase
     .from('group_members')

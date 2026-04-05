@@ -465,7 +465,7 @@ export interface User {
   birthday?: string;
   zodiacSign?: ZodiacSign;
   role: 'renter' | 'host';
-  emailVerified?: boolean;
+  emailVerified: boolean;
   onboardingStep?: 'profile' | 'hostType' | 'plan' | 'complete';
   hostType?: 'individual' | 'company' | 'agent';
   companyName?: string;

@@ -40,6 +40,7 @@ import { getNeighborhoodsByCity, getAllCities, NEIGHBORHOODS } from '../../utils
 import { fetchAreaInfo, formatNearestAmenity, AreaInfo, NearbyAmenity } from '../../services/neighborhoodService';
 import { getZodiacSymbol } from '../../utils/zodiacUtils';
 import { getBoostRotationIndex } from '../../utils/boostRotation';
+import { initImpressionTracking, stopImpressionTracking, trackImpression, flushImpressions } from '../../services/boostImpressionService';
 import { getAgentsWithCriticalStatus } from '../../services/responseTrackingService';
 import { shouldShowMatchScore, getHostBadgeLabel, getHostBadgeColor, getHostBadgeIcon } from '../../utils/hostTypeUtils';
 import type { HostType } from '../../utils/hostTypeUtils';
@@ -552,6 +553,16 @@ export const ExploreScreen = () => {
     } catch (err) {
       console.error('Error loading interest cards:', err);
     }
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (user?.id) {
+      initImpressionTracking(user.id);
+    }
+    return () => {
+      flushImpressions();
+      stopImpressionTracking();
+    };
   }, [user?.id]);
 
   useFocusEffect(
@@ -1532,10 +1543,24 @@ export const ExploreScreen = () => {
     const itemHostType: HostType = (item.hostType || hostUser?.hostType || 'individual') as HostType;
     const showMatch = shouldShowMatchScore(itemHostType);
 
+    const isBoostedActive = item.listingBoost?.isActive && new Date(item.listingBoost.expiresAt) > new Date();
+    const boostType = isBoostedActive ? (item.listingBoost as any)?.boostType as 'quick' | 'standard' | 'extended' | undefined : undefined;
+
     return (
       <Pressable
         ref={index === 0 ? exploreTour.setRef('listingCard') : undefined}
-        style={styles.propCard}
+        onLayout={() => {
+          trackImpression(item.id, 'card_view', { boostType, section: 'main_feed' });
+        }}
+        style={[
+          styles.propCard,
+          isBoostedActive ? {
+            borderWidth: 1,
+            borderColor: item.listingBoost?.includesFeaturedBadge
+              ? 'rgba(255, 215, 0, 0.3)'
+              : 'rgba(96, 165, 250, 0.25)',
+          } : null,
+        ]}
         onPress={() => {
           const viewCheck = canViewListing();
           if (!viewCheck.canView) {
@@ -1545,6 +1570,7 @@ export const ExploreScreen = () => {
             setShowPaywall(true);
             return;
           }
+          trackImpression(item.id, 'detail_view', { boostType, section: 'main_feed' });
           useListingView();
           setSelectedProperty(item);
           setPhotoIndex(0);
@@ -1593,6 +1619,15 @@ export const ExploreScreen = () => {
               <View style={styles.boostFeaturedBadge}>
                 <Feather name="star" size={9} color="#1a1200" />
                 <Text style={[styles.tagText, { color: '#1a1200', marginLeft: 3 }]}>FEATURED</Text>
+              </View>
+            ) : null}
+            {!item.featured &&
+             item.listingBoost?.isActive &&
+             !item.listingBoost?.includesFeaturedBadge &&
+             new Date(item.listingBoost.expiresAt) > new Date() ? (
+              <View style={styles.quickBoostBadge}>
+                <Feather name="zap" size={9} color="#fff" />
+                <Text style={[styles.tagText, { color: '#fff', marginLeft: 2 }]}>BOOSTED</Text>
               </View>
             ) : null}
           </View>
@@ -2188,7 +2223,7 @@ export const ExploreScreen = () => {
           onScroll={exploreScrollHandler}
           scrollEventThrottle={16}
           ListHeaderComponent={() => {
-            const featuredListings = filteredProperties.filter(p => {
+            const topHostListings = filteredProperties.filter(p => {
               const host = p.hostProfileId ? hostProfiles.get(p.hostProfileId) : null;
               return host && (host as any).hostPlan === 'business';
             });
@@ -2197,9 +2232,15 @@ export const ExploreScreen = () => {
               p.listingBoost?.includesTopPicks &&
               new Date(p.listingBoost.expiresAt) > new Date()
             );
-            const showFeatured = featuredListings.length > 0 && viewMode !== 'saved';
+            const boostedListings = filteredProperties.filter(p =>
+              p.listingBoost?.isActive &&
+              p.listingBoost?.includesFeaturedBadge &&
+              new Date(p.listingBoost.expiresAt) > new Date()
+            );
+            const showTopHosts = topHostListings.length > 0 && viewMode !== 'saved';
             const showTopPicks = topPicksListings.length > 0 && viewMode !== 'saved';
-            if (!showFeatured && !showTopPicks) return null;
+            const showBoosted = boostedListings.length > 0 && viewMode !== 'saved';
+            if (!showTopHosts && !showTopPicks && !showBoosted) return null;
             return (
               <View>
                 {showTopPicks ? (
@@ -2242,16 +2283,60 @@ export const ExploreScreen = () => {
                     </ScrollView>
                   </View>
                 ) : null}
-                {showFeatured ? (
-                  <View style={styles.featuredSection}>
+                {showBoosted ? (
+                  <View style={styles.boostedSection}>
                     <View style={styles.featuredHeader}>
-                      <Feather name="star" size={14} color="#ffd700" />
-                      <Text style={styles.featuredTitle}>Featured</Text>
+                      <Feather name="zap" size={14} color="#60a5fa" />
+                      <Text style={[styles.featuredTitle, { color: '#60a5fa' }]}>Boosted Listings</Text>
                     </View>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.featuredScroll}>
-                      {featuredListings.slice(0, 5).map(item => (
+                      {boostedListings.slice(0, 5).map(item => (
                         <Pressable
-                          key={`featured-${item.id}`}
+                          key={`boosted-${item.id}`}
+                          style={styles.boostedCard}
+                          onPress={() => {
+                            const viewCheck = canViewListing();
+                            if (!viewCheck.canView) {
+                              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+                              setPaywallFeature('Unlimited Listing Views');
+                              setPaywallPlan('plus');
+                              setShowPaywall(true);
+                              return;
+                            }
+                            trackImpression(item.id, 'detail_view', { section: 'boosted_carousel' });
+                            useListingView();
+                            setSelectedProperty(item);
+                            setPhotoIndex(0);
+                            setShowPropertyDetail(true);
+                          }}
+                          onLayout={() => {
+                            trackImpression(item.id, 'carousel_view', { section: 'boosted_carousel' });
+                          }}
+                        >
+                          <Image source={{ uri: item.photos[0] }} style={styles.featuredPhoto} />
+                          <LinearGradient colors={['transparent', 'rgba(20,50,100,0.9)']} style={styles.featuredGradient}>
+                            <Text style={styles.featuredPrice}>${item.price?.toLocaleString()}/mo</Text>
+                            <Text style={styles.featuredName} numberOfLines={1}>{item.title}</Text>
+                            <View style={styles.boostedBadge}>
+                              <Feather name="star" size={8} color="#1a1200" />
+                              <Text style={styles.featuredBadgeText}>FEATURED</Text>
+                            </View>
+                          </LinearGradient>
+                        </Pressable>
+                      ))}
+                    </ScrollView>
+                  </View>
+                ) : null}
+                {showTopHosts ? (
+                  <View style={styles.featuredSection}>
+                    <View style={styles.featuredHeader}>
+                      <Feather name="shield" size={14} color="#ffd700" />
+                      <Text style={styles.featuredTitle}>Top Hosts</Text>
+                    </View>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.featuredScroll}>
+                      {topHostListings.slice(0, 5).map(item => (
+                        <Pressable
+                          key={`tophost-${item.id}`}
                           style={styles.featuredCard}
                           onPress={() => {
                             const viewCheck = canViewListing();
@@ -2273,8 +2358,8 @@ export const ExploreScreen = () => {
                             <Text style={styles.featuredPrice}>${item.price?.toLocaleString()}/mo</Text>
                             <Text style={styles.featuredName} numberOfLines={1}>{item.title}</Text>
                             <View style={styles.featuredBadge}>
-                              <Feather name="star" size={8} color="#1a1200" />
-                              <Text style={styles.featuredBadgeText}>FEATURED</Text>
+                              <Feather name="shield" size={8} color="#1a1200" />
+                              <Text style={styles.featuredBadgeText}>TOP HOST</Text>
                             </View>
                           </LinearGradient>
                         </Pressable>
@@ -4358,6 +4443,14 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: 6,
   },
+  quickBoostBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#3b82f6',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
   tagFeatured: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -4748,6 +4841,29 @@ const styles = StyleSheet.create({
     gap: 3,
     marginTop: 4,
     backgroundColor: 'rgba(168,85,247,0.85)',
+    borderRadius: 20,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    alignSelf: 'flex-start',
+  },
+  boostedSection: {
+    marginBottom: Spacing.lg,
+  },
+  boostedCard: {
+    width: 200,
+    height: 140,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: '#1a1a1a',
+    borderWidth: 1,
+    borderColor: 'rgba(96,165,250,0.3)',
+  },
+  boostedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    marginTop: 4,
+    backgroundColor: '#f5c518',
     borderRadius: 20,
     paddingHorizontal: 8,
     paddingVertical: 3,

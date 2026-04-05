@@ -100,9 +100,17 @@ export async function getMessages(matchId: string, limit = 50, offset = 0) {
   return data || [];
 }
 
+async function checkEmailVerification() {
+  const { data: { user: authUser } } = await supabase.auth.getUser();
+  if (authUser && !authUser.email_confirmed_at) {
+    throw new Error('Please verify your email before sending messages.');
+  }
+}
+
 export async function sendMessage(userId: string, matchId: string, content: string) {
   if (!userId) throw new Error('Not authenticated');
 
+  await checkEmailVerification();
   await checkMessagingPaywall(userId, matchId);
 
   const { data, error } = await supabase
@@ -128,6 +136,7 @@ export async function sendStructuredMessage(
 ) {
   if (!userId) throw new Error('Not authenticated');
 
+  await checkEmailVerification();
   await checkMessagingPaywall(userId, matchId);
 
   const { data, error } = await supabase
@@ -179,6 +188,8 @@ export async function markMessagesAsRead(userId: string, matchId: string) {
 
 export async function sendColdMessage(userId: string, recipientId: string, content: string) {
   if (!userId) throw new Error('Not authenticated');
+
+  await checkEmailVerification();
 
   const userId1 = userId < recipientId ? userId : recipientId;
   const userId2 = userId < recipientId ? recipientId : userId;

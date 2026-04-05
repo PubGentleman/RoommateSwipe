@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { View, StyleSheet, Image, Pressable, Dimensions, Modal, ScrollView, Text, Animated as RNAnimated, InteractionManager } from 'react-native';
+import { View, StyleSheet, Image, Pressable, Dimensions, Modal, ScrollView, Text, Animated as RNAnimated, InteractionManager, Alert } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, withSequence, runOnJS, interpolate, FadeInDown } from 'react-native-reanimated';
 import { Feather } from '../../components/VectorIcons';
@@ -27,6 +27,8 @@ import { ReportBlockModal } from '../../components/ReportBlockModal';
 import { MatchCelebrationModal } from '../../components/MatchCelebrationModal';
 import { PaywallSheet } from '../../components/PaywallSheet';
 import { VerificationBadgeInline, getVerificationLevel } from '../../components/VerificationBadge';
+import { checkVerificationGate } from '../../utils/verificationGating';
+import { supabase } from '../../lib/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
 import CoachMarkOverlay from '../../components/CoachMark';
 import { useTourSetup } from '../../hooks/useTourSetup';
@@ -704,8 +706,30 @@ export const RoommatesScreen = () => {
     }
   };
 
+  const handleResendVerification = async () => {
+    try {
+      const { error } = await supabase.auth.resend({ type: 'signup', email: user?.email ?? '' });
+      if (!error) {
+        Alert.alert('Sent', 'Verification email sent! Check your inbox.');
+      }
+    } catch {}
+  };
+
   const handleSwipeAction = async (action: 'like' | 'nope' | 'superlike') => {
     if (!currentProfile || !user || isAnimatingSwipe.value) return;
+
+    const verificationCheck = checkVerificationGate(user, 'swipe');
+    if (!verificationCheck.allowed) {
+      Alert.alert(
+        'Email Verification Required',
+        'Please verify your email address to start swiping. Check your inbox for the verification link.',
+        [
+          { text: 'Resend Email', onPress: handleResendVerification },
+          { text: 'OK', style: 'cancel' },
+        ]
+      );
+      return;
+    }
 
     if (!gateStatus.canSwipe) {
       setGateModal({ visible: true, feature: 'Swiping', requiredTier: 'silver' });

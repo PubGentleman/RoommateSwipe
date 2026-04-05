@@ -27,6 +27,7 @@ import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../hooks/useTheme';
 import { StorageService } from '../utils/storage';
+import { supabase } from '../lib/supabase';
 
 export type RootStackParamList = {
   Login: undefined;
@@ -52,7 +53,7 @@ function HostMain() { return <HostTabNavigator />; }
 HostMain.displayName = 'HostMain';
 
 export const RootNavigator = () => {
-  const { user, isLoading, passwordRecoveryMode, clearPasswordRecovery, logout, completeOnboardingStep } = useAuth();
+  const { user, isLoading, passwordRecoveryMode, clearPasswordRecovery, logout, completeOnboardingStep, refreshSession } = useAuth();
   const { theme } = useTheme();
   const [onboardingChecked, setOnboardingChecked] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -137,7 +138,16 @@ export const RootNavigator = () => {
     return (
       <VerificationPendingScreen
         email={user.email}
-        onVerified={() => {}}
+        onVerified={async () => {
+          try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session) {
+              await refreshSession(session);
+            }
+          } catch (err) {
+            console.error('[Verification] Failed to refresh session after verification:', err);
+          }
+        }}
         onBackToLogin={async () => { try { await logout(); } catch {} }}
       />
     );

@@ -12,7 +12,7 @@ import { Property, HostSubscriptionData, ListingBoost, BoostCredits } from '../.
 import { BOOST_OPTIONS, BOOST_PACKS, calculateBoostExpiry, isListingBoosted, getBoostTimeRemaining, isFreePlan, createBoostRecord } from '../../utils/hostPricing';
 import { getListing } from '../../services/listingService';
 import { getPlanLimits, type HostPlan } from '../../constants/planLimits';
-import { getImpressionStats } from '../../services/boostImpressionService';
+import { getImpressionStats, getBoostComparison } from '../../services/boostImpressionService';
 import { recordBoostActivation } from '../../services/boostManagementService';
 
 const isDev = __DEV__;
@@ -536,8 +536,8 @@ export const ListingBoostScreen = () => {
                       </View>
                     ) : (
                       <View style={styles.perkRow}>
-                        <Feather name="minus" size={12} color="rgba(255,255,255,0.2)" />
-                        <Text style={[styles.perkText, { color: 'rgba(255,255,255,0.25)' }]}>No badge</Text>
+                        <Feather name="zap" size={12} color={BLUE} />
+                        <Text style={[styles.perkText, { color: BLUE }]}>Blue BOOSTED badge on listing</Text>
                       </View>
                     )}
                     {option.includesTopPicks ? (
@@ -554,6 +554,59 @@ export const ListingBoostScreen = () => {
                         </Text>
                       </View>
                     ) : null}
+                  </View>
+
+                  <View style={styles.previewSection}>
+                    <Text style={styles.previewTitle}>What renters see</Text>
+                    <View style={styles.previewContent}>
+                      {option.id === 'quick' ? (
+                        <View style={styles.previewItems}>
+                          <View style={styles.previewItem}>
+                            <View style={[styles.previewBadge, { backgroundColor: '#3b82f6' }]}>
+                              <Feather name="zap" size={8} color="#fff" />
+                              <Text style={[styles.previewBadgeText, { color: '#fff' }]}>BOOSTED</Text>
+                            </View>
+                            <Text style={styles.previewItemLabel}>Blue badge on card</Text>
+                          </View>
+                          <View style={styles.previewItem}>
+                            <Feather name="arrow-up" size={12} color={BLUE} />
+                            <Text style={styles.previewItemLabel}>Higher search ranking</Text>
+                          </View>
+                        </View>
+                      ) : option.id === 'standard' ? (
+                        <View style={styles.previewItems}>
+                          <View style={styles.previewItem}>
+                            <View style={[styles.previewBadge, { backgroundColor: '#f5c518' }]}>
+                              <Feather name="star" size={8} color="#1a1200" />
+                              <Text style={[styles.previewBadgeText, { color: '#1a1200' }]}>FEATURED</Text>
+                            </View>
+                            <Text style={styles.previewItemLabel}>Gold badge on card</Text>
+                          </View>
+                          <View style={styles.previewItem}>
+                            <Feather name="zap" size={12} color={BLUE} />
+                            <Text style={styles.previewItemLabel}>Boosted Listings carousel</Text>
+                          </View>
+                        </View>
+                      ) : (
+                        <View style={styles.previewItems}>
+                          <View style={styles.previewItem}>
+                            <View style={[styles.previewBadge, { backgroundColor: '#f5c518' }]}>
+                              <Feather name="star" size={8} color="#1a1200" />
+                              <Text style={[styles.previewBadgeText, { color: '#1a1200' }]}>FEATURED</Text>
+                            </View>
+                            <Text style={styles.previewItemLabel}>Gold badge on card</Text>
+                          </View>
+                          <View style={styles.previewItem}>
+                            <Feather name="zap" size={12} color={BLUE} />
+                            <Text style={styles.previewItemLabel}>Boosted Listings carousel</Text>
+                          </View>
+                          <View style={styles.previewItem}>
+                            <Feather name="award" size={12} color={PURPLE} />
+                            <Text style={styles.previewItemLabel}>Top Picks section</Text>
+                          </View>
+                        </View>
+                      )}
+                    </View>
                   </View>
 
                   {creditCount > 0 && !hasReachedBoostLimit ? (
@@ -623,10 +676,25 @@ export const ListingBoostScreen = () => {
 };
 
 function BoostAnalyticsCard({ listing, isBoosted }: { listing: Property; isBoosted: boolean }) {
-  const [stats, setStats] = useState({ totalImpressions: 0, cardViews: 0, detailViews: 0, searchResults: 0 });
+  const [stats, setStats] = useState({
+    totalImpressions: 0, cardViews: 0, detailViews: 0,
+    searchResults: 0, carouselViews: 0, uniqueViewers: 0,
+    bySection: {} as Record<string, number>,
+  });
+  const [comparison, setComparison] = useState<{
+    duringBoost: { impressions: number; uniqueViewers: number };
+    beforeBoost: { impressions: number; uniqueViewers: number };
+    multiplier: number;
+  } | null>(null);
 
   useEffect(() => {
-    getImpressionStats(listing.id).then(setStats);
+    const boost = listing.listingBoost;
+    if (!boost?.startedAt) return;
+    getImpressionStats(listing.id, boost.startedAt).then(setStats);
+    const durationMap: Record<string, number> = { '6h': 6, '12h': 12, '24h': 24, '3d': 72, '7d': 168 };
+    const dur = Object.entries(durationMap).find(([k]) => boost.expiresAt && (new Date(boost.expiresAt).getTime() - new Date(boost.startedAt).getTime()) / 3600000 <= (durationMap[k] || 24));
+    const hours = dur ? durationMap[dur[0]] : 24;
+    getBoostComparison(listing.id, boost.startedAt, hours).then(setComparison);
   }, [listing.id]);
 
   const boost = listing.listingBoost;
@@ -634,6 +702,7 @@ function BoostAnalyticsCard({ listing, isBoosted }: { listing: Property; isBoost
 
   const isExtended = boost.includesTopPicks;
   const dateRange = `${new Date(boost.startedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} — ${new Date(boost.expiresAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+  const multiplier = comparison?.multiplier || 1;
 
   return (
     <View style={styles.analyticsCard}>
@@ -648,25 +717,77 @@ function BoostAnalyticsCard({ listing, isBoosted }: { listing: Property; isBoost
           </View>
         ) : null}
       </View>
-      <Text style={styles.analyticsSubtitle}>{dateRange}</Text>
-      <View style={styles.analyticsStats}>
-        <View style={styles.analyticsStat}>
-          <Text style={styles.analyticsStatValue}>{stats.totalImpressions}</Text>
-          <Text style={styles.analyticsStatLabel}>Impressions</Text>
-        </View>
-        {isExtended ? (
-          <>
-            <View style={[styles.analyticsStat, { borderLeftWidth: 1, borderRightWidth: 1, borderColor: 'rgba(255,255,255,0.06)' }]}>
-              <Text style={styles.analyticsStatValue}>{stats.cardViews}</Text>
-              <Text style={styles.analyticsStatLabel}>Card Views</Text>
-            </View>
-            <View style={styles.analyticsStat}>
-              <Text style={styles.analyticsStatValue}>{stats.detailViews}</Text>
-              <Text style={styles.analyticsStatLabel}>Detail Views</Text>
-            </View>
-          </>
-        ) : null}
+
+      <View style={styles.multiplierHero}>
+        <Text style={styles.multiplierValue}>{multiplier}x</Text>
+        <Text style={styles.multiplierLabel}>visibility increase</Text>
       </View>
+
+      <Text style={styles.analyticsSubtitle}>{dateRange}</Text>
+
+      <View style={styles.statsGrid}>
+        <View style={styles.statsGridItem}>
+          <Text style={styles.statsGridValue}>{stats.totalImpressions}</Text>
+          <Text style={styles.statsGridLabel}>Impressions</Text>
+        </View>
+        <View style={styles.statsGridItem}>
+          <Text style={styles.statsGridValue}>{stats.uniqueViewers}</Text>
+          <Text style={styles.statsGridLabel}>Unique Viewers</Text>
+        </View>
+        <View style={styles.statsGridItem}>
+          <Text style={styles.statsGridValue}>{stats.cardViews}</Text>
+          <Text style={styles.statsGridLabel}>Card Views</Text>
+        </View>
+        <View style={styles.statsGridItem}>
+          <Text style={styles.statsGridValue}>{stats.detailViews}</Text>
+          <Text style={styles.statsGridLabel}>Detail Views</Text>
+        </View>
+      </View>
+
+      {isExtended && Object.keys(stats.bySection).length > 0 ? (
+        <View style={styles.sectionBreakdown}>
+          <Text style={styles.sectionBreakdownTitle}>By Section</Text>
+          {Object.entries(stats.bySection).map(([section, count]) => {
+            const sectionLabels: Record<string, string> = {
+              main_feed: 'Main Feed',
+              top_picks: 'Top Picks',
+              boosted_carousel: 'Boosted Carousel',
+              search: 'Search Results',
+            };
+            const sectionColors: Record<string, string> = {
+              main_feed: ACCENT,
+              top_picks: PURPLE,
+              boosted_carousel: BLUE,
+              search: GREEN,
+            };
+            return (
+              <View key={section} style={styles.sectionRow}>
+                <View style={[styles.sectionDot, { backgroundColor: sectionColors[section] || '#fff' }]} />
+                <Text style={styles.sectionName}>{sectionLabels[section] || section}</Text>
+                <Text style={styles.sectionCount}>{count}</Text>
+              </View>
+            );
+          })}
+        </View>
+      ) : null}
+
+      {comparison && comparison.beforeBoost.impressions > 0 ? (
+        <View style={styles.comparisonRow}>
+          <View style={styles.comparisonCol}>
+            <Text style={styles.comparisonLabel}>Before Boost</Text>
+            <Text style={styles.comparisonValue}>{comparison.beforeBoost.impressions}</Text>
+            <Text style={styles.comparisonSub}>{comparison.beforeBoost.uniqueViewers} viewers</Text>
+          </View>
+          <View style={styles.comparisonArrow}>
+            <Feather name="arrow-right" size={16} color={GREEN} />
+          </View>
+          <View style={styles.comparisonCol}>
+            <Text style={[styles.comparisonLabel, { color: GREEN }]}>During Boost</Text>
+            <Text style={[styles.comparisonValue, { color: GREEN }]}>{comparison.duringBoost.impressions}</Text>
+            <Text style={styles.comparisonSub}>{comparison.duringBoost.uniqueViewers} viewers</Text>
+          </View>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -747,27 +868,151 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginBottom: 14,
   },
-  analyticsStats: {
+  multiplierHero: {
+    alignItems: 'center',
+    paddingVertical: 12,
+    marginBottom: 4,
+  },
+  multiplierValue: {
+    fontSize: 36,
+    fontWeight: '900',
+    color: '#3b82f6',
+  },
+  multiplierLabel: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.5)',
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  statsGrid: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    flexWrap: 'wrap',
     backgroundColor: 'rgba(255,255,255,0.04)',
     borderRadius: 12,
-    paddingVertical: 14,
+    overflow: 'hidden',
   },
-  analyticsStat: {
-    flex: 1,
+  statsGridItem: {
+    width: '50%',
     alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderRightWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
   },
-  analyticsStatValue: {
-    fontSize: 22,
+  statsGridValue: {
+    fontSize: 20,
     fontWeight: '800',
     color: '#3b82f6',
   },
-  analyticsStatLabel: {
-    fontSize: 11,
+  statsGridLabel: {
+    fontSize: 10,
     color: 'rgba(255,255,255,0.4)',
     marginTop: 2,
     fontWeight: '600',
+  },
+  sectionBreakdown: {
+    marginTop: 14,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderRadius: 12,
+    padding: 12,
+  },
+  sectionBreakdownTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.6)',
+    marginBottom: 8,
+  },
+  sectionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 5,
+  },
+  sectionDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  sectionName: {
+    flex: 1,
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.7)',
+  },
+  sectionCount: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  comparisonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 14,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderRadius: 12,
+    padding: 14,
+  },
+  comparisonCol: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  comparisonArrow: {
+    paddingHorizontal: 12,
+  },
+  comparisonLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.5)',
+    marginBottom: 4,
+  },
+  comparisonValue: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#fff',
+  },
+  comparisonSub: {
+    fontSize: 10,
+    color: 'rgba(255,255,255,0.35)',
+    marginTop: 2,
+  },
+  previewSection: {
+    marginTop: 12,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderRadius: 10,
+    padding: 10,
+  },
+  previewTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.5)',
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  previewContent: {},
+  previewItems: {
+    gap: 8,
+  },
+  previewItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  previewBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  previewBadgeText: {
+    fontSize: 8,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  previewItemLabel: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.6)',
   },
   warningCard: {
     flexDirection: 'row',
