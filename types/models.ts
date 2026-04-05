@@ -202,6 +202,27 @@ export interface PropertyFilter {
   listingTypes?: string[];
 }
 
+export interface AdvancedPropertyFilter extends PropertyFilter {
+  transitLines?: string[];
+  maxWalkToTransitMin?: number;
+  moveInDateStart?: string;
+  moveInDateEnd?: string;
+  availableNow?: boolean;
+  roomType?: 'room' | 'entire' | 'any';
+  leaseType?: 'lease' | 'sublet' | 'any';
+  hostType?: 'individual' | 'agent' | 'company' | 'any';
+  verifiedHostOnly?: boolean;
+  minHostRating?: number;
+  genderPreference?: 'any' | 'female_only' | 'male_only';
+  hostLivesIn?: boolean | null;
+  petFriendly?: boolean;
+  noFee?: boolean;
+  furnished?: boolean;
+  utilitiesIncluded?: boolean;
+  minRating?: number;
+  sortBy?: 'relevance' | 'price_low' | 'price_high' | 'newest' | 'rating';
+}
+
 export type GroupType = 'roommate' | 'listing_inquiry';
 
 export type GroupMemberRole = 'admin' | 'member';

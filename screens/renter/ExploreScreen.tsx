@@ -23,7 +23,8 @@ import { getListings, mapListingToProperty, recordListingView } from '../../serv
 import { trackListingView, trackListingSave, trackInterestSent, trackSearchFilter, trackNeighborhoodSearch } from '../../utils/demandTracking';
 import { getDiscoverableGroupsForListing } from '../../services/groupService';
 import { getUserPreformedGroup, addToShortlist } from '../../services/preformedGroupService';
-import { Property, PropertyFilter, User, RoommateProfile, InterestCard, Conversation, Group } from '../../types/models';
+import { Property, PropertyFilter, AdvancedPropertyFilter, User, RoommateProfile, InterestCard, Conversation, Group } from '../../types/models';
+import AdvancedFilterSheet from '../../components/AdvancedFilterSheet';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
@@ -137,8 +138,8 @@ export const ExploreScreen = () => {
   const [error, setError] = useState<string | null>(null);
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState<Set<AmenityCategory>>(new Set(['unit_features']));
-  const [filters, setFilters] = useState<PropertyFilter>({});
-  const [tempFilters, setTempFilters] = useState<PropertyFilter>({});
+  const [filters, setFilters] = useState<AdvancedPropertyFilter>({});
+  const [tempFilters, setTempFilters] = useState<AdvancedPropertyFilter>({});
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [criticalAgentIds, setCriticalAgentIds] = useState<string[]>([]);
   const [showPropertyDetail, setShowPropertyDetail] = useState(false);
@@ -1007,6 +1008,122 @@ export const ExploreScreen = () => {
       });
     }
 
+    if (filters.roomType && filters.roomType !== 'any') {
+      const TYPE_MAP_ROOM: Record<string, string[]> = {
+        room: ['room', 'private_room'],
+        entire: ['entire', 'entire_unit', 'entire_apartment'],
+      };
+      const allowed = TYPE_MAP_ROOM[filters.roomType] || [];
+      filtered = filtered.filter(p => {
+        const rt = (p.roomType || p.listing_type || p.type || '').toLowerCase();
+        return allowed.some(v => rt === v);
+      });
+    }
+
+    if (filters.leaseType && filters.leaseType !== 'any') {
+      filtered = filtered.filter(p => {
+        const pt = ((p as any).propertyType || '').toLowerCase();
+        return pt === filters.leaseType;
+      });
+    }
+
+    if (filters.hostType && filters.hostType !== 'any') {
+      filtered = filtered.filter(p => {
+        const host = p.hostProfileId ? hostProfiles.get(p.hostProfileId) : null;
+        const ht = (host as any)?.hostType || p.hostType || 'individual';
+        return ht === filters.hostType;
+      });
+    }
+
+    if (filters.verifiedHostOnly) {
+      filtered = filtered.filter(p => p.host_badge !== null && p.host_badge !== undefined);
+    }
+
+    if (filters.minHostRating) {
+      filtered = filtered.filter(p => (p.average_rating || 0) >= filters.minHostRating!);
+    }
+
+    if (filters.genderPreference && filters.genderPreference !== 'any') {
+      filtered = filtered.filter(p =>
+        !p.preferred_tenant_gender || p.preferred_tenant_gender === 'any' ||
+        p.preferred_tenant_gender === filters.genderPreference
+      );
+    }
+
+    if (filters.hostLivesIn !== null && filters.hostLivesIn !== undefined) {
+      filtered = filtered.filter(p => (p as any).hostLivesIn === filters.hostLivesIn);
+    }
+
+    if (filters.minRating) {
+      filtered = filtered.filter(p => (p.average_rating || 0) >= filters.minRating!);
+    }
+
+    if (filters.availableNow) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      filtered = filtered.filter(p => {
+        if (!p.availableDate) return p.available === true;
+        const ad = new Date(p.availableDate);
+        ad.setHours(0, 0, 0, 0);
+        return ad <= today;
+      });
+    } else if (filters.moveInDateStart || filters.moveInDateEnd) {
+      filtered = filtered.filter(p => {
+        if (!p.availableDate) return true;
+        const avail = new Date(p.availableDate).getTime();
+        if (filters.moveInDateStart && avail < new Date(filters.moveInDateStart).getTime()) return false;
+        if (filters.moveInDateEnd && avail > new Date(filters.moveInDateEnd).getTime()) return false;
+        return true;
+      });
+    }
+
+    if (filters.petFriendly) {
+      filtered = filtered.filter(p =>
+        p.amenities?.some(a => a.toLowerCase().includes('pet')) ||
+        (p as any).petFriendly === true || (p as any).pet_friendly === true || (p as any).pets_allowed === true
+      );
+    }
+
+    if (filters.noFee) {
+      filtered = filtered.filter(p => {
+        const ids = (p.amenities || []).map(a => normalizeLegacyAmenity(a));
+        return ids.includes('no_fee') || (p as any).noFee === true || (p as any).no_fee === true;
+      });
+    }
+
+    if (filters.furnished) {
+      filtered = filtered.filter(p =>
+        p.amenities?.some(a => a.toLowerCase().includes('furnish')) || (p as any).furnished === true
+      );
+    }
+
+    if (filters.utilitiesIncluded) {
+      filtered = filtered.filter(p =>
+        p.amenities?.some(a => a.toLowerCase().includes('utilit')) || (p as any).utilitiesIncluded === true
+      );
+    }
+
+    if (filters.transitLines && filters.transitLines.length > 0) {
+      filtered = filtered.filter(p => {
+        const stops = (p as any).transitInfo?.stops;
+        if (!stops) return false;
+        return stops.some((stop: any) => {
+          const lines: string[] = stop.lines || stop.routes || [];
+          return filters.transitLines!.some(l => lines.includes(l));
+        });
+      });
+    }
+
+    if (filters.maxWalkToTransitMin) {
+      filtered = filtered.filter(p => {
+        const stops = (p as any).transitInfo?.stops;
+        if (!stops) return false;
+        return stops.some((stop: any) =>
+          (stop.walkMinutes || (stop.distanceMiles || 1) * 20) <= filters.maxWalkToTransitMin!
+        );
+      });
+    }
+
     const PLACEMENT_PRIORITY: Record<string, number> = { featured: 4, top: 3, priority: 2, standard: 1 };
     const getHostPlanPriority = (property: Property) => {
       const host = property.hostProfileId ? hostProfiles.get(property.hostProfileId) : null;
@@ -1092,6 +1209,18 @@ export const ExploreScreen = () => {
       return createdB - createdA;
     });
 
+    if (filters.sortBy && filters.sortBy !== 'relevance') {
+      filtered.sort((a, b) => {
+        switch (filters.sortBy) {
+          case 'price_low': return (a.price || 0) - (b.price || 0);
+          case 'price_high': return (b.price || 0) - (a.price || 0);
+          case 'newest': return (new Date((b as any).createdAt || 0).getTime()) - (new Date((a as any).createdAt || 0).getTime());
+          case 'rating': return (b.average_rating || 0) - (a.average_rating || 0);
+          default: return 0;
+        }
+      });
+    }
+
     const seen = new Set<string>();
     const deduped = filtered.filter(p => {
       if (seen.has(p.id)) return false;
@@ -1105,24 +1234,22 @@ export const ExploreScreen = () => {
   const renterLimits = getRenterPlanLimits(renterPlan);
 
   const handleFilterPress = () => {
-    setTempFilters({ ...filters, listingTypes: [...listingTypeFilter] });
     setShowFilterModal(true);
   };
 
-  const handleApplyFilters = () => {
+  const handleApplyAdvancedFilters = (newFilters: AdvancedPropertyFilter) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    if (tempFilters.listingTypes) {
-      setListingTypeFilter(tempFilters.listingTypes);
+    if (newFilters.listingTypes) {
+      setListingTypeFilter(newFilters.listingTypes);
     }
-    setFilters(tempFilters);
-    setShowFilterModal(false);
+    setFilters(newFilters);
     trackSearchFilter({
       city: activeCity || undefined,
       neighborhood: selectedNeighborhood || undefined,
-      priceMin: tempFilters.minPrice,
-      priceMax: tempFilters.maxPrice,
-      bedrooms: tempFilters.minBedrooms,
-      amenities: tempFilters.amenities,
+      priceMin: newFilters.minPrice,
+      priceMax: newFilters.maxPrice,
+      bedrooms: newFilters.minBedrooms,
+      amenities: newFilters.amenities,
     });
   };
 
@@ -1133,6 +1260,41 @@ export const ExploreScreen = () => {
     setListingTypeFilter([]);
     setShowFilterModal(false);
   };
+
+  const removeAdvancedFilter = (key: keyof AdvancedPropertyFilter) => {
+    setFilters(prev => {
+      const next = { ...prev };
+      delete next[key];
+      if (key === 'moveInDateStart') delete next.moveInDateEnd;
+      if (key === 'moveInDateEnd') delete next.moveInDateStart;
+      return next;
+    });
+  };
+
+  const advancedFilterChips = useMemo(() => {
+    const chips: { label: string; key: keyof AdvancedPropertyFilter }[] = [];
+    if (filters.maxPrice) chips.push({ label: `Under $${(filters.maxPrice / 1000).toFixed(1)}k`, key: 'maxPrice' });
+    if (filters.minPrice) chips.push({ label: `$${(filters.minPrice / 1000).toFixed(1)}k+`, key: 'minPrice' });
+    if (filters.minBedrooms !== undefined) chips.push({ label: `${filters.minBedrooms === 0 ? 'Studio' : filters.minBedrooms + '+ BR'}`, key: 'minBedrooms' });
+    if (filters.transitLines?.length) chips.push({ label: `${filters.transitLines.join(', ')} train`, key: 'transitLines' });
+    if (filters.maxWalkToTransitMin) chips.push({ label: `${filters.maxWalkToTransitMin} min walk`, key: 'maxWalkToTransitMin' });
+    if (filters.roomType && filters.roomType !== 'any') chips.push({ label: filters.roomType === 'room' ? 'Room' : 'Entire', key: 'roomType' });
+    if (filters.leaseType && filters.leaseType !== 'any') chips.push({ label: filters.leaseType.charAt(0).toUpperCase() + filters.leaseType.slice(1), key: 'leaseType' });
+    if (filters.hostType && filters.hostType !== 'any') chips.push({ label: filters.hostType.charAt(0).toUpperCase() + filters.hostType.slice(1) + ' host', key: 'hostType' });
+    if (filters.verifiedHostOnly) chips.push({ label: 'Verified hosts', key: 'verifiedHostOnly' });
+    if (filters.minHostRating) chips.push({ label: `${filters.minHostRating}+ host rating`, key: 'minHostRating' });
+    if (filters.minRating) chips.push({ label: `${filters.minRating}+ rating`, key: 'minRating' });
+    if (filters.genderPreference && filters.genderPreference !== 'any') chips.push({ label: filters.genderPreference === 'female_only' ? 'Female Only' : 'Male Only', key: 'genderPreference' });
+    if (filters.hostLivesIn === true) chips.push({ label: 'Host lives in', key: 'hostLivesIn' });
+    if (filters.petFriendly) chips.push({ label: 'Pet Friendly', key: 'petFriendly' });
+    if (filters.noFee) chips.push({ label: 'No Fee', key: 'noFee' });
+    if (filters.furnished) chips.push({ label: 'Furnished', key: 'furnished' });
+    if (filters.utilitiesIncluded) chips.push({ label: 'Utilities Incl.', key: 'utilitiesIncluded' });
+    if (filters.availableNow) chips.push({ label: 'Available Now', key: 'availableNow' });
+    if (filters.moveInDateStart || filters.moveInDateEnd) chips.push({ label: 'Move-in date', key: 'moveInDateStart' });
+    if (filters.sortBy && filters.sortBy !== 'relevance') chips.push({ label: `Sort: ${filters.sortBy.replace('_', ' ')}`, key: 'sortBy' });
+    return chips;
+  }, [filters]);
 
   const toggleAmenity = (amenity: string) => {
     const current = tempFilters.amenities || [];
@@ -1770,6 +1932,26 @@ export const ExploreScreen = () => {
           })}
         </ScrollView>
       </Animated.View>
+      {advancedFilterChips.length > 0 ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.activeChipBar}
+          contentContainerStyle={styles.activeChipBarContent}
+        >
+          {advancedFilterChips.map((chip) => (
+            <View key={chip.key} style={styles.activeChip}>
+              <Text style={styles.activeChipText}>{chip.label}</Text>
+              <Pressable onPress={() => removeAdvancedFilter(chip.key)} hitSlop={6}>
+                <Feather name="x-circle" size={14} color="#6C5CE7" />
+              </Pressable>
+            </View>
+          ))}
+          <Pressable style={styles.clearAllChip} onPress={handleClearFilters}>
+            <Text style={styles.clearAllText}>Clear all</Text>
+          </Pressable>
+        </ScrollView>
+      ) : null}
       {displayMode === 'map' ? (
         <PropertyMapView
           properties={filteredProperties}
@@ -1946,270 +2128,13 @@ export const ExploreScreen = () => {
         />
       )}
 
-      <Modal
+      <AdvancedFilterSheet
         visible={showFilterModal}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setShowFilterModal(false)}
-      >
-        <View style={styles.fmContainer}>
-          <View style={styles.fmHeader}>
-            <Pressable onPress={() => setShowFilterModal(false)} hitSlop={12}>
-              <Feather name="x" size={22} color="#fff" />
-            </Pressable>
-            <View style={{ flex: 1 }} />
-            <Pressable onPress={handleClearFilters} hitSlop={12}>
-              <Text style={styles.fmClearText}>Clear</Text>
-            </Pressable>
-          </View>
-
-          <ScrollView style={styles.fmScroll} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
-            <Text style={styles.fmSectionTitle}>Listing Type</Text>
-            <View style={styles.fmTypeGrid}>
-              {LISTING_TYPE_OPTIONS.map((opt) => {
-                const selectedTypes = tempFilters.listingTypes || [];
-                const isActive = opt.key === 'any'
-                  ? selectedTypes.length === 0
-                  : selectedTypes.includes(opt.key);
-                return (
-                  <Pressable
-                    key={opt.key}
-                    style={[styles.fmTypeCard, isActive && styles.fmTypeCardActive]}
-                    onPress={() => {
-                      if (opt.key === 'any') {
-                        setTempFilters({ ...tempFilters, listingTypes: [] });
-                      } else {
-                        const current = tempFilters.listingTypes || [];
-                        const updated = current.includes(opt.key)
-                          ? current.filter((t: string) => t !== opt.key)
-                          : [...current, opt.key];
-                        setTempFilters({ ...tempFilters, listingTypes: updated });
-                      }
-                    }}
-                  >
-                    <View style={[styles.fmTypeIcon, isActive && styles.fmTypeIconActive]}>
-                      <Feather
-                        name={opt.icon as any}
-                        size={20}
-                        color={isActive ? '#fff' : 'rgba(255,255,255,0.4)'}
-                      />
-                    </View>
-                    <Text style={[styles.fmTypeLabel, isActive && styles.fmTypeLabelActive]}>
-                      {opt.label}
-                    </Text>
-                    {isActive ? (
-                      <View style={styles.fmTypeCheck}>
-                        <Feather name="check" size={10} color="#fff" />
-                      </View>
-                    ) : null}
-                  </Pressable>
-                );
-              })}
-            </View>
-
-            <Text style={styles.fmSectionTitle}>Budget Range</Text>
-            <PricePickerPair
-              minValue={tempFilters.minPrice || 500}
-              maxValue={tempFilters.maxPrice || STANDARD_MAX_VALUE}
-              onMinChange={val => setTempFilters(prev => ({ ...prev, minPrice: val > 500 ? val : undefined }))}
-              onMaxChange={val => setTempFilters(prev => ({ ...prev, maxPrice: val < STANDARD_MAX_VALUE ? val : undefined }))}
-              height={120}
-            />
-
-            <Text style={styles.fmSectionTitle}>Rooms</Text>
-            <View style={styles.fmRoomsRow}>
-              <View style={styles.fmRoomCol}>
-                <Text style={styles.fmRoomLabel}>Bedrooms</Text>
-                <View style={styles.fmCounterRow}>
-                  <Pressable
-                    style={styles.fmCounterBtn}
-                    onPress={() => setTempFilters({ ...tempFilters, minBedrooms: Math.max(0, (tempFilters.minBedrooms || 0) - 1) })}
-                  >
-                    <Feather name="minus" size={18} color="rgba(255,255,255,0.6)" />
-                  </Pressable>
-                  <Text style={styles.fmCounterValue}>{tempFilters.minBedrooms || 0}+</Text>
-                  <Pressable
-                    style={styles.fmCounterBtn}
-                    onPress={() => setTempFilters({ ...tempFilters, minBedrooms: (tempFilters.minBedrooms || 0) + 1 })}
-                  >
-                    <Feather name="plus" size={18} color="rgba(255,255,255,0.6)" />
-                  </Pressable>
-                </View>
-              </View>
-              <View style={styles.fmRoomCol}>
-                <Text style={styles.fmRoomLabel}>Bathrooms</Text>
-                <View style={styles.fmCounterRow}>
-                  <Pressable
-                    style={styles.fmCounterBtn}
-                    onPress={() => setTempFilters({ ...tempFilters, minBathrooms: Math.max(0, (tempFilters.minBathrooms || 0) - 0.5) })}
-                  >
-                    <Feather name="minus" size={18} color="rgba(255,255,255,0.6)" />
-                  </Pressable>
-                  <Text style={styles.fmCounterValue}>{tempFilters.minBathrooms || 0}+</Text>
-                  <Pressable
-                    style={styles.fmCounterBtn}
-                    onPress={() => setTempFilters({ ...tempFilters, minBathrooms: (tempFilters.minBathrooms || 0) + 0.5 })}
-                  >
-                    <Feather name="plus" size={18} color="rgba(255,255,255,0.6)" />
-                  </Pressable>
-                </View>
-              </View>
-            </View>
-
-            <Text style={styles.fmSectionTitle}>Amenities</Text>
-            {AMENITY_CATEGORIES.map(category => {
-              const categoryAmenities = ALL_AMENITIES.filter(a => a.category === category.key);
-              const selectedInCategory = categoryAmenities.filter(a =>
-                tempFilters.amenities?.includes(a.id)
-              ).length;
-
-              return (
-                <View key={category.key} style={styles.fmAmenityCategory}>
-                  <Pressable
-                    style={styles.fmCategoryHeader}
-                    onPress={() => {
-                      setExpandedCategories(prev => {
-                        const next = new Set(prev);
-                        if (next.has(category.key)) next.delete(category.key);
-                        else next.add(category.key);
-                        return next;
-                      });
-                    }}
-                  >
-                    <View style={styles.fmCategoryHeaderLeft}>
-                      <Feather name={category.icon} size={16} color={theme.textSecondary} />
-                      <Text style={[styles.fmCategoryLabel, { color: theme.text }]}>
-                        {category.label}
-                      </Text>
-                      {selectedInCategory > 0 ? (
-                        <View style={styles.fmCategoryBadge}>
-                          <Text style={styles.fmCategoryBadgeText}>{selectedInCategory}</Text>
-                        </View>
-                      ) : null}
-                    </View>
-                    <Feather
-                      name={expandedCategories.has(category.key) ? 'chevron-up' : 'chevron-down'}
-                      size={16}
-                      color={theme.textSecondary}
-                    />
-                  </Pressable>
-
-                  {expandedCategories.has(category.key) ? (
-                    <View style={styles.fmAmenitiesWrap}>
-                      {categoryAmenities.map(amenity => {
-                        const isSelected = tempFilters.amenities?.includes(amenity.id) || false;
-                        return (
-                          <Pressable
-                            key={amenity.id}
-                            style={[styles.fmAmenityChip, isSelected && styles.fmAmenityChipActive]}
-                            onPress={() => toggleAmenity(amenity.id)}
-                          >
-                            <Feather
-                              name={amenity.icon}
-                              size={14}
-                              color={isSelected ? '#fff' : theme.textSecondary}
-                              style={{ marginRight: 6 }}
-                            />
-                            <Text style={[styles.fmAmenityText, isSelected && styles.fmAmenityTextActive]}>
-                              {amenity.label}
-                            </Text>
-                          </Pressable>
-                        );
-                      })}
-                    </View>
-                  ) : null}
-                </View>
-              );
-            })}
-
-            {!renterLimits.hasAdvancedFilters ? (
-              <Pressable
-                style={styles.fmLockedSection}
-                onPress={() => {
-                  setShowFilterModal(false);
-                  setPaywallFeature('Advanced Filters');
-                  setPaywallPlan('plus');
-                  setShowPaywall(true);
-                }}
-              >
-                <View style={styles.fmLockedRow}>
-                  <Text style={styles.fmSectionTitle}>Lifestyle Preferences</Text>
-                  <PlanBadgeInline plan="Plus" locked />
-                </View>
-                <Text style={styles.fmLockedDesc}>Cleanliness, noise level, social habits, pet preferences, smoking</Text>
-              </Pressable>
-            ) : (
-              <>
-                <Text style={styles.fmSectionTitle}>Lifestyle Preferences</Text>
-                <View style={styles.fmAmenitiesWrap}>
-                  {['Pet-Friendly', 'Non-Smoking', 'Quiet', 'Social', 'Clean', 'Early Bird', 'Night Owl'].map(tag => {
-                    const isSelected = tempFilters.lifestyleTags?.includes(tag) || false;
-                    return (
-                      <Pressable
-                        key={tag}
-                        style={[styles.fmAmenityChip, isSelected && styles.fmAmenityChipActive]}
-                        onPress={() => {
-                          const current = tempFilters.lifestyleTags || [];
-                          const updated = current.includes(tag) ? current.filter(t => t !== tag) : [...current, tag];
-                          setTempFilters(prev => ({ ...prev, lifestyleTags: updated }));
-                        }}
-                      >
-                        <Text style={[styles.fmAmenityText, isSelected && styles.fmAmenityTextActive]}>{tag}</Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              </>
-            )}
-
-            {!renterLimits.hasTransitFiltering ? (
-              <Pressable
-                style={styles.fmLockedSection}
-                onPress={() => {
-                  setShowFilterModal(false);
-                  setPaywallFeature('Transit Filtering');
-                  setPaywallPlan('plus');
-                  setShowPaywall(true);
-                }}
-              >
-                <View style={styles.fmLockedRow}>
-                  <Text style={styles.fmSectionTitle}>Transit Proximity</Text>
-                  <PlanBadgeInline plan="Plus" locked />
-                </View>
-                <Text style={styles.fmLockedDesc}>Filter listings by subway, bus, and train stop proximity</Text>
-              </Pressable>
-            ) : (
-              <>
-                <Text style={styles.fmSectionTitle}>Transit Proximity</Text>
-                <View style={styles.fmAmenitiesWrap}>
-                  {['Near Subway', 'Near Bus', 'Near Train', 'Under 10 min walk'].map(tag => {
-                    const isSelected = tempFilters.transitTags?.includes(tag) || false;
-                    return (
-                      <Pressable
-                        key={tag}
-                        style={[styles.fmAmenityChip, isSelected && styles.fmAmenityChipActive]}
-                        onPress={() => {
-                          const current = tempFilters.transitTags || [];
-                          const updated = current.includes(tag) ? current.filter(t => t !== tag) : [...current, tag];
-                          setTempFilters(prev => ({ ...prev, transitTags: updated }));
-                        }}
-                      >
-                        <Text style={[styles.fmAmenityText, isSelected && styles.fmAmenityTextActive]}>{tag}</Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              </>
-            )}
-          </ScrollView>
-
-          <View style={[styles.fmFooter, { paddingBottom: insets.bottom + 16 }]}>
-            <Pressable style={styles.fmApplyBtn} onPress={handleApplyFilters}>
-              <Text style={styles.fmApplyText}>Apply Filters</Text>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
+        filters={filters}
+        onApply={handleApplyAdvancedFilters}
+        onClose={() => setShowFilterModal(false)}
+        resultCount={filteredProperties.length}
+      />
 
       <PaywallSheet
         visible={showPaywall}
@@ -4170,6 +4095,41 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 12,
     fontWeight: '700',
+  },
+  activeChipBar: {
+    maxHeight: 36,
+    marginBottom: 4,
+  },
+  activeChipBarContent: {
+    paddingHorizontal: 16,
+    gap: 8,
+    alignItems: 'center',
+  },
+  activeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: 'rgba(108,92,231,0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(108,92,231,0.3)',
+  },
+  activeChipText: {
+    color: '#6C5CE7',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  clearAllChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  clearAllText: {
+    color: '#ff6b5b',
+    fontSize: 12,
+    fontWeight: '600',
   },
   chipUnselectedText: {
     color: 'rgba(255,255,255,0.45)',
