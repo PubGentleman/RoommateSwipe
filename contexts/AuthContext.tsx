@@ -369,8 +369,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const [userResult, profileResult, subscriptionResult] = await Promise.all([
         supabase.from('users').select('*').eq('id', session.user.id).single(),
-        supabase.from('profiles').select('*').eq('user_id', session.user.id).single(),
-        supabase.from('subscriptions').select('*').eq('user_id', session.user.id).single(),
+        supabase.from('profiles').select('*').eq('user_id', session.user.id).maybeSingle(),
+        supabase.from('subscriptions').select('*').eq('user_id', session.user.id).maybeSingle(),
       ]);
 
       const userData = userResult.data;
