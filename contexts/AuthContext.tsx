@@ -570,8 +570,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const loadUserFromStorage = async () => {
-    await StorageService.initializeWithMockData();
-    const currentUser = await StorageService.getCurrentUser();
+    const [, currentUser] = await Promise.all([
+      StorageService.initializeWithMockData(),
+      StorageService.getCurrentUser(),
+    ]);
     if (currentUser && currentUser.profileData && !currentUser.profileData.apartment_search_type) {
       try {
         const savedIntentRaw = await AsyncStorage.getItem('@rhome/renter_intent');

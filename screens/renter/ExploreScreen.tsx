@@ -261,10 +261,25 @@ export const ExploreScreen = () => {
   });
 
   useEffect(() => {
-    loadProperties();
-    loadSavedProperties();
-    loadHostProfiles();
-    loadUserGroups();
+    let cancelled = false;
+
+    const loadAll = async () => {
+      try {
+        await loadProperties();
+        if (!cancelled) {
+          Promise.all([
+            loadSavedProperties(),
+            loadHostProfiles(),
+            loadUserGroups(),
+          ]).catch(() => {});
+        }
+      } catch (e) {
+        console.warn('[Explore] Load error:', e);
+      }
+    };
+
+    loadAll();
+    return () => { cancelled = true; };
   }, [activeCity]);
 
   useEffect(() => {
@@ -332,8 +347,6 @@ export const ExploreScreen = () => {
     try {
       setIsLoading(true);
       setError(null);
-
-      await StorageService.initializeWithMockData();
 
       let usedSupabase = false;
       try {

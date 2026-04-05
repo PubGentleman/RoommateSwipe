@@ -110,8 +110,19 @@ export const GroupsScreen = () => {
   const isAnimatingSwipe = useSharedValue(false);
   const cardOpacity = useSharedValue(1);
 
+  const lastLoadedRef = React.useRef<number>(0);
+  const STALE_AFTER_MS = 30000;
+
   useFocusEffect(
     React.useCallback(() => {
+      const now = Date.now();
+      const isStale = now - lastLoadedRef.current > STALE_AFTER_MS;
+
+      if (!isStale && myGroups.length > 0) {
+        return;
+      }
+
+      lastLoadedRef.current = now;
       loadGroups();
       loadLikedGroupState();
       if (user) {
@@ -147,16 +158,21 @@ export const GroupsScreen = () => {
 
   useEffect(() => {
     if (myGroups.length > 0 && user) {
-      const ids = myGroups.map((g: any) => g.id);
-      getGroupsHealth(ids, user.id).then(scores => {
-        setGroupHealthScores(scores);
-        const ranked = Object.entries(scores)
-          .filter(([, h]) => h.score > 0)
-          .sort(([, a], [, b]) => b.score - a.score);
-        if (ranked.length > 0) setBestGroupId(ranked[0][0]);
-        else setBestGroupId(null);
-      }).catch(() => {});
-      getAllGroupQuickStats(ids, user.id).then(setGroupQuickStats).catch(() => {});
+      const timer = setTimeout(() => {
+        const ids = myGroups.map((g: any) => g.id);
+        Promise.all([
+          getGroupsHealth(ids, user.id),
+          getAllGroupQuickStats(ids, user.id),
+        ]).then(([scores, stats]) => {
+          setGroupHealthScores(scores);
+          setGroupQuickStats(stats);
+          const ranked = Object.entries(scores)
+            .filter(([, h]) => h.score > 0)
+            .sort(([, a], [, b]) => b.score - a.score);
+          setBestGroupId(ranked.length > 0 ? ranked[0][0] : null);
+        }).catch(() => {});
+      }, 100);
+      return () => clearTimeout(timer);
     }
   }, [myGroups]);
 
@@ -176,11 +192,19 @@ export const GroupsScreen = () => {
   const loadGroupLikeCounts = async (groups: Group[]) => {
     if (!user) return;
     const adminGroups = groups.filter(g => g.createdBy === user.id);
+    if (adminGroups.length === 0) return;
+
+    const results = await Promise.all(
+      adminGroups.map(async (g) => {
+        const count = await StorageService.getGroupLikeCount(g.id);
+        return { id: g.id, count };
+      })
+    );
+
     const counts = new Map<string, number>();
-    for (const g of adminGroups) {
-      const count = await StorageService.getGroupLikeCount(g.id);
-      if (count > 0) counts.set(g.id, count);
-    }
+    results.forEach(({ id, count }) => {
+      if (count > 0) counts.set(id, count);
+    });
     setGroupLikeCounts(counts);
   };
 
@@ -201,7 +225,7 @@ export const GroupsScreen = () => {
             getMyGroupsFromSupabase(user.id, 'roommate'),
             getMyInquiryGroupsFromSupabase(user.id),
           ]),
-          15000
+          5000
         );
 
         const supabaseGroups = discoverResult.status === 'fulfilled' ? discoverResult.value : [];

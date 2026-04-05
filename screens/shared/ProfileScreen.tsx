@@ -116,6 +116,9 @@ export const ProfileScreen = () => {
 
   const userId = user?.id;
   const userRole = user?.role;
+  const profileLastLoadedRef = React.useRef<number>(0);
+  const PROFILE_STALE_MS = 30000;
+
   useFocusEffect(
     React.useCallback(() => {
       let isMounted = true;
@@ -124,62 +127,64 @@ export const ProfileScreen = () => {
 
       if (!userId) return () => { isMounted = false; };
 
+      const now = Date.now();
+      const isStale = now - profileLastLoadedRef.current > PROFILE_STALE_MS;
+      if (!isStale) return () => { isMounted = false; };
+      profileLastLoadedRef.current = now;
+
       const loadData = async () => {
         try {
           if (userRole === 'host') {
-            const allProperties = await StorageService.getProperties();
+            const [allProperties, interestCards, groups] = await Promise.all([
+              StorageService.getProperties(),
+              StorageService.getInterestCardsForHost(userId),
+              (user?.hostType === 'agent' || user?.hostType === 'company') ? StorageService.getGroups() : Promise.resolve([]),
+            ]);
             if (!isMounted) return;
             const myListings = allProperties.filter(p => p.hostId === userId);
             setHostListingCount(myListings.length);
             setHostViewCount(myListings.filter(p => p.available && !p.rentedDate).length);
-            const interestCards = await StorageService.getInterestCardsForHost(userId);
-            if (!isMounted) return;
             setHostInquiryCount(interestCards.length);
 
             if (user?.hostType === 'agent' || user?.hostType === 'company') {
-              const groups = await StorageService.getGroups();
-              if (!isMounted) return;
               const myGroups = groups.filter((g: any) => g.createdByAgent === userId || g.agentId === userId);
               setAgentGroupCount(myGroups.length);
               setAgentPlacementCount(myListings.filter(p => p.rentedDate).length);
             }
           } else {
-            const matches = await StorageService.getMatches();
+            const [matches, allUsers, saved, renterCards] = await Promise.all([
+              StorageService.getMatches(),
+              StorageService.getUsers(),
+              StorageService.getSavedProperties(userId),
+              StorageService.getInterestCardsForRenter(userId),
+            ]);
             if (!isMounted) return;
             const userMatches = matches.filter(m => m.userId1 === userId || m.userId2 === userId);
             setMatchCount(userMatches.length);
-            const allUsers = await StorageService.getUsers();
-            if (!isMounted) return;
             const currentUser = allUsers.find(u => u.id === userId);
             const receivedLikes = currentUser?.receivedLikes || [];
             setProfileViewCount(receivedLikes.filter((l: any) => !l.isSuperLike).length);
             setLikesCount(receivedLikes.filter((l: any) => l.isSuperLike).length);
-            const saved = await StorageService.getSavedProperties(userId);
-            if (!isMounted) return;
             setSavedCount(saved.length);
-            const renterCards = await StorageService.getInterestCardsForRenter(userId);
-            if (!isMounted) return;
             setInquirySentCount(renterCards.length);
           }
 
-          if (!isHost) {
-            const cards = await StorageService.getInterestCardsForRenter(userId);
-            if (!isMounted) return;
-            setPendingInterestCount(cards.filter(c => c.status === 'pending').length);
-          }
-
           const { supabase } = await import('../../lib/supabase');
-          const { data } = await supabase
-            .from('profiles')
-            .select('search_paused, search_paused_at')
-            .eq('user_id', userId)
-            .single();
-          if (!isMounted) return;
-          if (data?.search_paused !== undefined) setSearchPaused(!!data.search_paused);
-          if (data?.search_paused_at) setSearchPausedAt(data.search_paused_at);
 
-          const aff = await getAffiliateForUser(userId);
+          const [searchPauseResult, pendingCards, aff] = await Promise.all([
+            supabase
+              .from('profiles')
+              .select('search_paused, search_paused_at')
+              .eq('user_id', userId)
+              .single(),
+            !isHost ? StorageService.getInterestCardsForRenter(userId).catch(() => []) : Promise.resolve([]),
+            getAffiliateForUser(userId).catch(() => null),
+          ]);
           if (!isMounted) return;
+
+          if (searchPauseResult.data?.search_paused !== undefined) setSearchPaused(!!searchPauseResult.data.search_paused);
+          if (searchPauseResult.data?.search_paused_at) setSearchPausedAt(searchPauseResult.data.search_paused_at);
+          if (!isHost) setPendingInterestCount((pendingCards as any[]).filter(c => c.status === 'pending').length);
           setHasAffiliate(!!aff);
 
           try {

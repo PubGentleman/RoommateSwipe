@@ -125,8 +125,17 @@ export const MessagesScreen = () => {
     return () => { unsubscribe(); };
   }, [user?.id]);
 
+  const messagesLastLoadedRef = React.useRef<number>(0);
+  const MESSAGES_STALE_MS = 30000;
+
   useFocusEffect(
     React.useCallback(() => {
+      const now = Date.now();
+      const isStale = now - messagesLastLoadedRef.current > MESSAGES_STALE_MS;
+      if (!isStale && conversations.length > 0) {
+        return;
+      }
+      messagesLastLoadedRef.current = now;
       loadConversations();
     }, [user, isHostMode])
   );
@@ -155,18 +164,24 @@ export const MessagesScreen = () => {
     try {
       setIsLoading(true);
 
-      const localConversations = await StorageService.getConversations();
+      const [localConversations, supaConvResult, hostConvResult, matches, profiles, allUsers] = await Promise.all([
+        StorageService.getConversations().catch(() => [] as Conversation[]),
+        loadConversationsFromSupabase().catch(() => null),
+        (isHostMode && user?.id) ? getHostConversations(user.id).catch(() => []) : Promise.resolve([]),
+        isHostMode ? Promise.resolve([]) : StorageService.getMatches().catch(() => []),
+        isHostMode ? Promise.resolve([]) : StorageService.getRoommateProfiles().catch(() => []),
+        isHostMode ? Promise.resolve([]) : StorageService.getUsers().catch(() => []),
+      ]);
+
       const localConvMap = new Map(localConversations.map(c => [c.id, c]));
 
       let existingConversations: Conversation[] = [];
-      try {
-        const supaConversations = await loadConversationsFromSupabase();
-        existingConversations = supaConversations.map(supaConv => {
+      if (supaConvResult) {
+        existingConversations = supaConvResult.map(supaConv => {
           const localConv = localConvMap.get(supaConv.id);
           return { ...supaConv, messages: localConv?.messages || [] };
         });
-      } catch (supaError) {
-        console.warn('Supabase getConversations failed, falling back to StorageService:', supaError);
+      } else {
         existingConversations = [...localConversations];
       }
 
@@ -177,38 +192,29 @@ export const MessagesScreen = () => {
       }
 
       if (isHostMode && user?.id) {
-        try {
-          const hostConvs = await getHostConversations(user.id);
-          for (const hc of hostConvs) {
-            if (!existingConversations.some(c => c.id === hc.id)) {
-              existingConversations.push({
-                id: hc.id,
-                participant: {
-                  id: hc.participant?.id || '',
-                  name: hc.name || hc.participant?.full_name || 'Renter',
-                  photo: hc.avatar || hc.participant?.avatar_url || undefined,
-                  online: false,
-                },
-                lastMessage: hc.lastMessage || 'New inquiry',
-                timestamp: safeDate(hc.timestamp),
-                unread: hc.unread || 0,
-                messages: [],
-                isInquiryThread: true,
-                hostId: hc.hostId || user.id,
-                inquiryStatus: hc.inquiryStatus,
-                listingId: hc.listingId,
-                listingAddress: hc.listingAddress,
-              } as any);
-            }
+        for (const hc of hostConvResult) {
+          if (!existingConversations.some(c => c.id === hc.id)) {
+            existingConversations.push({
+              id: hc.id,
+              participant: {
+                id: hc.participant?.id || '',
+                name: hc.name || hc.participant?.full_name || 'Renter',
+                photo: hc.avatar || hc.participant?.avatar_url || undefined,
+                online: false,
+              },
+              lastMessage: hc.lastMessage || 'New inquiry',
+              timestamp: safeDate(hc.timestamp),
+              unread: hc.unread || 0,
+              messages: [],
+              isInquiryThread: true,
+              hostId: hc.hostId || user.id,
+              inquiryStatus: hc.inquiryStatus,
+              listingId: hc.listingId,
+              listingAddress: hc.listingAddress,
+            } as any);
           }
-        } catch (e) {
-          console.warn('Failed to load host conversations:', e);
         }
       }
-
-      const matches = isHostMode ? [] : await StorageService.getMatches();
-      const profiles = isHostMode ? [] : await StorageService.getRoommateProfiles();
-      const allUsers = isHostMode ? [] : await StorageService.getUsers();
       const pMap = new Map(profiles.map(p => [p.id, p]));
       const uMap = new Map(allUsers.map(u => [u.id, u]));
       setProfilesMap(pMap);
