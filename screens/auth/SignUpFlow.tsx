@@ -116,13 +116,13 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
     referralCode: '',
   });
 
-  type StepId = 'accountType' | 'credentials' | 'location' | 'details' | 'photo' | 'complete';
+  type StepId = 'accountType' | 'credentials' | 'location' | 'details' | 'complete';
 
   const getSteps = (): StepId[] => {
     if (state.accountType === 'renter') {
-      return ['accountType', 'credentials', 'location', 'photo', 'complete'];
+      return ['accountType', 'credentials', 'location', 'complete'];
     }
-    return ['accountType', 'credentials', 'location', 'details', 'photo', 'complete'];
+    return ['accountType', 'credentials', 'location', 'details', 'complete'];
   };
 
   const steps = getSteps();
@@ -320,19 +320,6 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
     updateState({ licensePhoto: null, licensePhotoValidation: 'none', licenseExpirationDate: null });
   };
 
-  const handlePhotoUpload = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    });
-    if (!result.canceled && result.assets?.[0]) {
-      updateState({ profilePhoto: result.assets[0].uri });
-      setTimeout(goForward, 300);
-    }
-  };
-
   const handleComplete = async () => {
     setIsLoading(true);
     try {
@@ -424,7 +411,6 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
       case 'credentials': return renderCredentials();
       case 'location': return renderLocation();
       case 'details': return renderDetails();
-      case 'photo': return renderPhoto();
       case 'complete': return renderComplete();
       default: return null;
     }
@@ -876,45 +862,6 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
       </View>
     );
   };
-
-  const renderPhoto = () => (
-    <View style={styles.stepContainer}>
-      <OnboardingHeader
-        showBack={currentStep > 0}
-        onBack={goBack}
-        step={currentStep}
-        totalSteps={totalProgressSteps}
-        rightAction={
-          <Pressable onPress={goForward} hitSlop={8}>
-            <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 15 }}>Skip</Text>
-          </Pressable>
-        }
-      />
-      <View style={styles.stepContent}>
-        <Text style={styles.headline}>Add a photo</Text>
-        <Text style={styles.subheadline}>Help others recognize you</Text>
-        <Pressable style={styles.photoCircle} onPress={handlePhotoUpload}>
-          {state.profilePhoto ? (
-            <View style={styles.photoPreview}>
-              <Feather name="check" size={40} color="#22C55E" />
-              <Text style={styles.photoAddedText}>Photo added</Text>
-            </View>
-          ) : (
-            <View style={styles.photoPlaceholder}>
-              <Feather name="camera" size={40} color="rgba(255,255,255,0.3)" />
-            </View>
-          )}
-        </Pressable>
-        <Pressable onPress={handlePhotoUpload} style={styles.photoActionBtn}>
-          <Feather name="image" size={16} color="#FFFFFF" />
-          <Text style={styles.photoActionText}>Choose from Library</Text>
-        </Pressable>
-        <Pressable onPress={goForward} hitSlop={8} style={styles.skipLink}>
-          <Text style={styles.skipLinkText}>Skip for now</Text>
-        </Pressable>
-      </View>
-    </View>
-  );
 
   const renderComplete = () => {
     const subheadlines: Record<AccountType, string> = {
@@ -1388,50 +1335,6 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.6)',
   },
   countChipTextActive: {
-    color: '#FFFFFF',
-  },
-  photoCircle: {
-    width: 160,
-    height: 160,
-    borderRadius: 80,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.1)',
-    borderStyle: 'dashed',
-    alignItems: 'center',
-    justifyContent: 'center',
-    alignSelf: 'center',
-    marginVertical: 32,
-  },
-  photoPlaceholder: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  photoPreview: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  photoAddedText: {
-    fontSize: 12,
-    color: '#22C55E',
-    fontWeight: '600',
-  },
-  photoActionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderRadius: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    alignSelf: 'center',
-    marginBottom: 16,
-  },
-  photoActionText: {
-    fontSize: 14,
-    fontWeight: '600',
     color: '#FFFFFF',
   },
   skipLink: {
