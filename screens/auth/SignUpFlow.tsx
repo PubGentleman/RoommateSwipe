@@ -255,20 +255,8 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
     }
     if (!state.password || state.password.length < 6) { setError('Password must be at least 6 characters'); return; }
 
-    try {
-      const { supabase, isSupabaseConfigured } = await import('../../lib/supabase');
-      if (isSupabaseConfigured) {
-        const { data: existingUser } = await supabase
-          .from('users')
-          .select('id')
-          .eq('email', state.email.trim().toLowerCase())
-          .maybeSingle();
-        if (existingUser) {
-          setError('An account with this email already exists. Please sign in instead.');
-          return;
-        }
-      }
-    } catch (_) {}
+    // Duplicate email check happens server-side in supabase.auth.signUp()
+    // Pre-checking via users table doesn't work for unauthenticated users (RLS)
 
     goForward();
   };

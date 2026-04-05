@@ -717,7 +717,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     if (error) {
+      if (error.message.toLowerCase().includes('already registered') || error.message.toLowerCase().includes('already exists')) {
+        throw new Error('An account with this email already exists. Please sign in instead.');
+      }
       throw new Error(error.message);
+    }
+
+    if (data.user && data.user.identities && data.user.identities.length === 0) {
+      throw new Error('An account with this email already exists. Please sign in instead.');
+    }
+
+    if (!data.user) {
+      throw new Error('Sign up failed. Please try again.');
     }
 
     if (data.user) {
