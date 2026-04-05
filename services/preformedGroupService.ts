@@ -102,24 +102,26 @@ export async function getGroupByInviteCode(code: string): Promise<PreformedGroup
 }
 
 export async function getGroupMembers(groupId: string): Promise<PreformedGroupMember[]> {
-  const { data, error } = await supabase
+  const supabasePromise = supabase
     .from('preformed_group_members')
     .select('*')
     .eq('preformed_group_id', groupId)
-    .order('invited_at', { ascending: true });
+    .order('invited_at', { ascending: true })
+    .then(({ data, error }) => {
+      if (error || !data || data.length === 0) return null;
+      return data as PreformedGroupMember[];
+    })
+    .catch(() => null);
 
-  if (data && data.length > 0) return data as PreformedGroupMember[];
+  const localPromise = AsyncStorage.getItem(`@rhome/preformed_members_${groupId}`)
+    .then(raw => (raw ? JSON.parse(raw) as PreformedGroupMember[] : null))
+    .catch(() => null);
 
-  if ((error || !data || data.length === 0) && shouldLoadMockData()) {
-    try {
-      const local = await AsyncStorage.getItem(`@rhome/preformed_members_${groupId}`);
-      if (local) return JSON.parse(local) as PreformedGroupMember[];
-    } catch (e) {
-      console.warn('[getGroupMembers] Local fallback failed:', e);
-    }
-  }
+  const [supabaseResult, localResult] = await Promise.allSettled([supabasePromise, localPromise]);
+  const supabaseMembers = supabaseResult.status === 'fulfilled' ? supabaseResult.value : null;
+  const localMembers = localResult.status === 'fulfilled' ? localResult.value : null;
 
-  return [];
+  return supabaseMembers || localMembers || [];
 }
 
 export async function joinGroupByCode(userId: string, code: string, userName: string): Promise<{ success: boolean; group?: PreformedGroup }> {
@@ -464,40 +466,28 @@ export async function removeMember(groupId: string, memberId: string): Promise<b
 export async function getUserPreformedGroup(userId: string): Promise<PreformedGroup | null> {
   if (!userId) return null;
 
-  const { data: memberData, error } = await supabase
+  const supabasePromise = supabase
     .from('preformed_group_members')
     .select('preformed_group_id')
     .eq('user_id', userId)
     .eq('status', 'joined')
     .limit(1)
-    .maybeSingle();
+    .maybeSingle()
+    .then(async ({ data: memberData, error }) => {
+      if (error || !memberData) return null;
+      return getGroupById(memberData.preformed_group_id);
+    })
+    .catch(() => null);
 
-  if (error) {
-    console.warn('[getUserPreformedGroup] Supabase query failed, checking local storage');
-    if (shouldLoadMockData()) {
-      try {
-        const local = await AsyncStorage.getItem(`@rhome/preformed_group_${userId}`);
-        if (local) return JSON.parse(local) as PreformedGroup;
-      } catch (e) {
-        console.warn('[getUserPreformedGroup] Local fallback failed:', e);
-      }
-    }
-    return null;
-  }
+  const localPromise = AsyncStorage.getItem(`@rhome/preformed_group_${userId}`)
+    .then(raw => (raw ? JSON.parse(raw) as PreformedGroup : null))
+    .catch(() => null);
 
-  if (!memberData) {
-    if (shouldLoadMockData()) {
-      try {
-        const local = await AsyncStorage.getItem(`@rhome/preformed_group_${userId}`);
-        if (local) return JSON.parse(local) as PreformedGroup;
-      } catch (e) {
-        console.warn('[getUserPreformedGroup] Local fallback failed:', e);
-      }
-    }
-    return null;
-  }
+  const [supabaseResult, localResult] = await Promise.allSettled([supabasePromise, localPromise]);
+  const supabaseGroup = supabaseResult.status === 'fulfilled' ? supabaseResult.value : null;
+  const localGroup = localResult.status === 'fulfilled' ? localResult.value : null;
 
-  return getGroupById(memberData.preformed_group_id);
+  return supabaseGroup || localGroup || null;
 }
 
 export async function convertToRealGroup(preformedGroupId: string): Promise<string | null> {
