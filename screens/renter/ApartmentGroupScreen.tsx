@@ -8,13 +8,13 @@ import {
   FlatList,
   ScrollView,
   Share,
-  Alert,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import * as Linking from 'expo-linking';
 import { Feather } from '../../components/VectorIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../contexts/AuthContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { GroupMemberCard } from '../../components/GroupMemberCard';
 import {
@@ -49,6 +49,7 @@ export default function ApartmentGroupScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const { user } = useAuth();
+  const { confirm, alert: showAlert } = useConfirm();
 
   const [group, setGroup] = useState<PreformedGroup | null>(null);
   const [members, setMembers] = useState<PreformedGroupMember[]>([]);
@@ -123,103 +124,88 @@ export default function ApartmentGroupScreen() {
     const member = members.find(m => m.id === memberId);
     const memberName = member?.name || 'this member';
 
-    const doRemove = async () => {
-      try {
-        setMembers(prev => prev.filter(m => m.id !== memberId));
+    const shouldRemove = await confirm({
+      title: 'Remove Member',
+      message: `Remove ${memberName} from the group?`,
+      confirmText: 'Remove',
+      variant: 'danger',
+    });
 
-        await removeMember(group.id, memberId);
+    if (!shouldRemove) return;
 
-        const freshGroup = await getUserPreformedGroup(user!.id);
-        if (freshGroup) {
-          const freshMembers = await getGroupMembers(freshGroup.id);
-          const filteredMembers = freshMembers.filter(m => m.id !== memberId);
-          setGroup(freshGroup);
-          setMembers(filteredMembers);
+    try {
+      setMembers(prev => prev.filter(m => m.id !== memberId));
+      await removeMember(group.id, memberId);
 
-          const activeMembers = filteredMembers.filter(m => m.status === 'joined');
-          const freshOpenSlots = (freshGroup.group_size || 0) - activeMembers.length;
+      const freshGroup = await getUserPreformedGroup(user!.id);
+      if (freshGroup) {
+        const freshMembers = await getGroupMembers(freshGroup.id);
+        const filteredMembers = freshMembers.filter(m => m.id !== memberId);
+        setGroup(freshGroup);
+        setMembers(filteredMembers);
 
-          if (freshOpenSlots > 0) {
-            Alert.alert(
-              'Member Removed',
-              `Your group now has ${freshOpenSlots} open ${freshOpenSlots === 1 ? 'spot' : 'spots'}. What would you like to do?`,
-              [
-                { text: 'Nothing for Now', style: 'cancel' },
-                {
-                  text: 'Invite a Friend',
-                  onPress: () => shareInvite(),
-                },
-                {
-                  text: 'Find on Rhome',
-                  onPress: async () => {
-                    await enableReplacement(freshGroup.id, freshOpenSlots);
-                    loadData();
-                    Alert.alert(
-                      'You\'re Live!',
-                      'Your group is now visible to roommate seekers. You\'ll get notifications when someone requests to join.',
-                    );
-                  },
-                },
-              ],
-            );
+        const activeMembers = filteredMembers.filter(m => m.status === 'joined');
+        const freshOpenSlots = (freshGroup.group_size || 0) - activeMembers.length;
+
+        if (freshOpenSlots > 0) {
+          const wantFind = await confirm({
+            title: 'Member Removed',
+            message: `Your group now has ${freshOpenSlots} open ${freshOpenSlots === 1 ? 'spot' : 'spots'}. Would you like to find roommates on Rhome?`,
+            confirmText: 'Find Roommates',
+            cancelText: 'Not Now',
+            variant: 'info',
+          });
+
+          if (wantFind) {
+            await enableReplacement(freshGroup.id, freshOpenSlots);
+            loadData();
+            await showAlert({
+              title: 'You\'re Live!',
+              message: 'Your group is now visible to roommate seekers. You\'ll get notifications when someone requests to join.',
+              variant: 'success',
+            });
           }
         }
-      } catch (err) {
-        console.error('[handleRemoveMember] Error:', err);
-        loadData();
       }
-    };
-
-    Alert.alert(
-      'Remove Member',
-      `Remove ${memberName} from the group?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Remove', style: 'destructive', onPress: doRemove },
-      ],
-    );
+    } catch (err) {
+      console.error('[handleRemoveMember] Error:', err);
+      loadData();
+    }
   };
 
-  const handleNeedRoommate = () => {
+  const handleNeedRoommate = async () => {
     if (!group) return;
     const joinedCount = members.filter(m => m.status === 'joined').length;
     const openSlots = (group.group_size || 0) - joinedCount;
 
     if (openSlots > 0) {
-      Alert.alert(
-        'Find a Roommate',
-        `You have ${openSlots} open ${openSlots === 1 ? 'spot' : 'spots'}. Turning this on will make your group visible to people looking for roommates on Rhome. You'll be able to review requests before accepting anyone.`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Find Roommates',
-            onPress: async () => {
-              await enableReplacement(group.id, openSlots);
-              loadData();
-              Alert.alert(
-                'You\'re Live!',
-                'Your group is now visible to roommate seekers. You\'ll get notifications when someone requests to join. You can review their profile and compatibility before accepting.',
-              );
-            },
-          },
-        ],
-      );
+      const shouldFind = await confirm({
+        title: 'Find a Roommate',
+        message: `You have ${openSlots} open ${openSlots === 1 ? 'spot' : 'spots'}. This will make your group visible to people looking for roommates. You can review requests before accepting.`,
+        confirmText: 'Find Roommates',
+        variant: 'info',
+      });
+
+      if (shouldFind) {
+        await enableReplacement(group.id, openSlots);
+        loadData();
+        await showAlert({
+          title: 'You\'re Live!',
+          message: 'Your group is now visible to roommate seekers. You\'ll get notifications when someone requests to join.',
+          variant: 'success',
+        });
+      }
     } else {
-      Alert.alert(
-        'Add More Roommates',
-        `Your group currently has ${joinedCount} members with all spots filled. How many additional roommates would you like to find?`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: '+1 Roommate',
-            onPress: () => expandGroupAndEnable(1),
-          },
-          {
-            text: '+2 Roommates',
-            onPress: () => expandGroupAndEnable(2),
-          },
-        ],
-      );
+      const wantExpand = await confirm({
+        title: 'Add More Roommates',
+        message: `Your group has ${joinedCount} members with all spots filled. Would you like to add a spot and find a new roommate?`,
+        confirmText: 'Add +1 Roommate',
+        variant: 'info',
+      });
+
+      if (wantExpand) {
+        await expandGroupAndEnable(1);
+      }
     }
   };
 
@@ -229,10 +215,11 @@ export default function ApartmentGroupScreen() {
     await updateGroupPreferences(group.id, { group_size: newSize });
     await enableReplacement(group.id, extraSlots);
     loadData();
-    Alert.alert(
-      'You\'re Live!',
-      `Group size updated to ${newSize}. Your group is now visible to roommate seekers looking for a spot.`,
-    );
+    await showAlert({
+      title: 'You\'re Live!',
+      message: `Group size updated to ${newSize}. Your group is now visible to roommate seekers looking for a spot.`,
+      variant: 'success',
+    });
   };
 
   if (loading) {
@@ -334,23 +321,19 @@ export default function ApartmentGroupScreen() {
       {isLead ? (
         <Pressable
           style={styles.needRoommateBanner}
-          onPress={() => {
+          onPress={async () => {
             if (group.needs_replacement) {
-              Alert.alert(
-                'Roommate Finding Active',
-                `Your group is visible to roommate seekers.${openSlots > 0 ? ` ${openSlots} open ${openSlots === 1 ? 'spot' : 'spots'}.` : ''} No join requests yet — we'll notify you when someone is interested.`,
-                [
-                  { text: 'OK' },
-                  {
-                    text: 'Turn Off',
-                    style: 'destructive',
-                    onPress: async () => {
-                      await disableReplacement(group.id);
-                      loadData();
-                    },
-                  },
-                ],
-              );
+              const turnOff = await confirm({
+                title: 'Roommate Finding Active',
+                message: `Your group is visible to roommate seekers.${openSlots > 0 ? ` ${openSlots} open ${openSlots === 1 ? 'spot' : 'spots'}.` : ''} No join requests yet.`,
+                confirmText: 'Turn Off',
+                cancelText: 'Keep Active',
+                variant: 'warning',
+              });
+              if (turnOff) {
+                await disableReplacement(group.id);
+                loadData();
+              }
             } else {
               handleNeedRoommate();
             }
@@ -386,13 +369,14 @@ export default function ApartmentGroupScreen() {
       ) : hasDropout ? (
         <Pressable
           style={styles.needRoommateBanner}
-          onPress={() => {
-            Alert.alert(
-              `${openSlots} ${openSlots === 1 ? 'Spot' : 'Spots'} Open`,
-              group.needs_replacement
+          onPress={async () => {
+            await showAlert({
+              title: `${openSlots} ${openSlots === 1 ? 'Spot' : 'Spots'} Open`,
+              message: group.needs_replacement
                 ? 'Your group lead has turned on roommate finding. New members will need approval to join.'
                 : 'Your group has open spots. Ask your group lead to find a replacement.',
-            );
+              variant: 'info',
+            });
           }}
         >
           <View style={styles.needRoommateIcon}>
@@ -466,9 +450,9 @@ export default function ApartmentGroupScreen() {
                     </View>
                     {isLead ? (
                       <Pressable
-                        onPress={() => {
+                        onPress={async () => {
                           resendGroupInvite(inv.id).catch(() => {});
-                          Alert.alert('Sent!', 'Invite resent.');
+                          await showAlert({ title: 'Sent!', message: 'Invite resent.', variant: 'success' });
                         }}
                         style={styles.resendBtn}
                       >
@@ -587,7 +571,7 @@ export default function ApartmentGroupScreen() {
                     setShowTourForm(false);
                     loadData();
                   } catch (e) {
-                    Alert.alert('Error', 'Failed to schedule tour.');
+                    showAlert({ title: 'Error', message: 'Failed to schedule tour.', variant: 'danger' });
                   } finally {
                     setTourSubmitting(false);
                   }
