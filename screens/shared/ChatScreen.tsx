@@ -245,7 +245,14 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   const [counterProposalMessageId, setCounterProposalMessageId] = useState<string | null>(null);
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [cardActionLoading, setCardActionLoading] = useState<string | null>(null);
-  const [chatAgentInfo, setChatAgentInfo] = useState<{ name?: string; isVerifiedAgent?: boolean; companyName?: string } | null>(null);
+  const [chatHostInfo, setChatHostInfo] = useState<{
+    name?: string;
+    hostType: 'individual' | 'company' | 'agent';
+    isVerifiedAgent?: boolean;
+    companyName?: string;
+    companyId?: string;
+    licenseNumber?: string;
+  } | null>(null);
   const [chatGroupSize, setChatGroupSize] = useState<number>(0);
   const [isGroupLeader, setIsGroupLeader] = useState<boolean>(true);
   const [responseDelayHours, setResponseDelayHours] = useState<number>(0);
@@ -1294,11 +1301,15 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
       const hostId = inquiryGroup?.hostId;
       if (hostId) {
         const hostUser = allUsers.find(u => u.id === hostId);
-        if (hostUser && hostUser.hostType === 'agent') {
-          setChatAgentInfo({
+        if (hostUser) {
+          const hostType = hostUser.hostType || 'individual';
+          setChatHostInfo({
             name: hostUser.full_name || hostUser.name,
-            isVerifiedAgent: !!hostUser.licenseVerified,
-            companyName: hostUser.companyName,
+            hostType,
+            isVerifiedAgent: hostType === 'agent' && !!hostUser.licenseVerified,
+            companyName: hostUser.companyName || undefined,
+            companyId: (hostUser as any).company_id || undefined,
+            licenseNumber: (hostUser as any).licenseNumber || undefined,
           });
         }
       }
@@ -1877,7 +1888,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
               onAcceptBooking={() => {}}
               onDeclineBooking={() => {}}
               actionLoading={false}
-              agentInfo={chatAgentInfo}
+              agentInfo={chatHostInfo}
               groupSize={chatGroupSize}
               isGroupLeader={isGroupLeader}
             />
@@ -1894,7 +1905,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
           onAcceptBooking={handleAcceptBooking}
           onDeclineBooking={handleDeclineBooking}
           actionLoading={cardActionLoading}
-          agentInfo={chatAgentInfo}
+          agentInfo={chatHostInfo}
           groupSize={chatGroupSize}
           isGroupLeader={isGroupLeader}
         />
@@ -1941,9 +1952,39 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
         ]}
       >
         {isHostMessage && !isOwnMessage && isFirstInCluster ? (
-          <View style={styles.hostBadge}>
-            <Feather name="home" size={10} color="#ff6b5b" />
-            <ThemedText style={styles.hostBadgeText}>Host</ThemedText>
+          <View style={[
+            styles.hostBadge,
+            chatHostInfo?.hostType === 'agent'
+              ? { borderLeftColor: '#3b82f6' }
+              : chatHostInfo?.hostType === 'company'
+                ? { borderLeftColor: '#a855f7' }
+                : null,
+          ]}>
+            <Feather
+              name={
+                chatHostInfo?.hostType === 'agent' ? 'briefcase'
+                : chatHostInfo?.hostType === 'company' ? 'building'
+                : 'home'
+              }
+              size={10}
+              color={
+                chatHostInfo?.hostType === 'agent' ? '#3b82f6'
+                : chatHostInfo?.hostType === 'company' ? '#a855f7'
+                : '#ff6b5b'
+              }
+            />
+            <ThemedText style={[
+              styles.hostBadgeText,
+              chatHostInfo?.hostType === 'agent'
+                ? { color: '#3b82f6' }
+                : chatHostInfo?.hostType === 'company'
+                  ? { color: '#a855f7' }
+                  : null,
+            ]}>
+              {chatHostInfo?.hostType === 'agent' ? 'Agent'
+                : chatHostInfo?.hostType === 'company' ? 'Property Mgmt'
+                : 'Host'}
+            </ThemedText>
           </View>
         ) : null}
         {isGroupChat && !isInquiryChat && !isOwnMessage && isFirstInCluster ? (
@@ -2016,10 +2057,19 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
                 backgroundColor: isOwnMessage
                   ? theme.primary
                   : isHostMessage
-                    ? 'rgba(255,107,91,0.15)'
+                    ? chatHostInfo?.hostType === 'agent'
+                      ? 'rgba(59,130,246,0.12)'
+                      : chatHostInfo?.hostType === 'company'
+                        ? 'rgba(168,85,247,0.12)'
+                        : 'rgba(255,107,91,0.15)'
                     : theme.backgroundSecondary,
               },
-              isHostMessage && !isOwnMessage ? { borderLeftWidth: 3, borderLeftColor: '#ff6b5b' } : null,
+              isHostMessage && !isOwnMessage ? {
+                borderLeftWidth: 3,
+                borderLeftColor: chatHostInfo?.hostType === 'agent' ? '#3b82f6'
+                  : chatHostInfo?.hostType === 'company' ? '#a855f7'
+                  : '#ff6b5b',
+              } : null,
             ]}
           >
             <SafeMessageText
@@ -2292,10 +2342,39 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
                     </ThemedText>
                     <PlanBadge plan={otherUserPlan} size={15} />
                   </View>
-                  {chatAgentInfo?.isVerifiedAgent ? (
+                  {chatHostInfo ? (
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 1 }}>
-                      <Feather name="check-circle" size={10} color="#3b82f6" />
-                      <Text style={{ fontSize: 10, fontWeight: '700', color: '#3b82f6' }}>Verified Agent</Text>
+                      {chatHostInfo.hostType === 'agent' && chatHostInfo.isVerifiedAgent ? (
+                        <>
+                          <Feather name="check-circle" size={10} color="#3b82f6" />
+                          <Text style={{ fontSize: 10, fontWeight: '700', color: '#3b82f6' }}>
+                            Verified Agent
+                            {chatHostInfo.companyName ? ` · ${chatHostInfo.companyName}` : ''}
+                          </Text>
+                        </>
+                      ) : chatHostInfo.hostType === 'agent' ? (
+                        <>
+                          <Feather name="briefcase" size={10} color="#3b82f6" />
+                          <Text style={{ fontSize: 10, fontWeight: '600', color: '#3b82f6' }}>
+                            Agent
+                            {chatHostInfo.companyName ? ` · ${chatHostInfo.companyName}` : ''}
+                          </Text>
+                        </>
+                      ) : chatHostInfo.hostType === 'company' ? (
+                        <>
+                          <Feather name="briefcase" size={10} color="#a855f7" />
+                          <Text style={{ fontSize: 10, fontWeight: '600', color: '#a855f7' }}>
+                            {chatHostInfo.companyName || 'Property Management'}
+                          </Text>
+                        </>
+                      ) : (
+                        <>
+                          <Feather name="home" size={10} color="rgba(255,107,91,0.7)" />
+                          <Text style={{ fontSize: 10, fontWeight: '600', color: 'rgba(255,107,91,0.7)' }}>
+                            Independent Host
+                          </Text>
+                        </>
+                      )}
                     </View>
                   ) : canSeeOnlineStatus() ? (
                     <OnlineDot userId={otherUser.id} showLastSeen />
@@ -2696,7 +2775,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
           </ThemedText>
         </View>
       ) : null}
-      {isInquiryChat && !isHost && responseDelayHours >= 48 && !requestedDifferentAgent && chatAgentInfo ? (
+      {isInquiryChat && !isHost && responseDelayHours >= 48 && !requestedDifferentAgent && chatHostInfo ? (
         <Pressable
           style={{
             flexDirection: 'row', alignItems: 'center', gap: 8,
@@ -2704,35 +2783,59 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
             marginHorizontal: 16, marginBottom: 8, padding: 12, borderRadius: 12,
           }}
           onPress={async () => {
-            const shouldRequest = await confirm({
-              title: 'Request Different Agent',
-              message: `${chatAgentInfo.name || 'This agent'} hasn't responded in ${Math.floor(responseDelayHours)} hours. Would you like to request a different agent from their company?`,
-              confirmText: 'Request',
-              cancelText: 'Cancel',
-              variant: 'warning',
-            });
-            if (shouldRequest) {
-              const hostId = inquiryGroup?.hostId;
-              if (hostId) {
-                const allUsers = await StorageService.getUsers();
-                const hostUser = allUsers.find(u => u.id === hostId);
-                const companyId = (hostUser as any)?.company_id || hostId;
-                await requestDifferentAgent(
-                  conversationId,
-                  companyId,
-                  user?.name || 'A renter',
-                  chatAgentInfo.name || 'Agent'
-                );
-                setRequestedDifferentAgent(true);
-                await alert({ title: 'Request Sent', message: 'The company admin has been notified. They will assign a different agent to assist you.' });
+            if (chatHostInfo.hostType === 'agent') {
+              if (chatHostInfo.companyId) {
+                const shouldRequest = await confirm({
+                  title: 'Request Different Agent',
+                  message: `${chatHostInfo.name || 'This agent'} hasn't responded in ${Math.floor(responseDelayHours)} hours. Would you like to request a different agent from their company?`,
+                  confirmText: 'Request',
+                  cancelText: 'Cancel',
+                  variant: 'warning',
+                });
+                if (shouldRequest) {
+                  await requestDifferentAgent(
+                    conversationId,
+                    chatHostInfo.companyId,
+                    user?.name || 'A renter',
+                    chatHostInfo.name || 'Agent'
+                  );
+                  setRequestedDifferentAgent(true);
+                  await alert({ title: 'Request Sent', message: 'The company admin has been notified. They will assign a different agent to assist you.' });
+                }
+              } else {
+                const followUpText = `Hi ${chatHostInfo.name || 'there'}, I sent an inquiry ${Math.floor(responseDelayHours)} hours ago and haven't heard back. Could you please provide an update?`;
+                setInputText(followUpText);
               }
+            } else if (chatHostInfo.hostType === 'company') {
+              const shouldEscalate = await confirm({
+                title: 'Response Delayed',
+                message: `${chatHostInfo.companyName || chatHostInfo.name || 'This company'} hasn't responded in ${Math.floor(responseDelayHours)} hours. Would you like to send a follow-up?`,
+                confirmText: 'Send Follow-up',
+                cancelText: 'Cancel',
+                variant: 'warning',
+              });
+              if (shouldEscalate) {
+                const followUpText = `Hi, I sent an inquiry ${Math.floor(responseDelayHours)} hours ago and haven't heard back. Could you please provide an update?`;
+                setInputText(followUpText);
+              }
+            } else {
+              await alert({
+                title: 'Response Delayed',
+                message: `${chatHostInfo.name || 'This host'} hasn't responded in ${Math.floor(responseDelayHours)} hours. Individual hosts may take longer to respond. You can try sending a follow-up message.`,
+              });
             }
           }}
         >
           <Feather name="alert-circle" size={16} color="#F59E0B" />
           <View style={{ flex: 1 }}>
             <Text style={{ color: '#F59E0B', fontSize: 13, fontWeight: '600' }}>Response delayed ({Math.floor(responseDelayHours)}h)</Text>
-            <Text style={{ color: 'rgba(245,158,11,0.7)', fontSize: 11 }}>Tap to request a different agent</Text>
+            <Text style={{ color: 'rgba(245,158,11,0.7)', fontSize: 11 }}>
+              {chatHostInfo.hostType === 'agent'
+                ? 'Tap to request a different agent'
+                : chatHostInfo.hostType === 'company'
+                  ? 'Tap to send a follow-up'
+                  : 'Tap for options'}
+            </Text>
           </View>
           <Feather name="chevron-right" size={14} color="rgba(245,158,11,0.5)" />
         </Pressable>
@@ -3282,8 +3385,13 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
       <PaywallSheet
         visible={showPaywall}
         featureName={paywallFeature}
-        requiredPlan={user?.hostType === 'agent' ? 'pro' : isHost ? 'pro' : 'elite'}
-        role={user?.hostType === 'agent' ? 'host' : isHost ? 'host' : 'renter'}
+        requiredPlan={
+          user?.hostType === 'agent' ? 'pro'
+          : user?.hostType === 'company' ? 'starter'
+          : isHost ? 'pro'
+          : 'elite'
+        }
+        role={isHost ? 'host' : 'renter'}
         onUpgrade={() => { setShowPaywall(false); (navigation as any).navigate(isHost ? 'HostSubscription' : 'Plans'); }}
         onDismiss={() => setShowPaywall(false)}
       />

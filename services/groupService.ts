@@ -236,16 +236,33 @@ export async function createListingInquiryGroup(
     if (!userId) throw new Error('Not authenticated');
 
     let effectiveHostId = hostId;
+    let hostType: 'individual' | 'company' | 'agent' = 'individual';
     try {
       const { data: listing } = await supabase
         .from('listings')
-        .select('assigned_agent_id')
+        .select('assigned_agent_id, host_type')
         .eq('id', listingId)
         .single();
       if (listing?.assigned_agent_id) {
         effectiveHostId = listing.assigned_agent_id;
+        hostType = 'agent';
+      } else if (listing?.host_type) {
+        hostType = listing.host_type;
       }
     } catch (e) { console.warn('[groupService] Agent lookup failed:', e); }
+
+    if (hostType === 'individual') {
+      try {
+        const { data: hostUser } = await supabase
+          .from('users')
+          .select('host_type')
+          .eq('id', effectiveHostId)
+          .single();
+        if (hostUser?.host_type) {
+          hostType = hostUser.host_type;
+        }
+      } catch (e) {}
+    }
 
     let renterIds: string[] = [];
 
@@ -268,6 +285,7 @@ export async function createListingInquiryGroup(
         type: 'listing_inquiry',
         listing_id: listingId,
         host_id: effectiveHostId,
+        host_type: hostType,
         listing_address: listingAddress,
         source_group_id: sourceGroupId,
         created_by: userId,
@@ -301,11 +319,15 @@ export async function createListingInquiryGroup(
     console.warn('[groupService] Supabase createListingInquiryGroup failed, using local fallback:', supaError);
     const { StorageService } = await import('../utils/storage');
     let fallbackHostId = hostId;
+    let fallbackHostType: 'individual' | 'company' | 'agent' = 'individual';
     try {
       const listings = await StorageService.getListings();
       const listing = listings.find((l: any) => l.id === listingId);
       if (listing?.assigned_agent_id) {
         fallbackHostId = listing.assigned_agent_id;
+        fallbackHostType = 'agent';
+      } else if (listing?.host_type) {
+        fallbackHostType = listing.host_type;
       }
     } catch (e) { console.warn('[groupService] Fallback listing lookup failed:', e); }
     const localGroup = {
@@ -314,6 +336,7 @@ export async function createListingInquiryGroup(
       type: 'listing_inquiry' as const,
       listing_id: listingId,
       host_id: fallbackHostId,
+      host_type: fallbackHostType,
       listing_address: listingAddress,
       source_group_id: sourceGroupId,
       created_by: 'local',
