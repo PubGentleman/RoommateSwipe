@@ -16,6 +16,114 @@ const DAILY_LIMITS: Record<string, number> = {
   agent_business: 500,
 };
 
+const NEIGHBORHOOD_KEYWORDS = [
+  'neighborhood', 'area', 'safe', 'safety', 'crime', 'transit', 'commute', 'subway',
+  'walkable', 'walkability', 'vibe', 'nightlife', 'grocery', 'park', 'gym',
+  'rent', 'median rent', 'expensive', 'affordable', 'cheap',
+  'noisy', 'quiet', 'loud', 'compare', 'vs', 'versus', 'better',
+  'move to', 'live in', 'living in', 'what about', 'tell me about',
+  'how is', 'how\'s', 'is it safe', 'what\'s it like',
+];
+
+const KNOWN_NEIGHBORHOODS = [
+  'Park Slope', 'Williamsburg', 'Bushwick', 'Greenpoint', 'Crown Heights',
+  'Bed-Stuy', 'Bedford-Stuyvesant', 'Carroll Gardens', 'Flatbush', 'Bay Ridge',
+  'Sunset Park', 'Clinton Hill', 'Gowanus', 'Ditmas Park', 'Prospect Heights',
+  'Downtown Brooklyn', 'Bensonhurst', 'Cobble Hill', 'Boerum Hill', 'Brooklyn Heights',
+  'DUMBO', 'Fort Greene', 'Red Hook',
+  'Harlem', 'East Harlem', 'Washington Heights', "Hell's Kitchen", 'Hells Kitchen',
+  'Upper West Side', 'Upper East Side', 'Midtown', 'Midtown East', 'Midtown West',
+  'Chelsea', 'Tribeca', 'Lower East Side', 'East Village', 'West Village',
+  'Greenwich Village', 'SoHo', 'NoHo', 'NoLita', 'Murray Hill', 'Morningside Heights',
+  'Inwood', 'Financial District', 'Gramercy', 'Flatiron', 'Kips Bay',
+  'Astoria', 'Long Island City', 'LIC', 'Jackson Heights', 'Flushing',
+  'Woodside', 'Forest Hills', 'Ridgewood', 'Sunnyside',
+  'Riverdale', 'Fordham', 'South Bronx', 'Pelham Bay',
+  'Jersey City', 'Hoboken',
+];
+
+const NEIGHBORHOOD_ALIASES: Record<string, string> = {
+  'les': 'Lower East Side', 'uws': 'Upper West Side', 'ues': 'Upper East Side',
+  'lic': 'Long Island City', 'fidi': 'Financial District', 'ev': 'East Village',
+  'wv': 'West Village', 'bed stuy': 'Bed-Stuy', 'hells kitchen': "Hell's Kitchen",
+  'soho': 'SoHo', 'noho': 'NoHo', 'nolita': 'NoLita',
+  'south bronx': 'South Bronx', 'jc': 'Jersey City',
+};
+
+function extractNeighborhoodsFromMessage(message: string): string[] {
+  const lower = message.toLowerCase().replace(/[?!.,]/g, '');
+  const found: string[] = [];
+  for (const [alias, canonical] of Object.entries(NEIGHBORHOOD_ALIASES)) {
+    if (lower.includes(alias) && !found.includes(canonical)) found.push(canonical);
+  }
+  for (const name of KNOWN_NEIGHBORHOODS) {
+    if (lower.includes(name.toLowerCase()) && !found.includes(name)) found.push(name);
+  }
+  return found;
+}
+
+function detectNeighborhoodQuestion(message: string): boolean {
+  const lower = message.toLowerCase();
+  const hasKeyword = NEIGHBORHOOD_KEYWORDS.some(kw => lower.includes(kw));
+  const hasNeighborhood = extractNeighborhoodsFromMessage(message).length > 0;
+  return hasKeyword || hasNeighborhood;
+}
+
+async function getNeighborhoodInfo(supabase: any, name: string): Promise<any | null> {
+  const cleaned = name.trim();
+  const aliasKey = cleaned.toLowerCase();
+  const resolvedName = NEIGHBORHOOD_ALIASES[aliasKey] || cleaned;
+  const { data } = await supabase.from('neighborhood_data').select('*').ilike('neighborhood', resolvedName).limit(1).maybeSingle();
+  if (data) return data;
+  const { data: fuzzy } = await supabase.from('neighborhood_data').select('*').ilike('neighborhood', `%${resolvedName}%`).limit(1).maybeSingle();
+  return fuzzy;
+}
+
+function formatNeighborhoodDataForAssistant(n: any): string {
+  return `
+NEIGHBORHOOD: ${n.neighborhood}, ${n.borough}
+Safety: ${n.safety_score}/100 — ${n.safety_summary}
+Tips: ${n.safety_tips}
+Crime trend: ${n.crime_trend} (${n.crime_trend_percent > 0 ? '+' : ''}${n.crime_trend_percent}% YoY)${n.violent_crime_count !== null ? `\nViolent crimes (yearly): ${n.violent_crime_count}` : ''}${n.property_crime_count !== null ? `\nProperty crimes (yearly): ${n.property_crime_count}` : ''}${n.comparison_to_borough_avg !== null ? `\nVs borough average: ${n.comparison_to_borough_avg > 0 ? '+' : ''}${n.comparison_to_borough_avg}%` : ''}
+Transit: ${n.transit_score}/100 — ${n.transit_summary}
+Subway: ${n.nearby_subway_lines?.join(', ') || 'none'}
+Walkability: ${n.walkability_score}/100
+Nightlife: ${n.nightlife_rating}/5 | Noise: ${n.noise_level}
+Vibe: ${n.vibe_tags?.join(', ') || 'unknown'} — ${n.vibe_summary}
+Median rents: 1BR $${n.median_rent_1br} | 2BR $${n.median_rent_2br}`;
+}
+
+async function getNeighborhoodContextForAssistant(supabase: any, message: string, profile: any): Promise<string> {
+  if (!detectNeighborhoodQuestion(message)) return '';
+
+  const neighborhoods = extractNeighborhoodsFromMessage(message);
+  const toFetch: string[] = [...neighborhoods];
+
+  if (toFetch.length === 0 && profile?.neighborhood) {
+    toFetch.push(profile.neighborhood);
+  }
+  if (toFetch.length === 0 && profile?.preferred_neighborhoods?.length) {
+    toFetch.push(...profile.preferred_neighborhoods.slice(0, 2));
+  }
+  if (toFetch.length === 0) return '';
+
+  const results: any[] = [];
+  for (const name of toFetch.slice(0, 4)) {
+    try {
+      const data = await getNeighborhoodInfo(supabase, name);
+      if (data) results.push(data);
+    } catch {}
+  }
+  if (results.length === 0) return '';
+
+  let context = '\n\nNEIGHBORHOOD DATA (use this when answering):';
+  for (const n of results) {
+    context += formatNeighborhoodDataForAssistant(n);
+  }
+  context += '\n\nUse this data to give specific, data-backed answers. Reference actual scores and place names. Never say you don\'t have data when it\'s provided above.';
+  return context;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', {
@@ -61,9 +169,10 @@ serve(async (req) => {
     const history = await getConversationHistory(supabase, user.id, sessionId);
 
     const memoryContext = buildMemoryContext(aiMemory);
+    const neighborhoodContext = isAgent ? '' : await getNeighborhoodContextForAssistant(supabase, message, profile);
     const systemPrompt = isAgent
       ? buildAgentSystemPrompt(profile, nearbyListings, plan)
-      : buildSystemPrompt(profile, topMatches, nearbyListings, plan, memoryContext);
+      : buildSystemPrompt(profile, topMatches, nearbyListings, plan, memoryContext + neighborhoodContext);
 
     const remainingMessages = dailyLimit - todayCount - 1;
     const conversationMessages = [

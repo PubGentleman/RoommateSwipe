@@ -125,7 +125,7 @@ export function NeighborhoodAISheet({ visible, onClose, listingId, address, neig
 
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 20000);
+      const timeout = setTimeout(() => controller.abort(), 35000);
 
       const response = await fetch(
         `${SUPABASE_URL}/functions/v1/neighborhood-chat`,
@@ -189,24 +189,32 @@ export function NeighborhoodAISheet({ visible, onClose, listingId, address, neig
     setMessages(prev => [...prev, { id: Date.now().toString(), role: 'user', content: messageText }]);
     setLoading(true);
 
-    try {
-      const data = await callChat(messageText);
-      const reply = data?.reply || `Based on what I know about ${neighborhood || 'this area'}, I'd need a bit more data to give you a detailed answer. Try asking about specific topics like transit options, grocery stores, parks, or safety — I can pull real data for those.`;
-      const aiMsg: ChatMessage = { id: (Date.now() + 1).toString(), role: 'assistant', content: reply };
-      setMessages(prev => [...prev, aiMsg]);
-      setConversationHistory(prev => [
-        ...prev,
-        { role: 'user', content: messageText },
-        { role: 'assistant', content: reply },
-      ]);
-    } catch {
-      const loc = neighborhood || address || 'this area';
-      const fallbackReply = `I'm having trouble looking up ${loc} right now. Try asking again in a moment — I'll pull transit, amenity, and safety data for you.`;
-      setMessages(prev => [...prev, { id: 'fb-' + Date.now(), role: 'assistant', content: fallbackReply }]);
-    } finally {
-      setLoading(false);
-      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+    let data: any = null;
+    let attempts = 0;
+    const maxAttempts = 2;
+
+    while (attempts < maxAttempts && !data?.reply) {
+      try {
+        data = await callChat(messageText);
+        if (data?.reply) break;
+      } catch {}
+      attempts++;
+      if (attempts < maxAttempts) {
+        await new Promise(r => setTimeout(r, 1000));
+      }
     }
+
+    const reply = data?.reply || `I'm having trouble pulling live data for ${neighborhood || 'this area'} right now. Give me a sec and try asking again — I should be able to get safety stats, transit info, and nearby spots for you.`;
+    const aiMsg: ChatMessage = { id: (Date.now() + 1).toString(), role: 'assistant', content: reply };
+    setMessages(prev => [...prev, aiMsg]);
+    setConversationHistory(prev => [
+      ...prev,
+      { role: 'user', content: messageText },
+      { role: 'assistant', content: reply },
+    ]);
+
+    setLoading(false);
+    setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
   }
 
   function ScorePill({ label, score, iconName }: { label: string; score: number; iconName: string }) {

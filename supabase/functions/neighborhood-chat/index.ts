@@ -32,7 +32,8 @@ async function fetchNYCCrimeData(lat: number, lng: number): Promise<CrimeSummary
       categories[normalized] = (categories[normalized] || 0) + 1;
     }
     return { total: data.length, categories, period: '90 days' };
-  } catch {
+  } catch (err) {
+    console.error('[neighborhood-chat] NYC crime data fetch failed:', err);
     return null;
   }
 }
@@ -53,7 +54,8 @@ async function fetchWalkScore(address: string, lat: number, lng: number): Promis
       transit: data.transit?.score ?? null,
       bike: data.bike?.score ?? null,
     };
-  } catch {
+  } catch (err) {
+    console.error('[neighborhood-chat] Walk Score fetch failed:', err);
     return null;
   }
 }
@@ -109,7 +111,8 @@ async function fetchOverpassAmenities(lat: number, lng: number): Promise<{
     }
     groceryList.sort((a, b) => a.distance - b.distance);
     return { transitStops, restaurants, cafes, grocery: groceryList.slice(0, 3), parks, laundromats };
-  } catch {
+  } catch (err) {
+    console.error('[neighborhood-chat] Overpass amenities fetch failed:', err);
     return null;
   }
 }
@@ -170,10 +173,99 @@ function buildDataContext(
   }
 
   if (sections.length === 0) {
-    return 'Limited neighborhood data available for this area.';
+    return '';
   }
 
   return sections.join('\n\n');
+}
+
+async function fetchPreSeededData(supabase: any, neighborhoodName: string): Promise<string | null> {
+  if (!neighborhoodName) return null;
+
+  try {
+    let { data } = await supabase
+      .from('neighborhood_data')
+      .select('*')
+      .ilike('neighborhood', neighborhoodName.trim())
+      .limit(1)
+      .maybeSingle();
+
+    if (!data) {
+      const result = await supabase
+        .from('neighborhood_data')
+        .select('*')
+        .ilike('neighborhood', `%${neighborhoodName.trim()}%`)
+        .limit(1)
+        .maybeSingle();
+      data = result.data;
+    }
+
+    if (!data) return null;
+
+    const lines: string[] = [];
+
+    if (data.safety_score !== null) {
+      lines.push(`SAFETY DATA:`);
+      lines.push(`Safety score: ${data.safety_score}/100`);
+      if (data.safety_summary) lines.push(`Summary: ${data.safety_summary}`);
+      if (data.safety_tips) lines.push(`Safety tips: ${data.safety_tips}`);
+      if (data.total_incidents_yearly) lines.push(`Annual incidents: ${data.total_incidents_yearly}`);
+      if (data.violent_crime_count !== null) lines.push(`Violent crimes (annual): ${data.violent_crime_count}`);
+      if (data.property_crime_count !== null) lines.push(`Property crimes (annual): ${data.property_crime_count}`);
+      if (data.crime_trend) lines.push(`Crime trend: ${data.crime_trend} (${data.crime_trend_percent > 0 ? '+' : ''}${data.crime_trend_percent}% YoY)`);
+      if (data.comparison_to_borough_avg !== null) lines.push(`Compared to borough average: ${data.comparison_to_borough_avg > 0 ? '+' : ''}${data.comparison_to_borough_avg}%`);
+    }
+
+    if (data.transit_score !== null || data.nearby_subway_lines?.length) {
+      lines.push(`\nTRANSIT DATA:`);
+      if (data.transit_score !== null) lines.push(`Transit score: ${data.transit_score}/100`);
+      if (data.transit_summary) lines.push(`Transit: ${data.transit_summary}`);
+      if (data.nearby_subway_lines?.length) lines.push(`Subway lines: ${data.nearby_subway_lines.join(', ')}`);
+      if (data.subway_stations?.length) lines.push(`Stations: ${data.subway_stations.join(', ')}`);
+      if (data.avg_commute_midtown_min) lines.push(`Commute to Midtown: ~${data.avg_commute_midtown_min} min`);
+      if (data.avg_commute_downtown_min) lines.push(`Commute to Downtown: ~${data.avg_commute_downtown_min} min`);
+      if (data.bus_lines?.length) lines.push(`Bus lines: ${data.bus_lines.join(', ')}`);
+    }
+
+    if (data.walkability_score !== null) {
+      lines.push(`\nWALKABILITY: ${data.walkability_score}/100`);
+    }
+
+    if (data.grocery_stores?.length || data.parks?.length || data.gyms?.length) {
+      lines.push(`\nNEARBY AMENITIES:`);
+      if (data.grocery_stores?.length) lines.push(`Grocery: ${data.grocery_stores.join(', ')}`);
+      if (data.parks?.length) lines.push(`Parks: ${data.parks.join(', ')}`);
+      if (data.gyms?.length) lines.push(`Gyms: ${data.gyms.join(', ')}`);
+      if (data.laundromats) lines.push(`Laundromats: ${data.laundromats}`);
+      if (data.coffee_shops) lines.push(`Coffee shops: ${data.coffee_shops}`);
+    }
+
+    if (data.nightlife_rating || data.restaurant_density) {
+      lines.push(`\nNIGHTLIFE & DINING:`);
+      if (data.nightlife_rating) lines.push(`Nightlife rating: ${data.nightlife_rating}/5`);
+      if (data.restaurant_density) lines.push(`Restaurant density: ${data.restaurant_density}`);
+    }
+
+    if (data.vibe_summary || data.vibe_tags?.length) {
+      lines.push(`\nVIBE:`);
+      if (data.vibe_tags?.length) lines.push(`Tags: ${data.vibe_tags.join(', ')}`);
+      if (data.vibe_summary) lines.push(`${data.vibe_summary}`);
+      if (data.noise_level) lines.push(`Noise level: ${data.noise_level}`);
+      if (data.avg_age_range) lines.push(`Typical age range: ${data.avg_age_range}`);
+    }
+
+    if (data.median_rent_1br || data.median_rent_2br) {
+      lines.push(`\nMEDIAN RENTS:`);
+      if (data.median_rent_1br) lines.push(`1BR: $${data.median_rent_1br}/mo`);
+      if (data.median_rent_2br) lines.push(`2BR: $${data.median_rent_2br}/mo`);
+      if (data.median_rent_3br) lines.push(`3BR: $${data.median_rent_3br}/mo`);
+    }
+
+    return lines.join('\n');
+  } catch (err) {
+    console.error('[neighborhood-chat] Pre-seeded data fetch failed:', err);
+    return null;
+  }
 }
 
 serve(async (req) => {
@@ -220,7 +312,7 @@ serve(async (req) => {
 
       if (listing) {
         neighborhoodName = neighborhoodName || listing.neighborhood || listing.city || '';
-        cityName = cityName || listing.city || '';
+        cityName = listing.city || cityName || '';
         lat = listing.lat;
         lng = listing.lng;
         fullAddress = `${listing.address}, ${listing.city}, ${listing.state} ${listing.zip}`;
@@ -231,24 +323,39 @@ Rent: $${listing.rent}/mo | ${listing.bedrooms}bd/${listing.bathrooms}ba`;
       }
     }
 
-    let dataContext = 'No real-time neighborhood data available for this area.';
+    const preSeededData = await fetchPreSeededData(supabase, neighborhoodName);
 
+    let liveDataContext = '';
     if (lat && lng) {
       const nyc = isNYCArea(cityName, '', lat, lng);
 
-      const [crimeData, walkScores, amenities] = await Promise.all([
-        nyc ? fetchNYCCrimeData(lat, lng) : Promise.resolve(null),
-        fetchWalkScore(fullAddress || `${neighborhoodName}, ${cityName}`, lat, lng),
-        fetchOverpassAmenities(lat, lng),
-      ]);
+      try {
+        const [crimeData, walkScores, amenities] = await Promise.all([
+          nyc ? fetchNYCCrimeData(lat, lng).catch(() => null) : Promise.resolve(null),
+          fetchWalkScore(fullAddress || `${neighborhoodName}, ${cityName}`, lat, lng).catch(() => null),
+          fetchOverpassAmenities(lat, lng).catch(() => null),
+        ]);
+        liveDataContext = buildDataContext(crimeData, walkScores, amenities, nyc);
+      } catch (err) {
+        console.error('[neighborhood-chat] Live data fetch failed:', err);
+      }
+    }
 
-      dataContext = buildDataContext(crimeData, walkScores, amenities, nyc);
+    let dataContext: string;
+    if (preSeededData && liveDataContext && liveDataContext !== 'No real-time neighborhood data available for this area.' && liveDataContext !== 'Limited neighborhood data available for this area.') {
+      dataContext = `PRE-SEEDED NEIGHBORHOOD DATA:\n${preSeededData}\n\nLIVE DATA (last 90 days):\n${liveDataContext}`;
+    } else if (preSeededData) {
+      dataContext = preSeededData;
+    } else if (liveDataContext) {
+      dataContext = liveDataContext;
+    } else {
+      dataContext = 'Limited neighborhood data available. Give honest answers based on general knowledge of this NYC neighborhood.';
     }
 
     const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
     if (!apiKey) {
       return new Response(JSON.stringify({
-        reply: `Based on available data for ${neighborhoodName || 'this area'}: ${dataContext.split('\n')[0]}. For more specific details, I'd recommend visiting the neighborhood at different times of day.`,
+        reply: `Based on available data for ${neighborhoodName || 'this area'}: ${dataContext.split('\n')[0]}. For more specific details, try asking again shortly.`,
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -263,14 +370,17 @@ REAL DATA ABOUT THIS AREA:
 ${dataContext}
 
 RULES:
-- Give a specific, honest 2-3 sentence answer based on the real data above
-- Reference actual numbers, scores, and place names from the data
-- NEVER say "check local forums" or give vague advice like "visit the area" or "look it up online"
-- If crime data is available, use it honestly — don't sensationalize but don't sugarcoat
+- ALWAYS give a direct, specific answer to the user's question — never deflect with "I'd need more data"
+- Reference actual numbers, scores, and place names from the data above
+- If safety data is available (safety score, crime stats, crime trend), USE IT to answer safety questions directly. Give the score, summarize incidents, mention the trend, and share safety tips.
+- If crime data shows low numbers, say it's relatively safe. If high, be honest but constructive (mention the trend direction, compare to borough average if available)
+- For "is it safe at night?" specifically: use the safety score, violent crime count, crime trend, and safety tips to give a direct answer. Don't dodge this question.
+- NEVER say "check local forums", "I'd need more data", "visit the area", or "look it up online"
+- NEVER say "I don't have data" when data IS provided above — read and use it
 - If Walk Score is available, reference it to characterize walkability
-- For cities where crime data isn't available, use Walk Score and amenity data and be transparent: "Based on walkability and amenity data for this area..."
-- Keep it conversational and concise
-- If asked about something the data doesn't cover, give your best informed answer based on the neighborhood characteristics shown in the data, and be upfront about what you're inferring vs what you know`;
+- For areas where specific data isn't available, give your best informed answer based on the neighborhood characteristics shown, and be upfront about what you're inferring vs what the data shows
+- Keep it conversational and concise — 3-5 sentences unless more detail is genuinely needed
+- Be honest about tradeoffs — don't sugarcoat but don't sensationalize either`;
 
     try {
       const anthropic = new Anthropic({ apiKey });
@@ -302,7 +412,7 @@ RULES:
       });
 
     } catch (claudeError) {
-      console.error('Claude API error in neighborhood-chat:', claudeError);
+      console.error('[neighborhood-chat] Claude API error:', claudeError);
       return new Response(JSON.stringify({
         reply: `Based on data for ${neighborhoodName || 'this area'}: ${dataContext.split('\n')[0]}. I'm having trouble with a detailed analysis right now, but feel free to try again.`,
       }), {
@@ -311,7 +421,7 @@ RULES:
     }
 
   } catch (error) {
-    console.error('neighborhood-chat error:', error);
+    console.error('[neighborhood-chat] error:', error);
     return new Response(JSON.stringify({
       reply: 'I ran into an issue looking that up. Try asking again in a moment.',
     }), {

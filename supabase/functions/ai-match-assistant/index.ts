@@ -624,7 +624,7 @@ Nightlife: ${n.nightlife_rating}/5 | Restaurants: ${n.restaurant_density} densit
 Noise: ${n.noise_level}
 Vibe: ${n.vibe_tags?.join(', ') || 'unknown'} — ${n.vibe_summary}
 Median rents: 1BR $${n.median_rent_1br} | 2BR $${n.median_rent_2br} | 3BR $${n.median_rent_3br}
-Age range: ${n.avg_age_range}`;
+Age range: ${n.avg_age_range}${n.violent_crime_count !== null ? `\nViolent crimes (yearly): ${n.violent_crime_count}` : ''}${n.property_crime_count !== null ? `\nProperty crimes (yearly): ${n.property_crime_count}` : ''}${n.comparison_to_borough_avg !== null ? `\nVs borough average: ${n.comparison_to_borough_avg > 0 ? '+' : ''}${n.comparison_to_borough_avg}%` : ''}`;
 }
 
 async function getNeighborhoodContext(supabase: any, message: string, profile: any, listingContext: any): Promise<string> {
