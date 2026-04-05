@@ -87,7 +87,11 @@ export async function getConversations(userId: string) {
 export async function getMessages(matchId: string, limit = 50, offset = 0) {
   const { data, error } = await supabase
     .from('messages')
-    .select('*')
+    .select(`
+      *,
+      reply_to:reply_to_id(id, content, sender_id),
+      reactions:message_reactions(id, emoji, user_id)
+    `)
     .eq('match_id', matchId)
     .order('created_at', { ascending: true })
     .range(offset, offset + limit - 1);
@@ -445,4 +449,110 @@ export function joinChatPresence(
       supabase.removeChannel(channel);
     },
   };
+}
+
+export async function addReaction(messageId: string, userId: string, emoji: string) {
+  const { error } = await supabase
+    .from('message_reactions')
+    .upsert({ message_id: messageId, user_id: userId, emoji }, { onConflict: 'message_id,user_id,emoji' });
+  if (error) throw error;
+}
+
+export async function removeReaction(messageId: string, userId: string, emoji: string) {
+  const { error } = await supabase
+    .from('message_reactions')
+    .delete()
+    .eq('message_id', messageId)
+    .eq('user_id', userId)
+    .eq('emoji', emoji);
+  if (error) throw error;
+}
+
+export async function getReactions(messageIds: string[]) {
+  if (!messageIds.length) return {};
+  const { data, error } = await supabase
+    .from('message_reactions')
+    .select('id, message_id, user_id, emoji')
+    .in('message_id', messageIds);
+  if (error) throw error;
+
+  const grouped: Record<string, { emoji: string; userIds: string[]; count: number }[]> = {};
+  (data || []).forEach((r: any) => {
+    if (!grouped[r.message_id]) grouped[r.message_id] = [];
+    const existing = grouped[r.message_id].find((e: any) => e.emoji === r.emoji);
+    if (existing) {
+      existing.userIds.push(r.user_id);
+      existing.count++;
+    } else {
+      grouped[r.message_id].push({ emoji: r.emoji, userIds: [r.user_id], count: 1 });
+    }
+  });
+  return grouped;
+}
+
+export async function sendReplyMessage(
+  userId: string, matchId: string, content: string, replyToId: string
+) {
+  await checkMessagingPaywall(userId, matchId);
+  const { data, error } = await supabase
+    .from('messages')
+    .insert({ match_id: matchId, sender_id: userId, content, reply_to_id: replyToId })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteMessage(messageId: string, userId: string) {
+  const { error } = await supabase
+    .from('messages')
+    .update({ deleted_at: new Date().toISOString(), content: 'This message was deleted' })
+    .eq('id', messageId)
+    .eq('sender_id', userId);
+  if (error) throw error;
+}
+
+export async function editMessage(messageId: string, userId: string, newContent: string) {
+  const { error } = await supabase
+    .from('messages')
+    .update({ content: newContent, edited_at: new Date().toISOString() })
+    .eq('id', messageId)
+    .eq('sender_id', userId);
+  if (error) throw error;
+}
+
+export async function sendVoiceMessage(
+  userId: string, matchId: string, audioUri: string, durationMs: number
+) {
+  await checkMessagingPaywall(userId, matchId);
+
+  const fileName = `voice_${userId}_${Date.now()}.m4a`;
+  const filePath = `voice-messages/${matchId}/${fileName}`;
+
+  const response = await fetch(audioUri);
+  const blob = await response.blob();
+
+  const { error: uploadError } = await supabase.storage
+    .from('chat-media')
+    .upload(filePath, blob, { contentType: 'audio/m4a' });
+  if (uploadError) throw uploadError;
+
+  const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+    .from('chat-media')
+    .createSignedUrl(filePath, 60 * 60 * 24 * 7);
+  const audioUrl = signedUrlData?.signedUrl || filePath;
+
+  const { data, error } = await supabase
+    .from('messages')
+    .insert({
+      match_id: matchId,
+      sender_id: userId,
+      content: 'Voice message',
+      message_type: 'voice',
+      metadata: { audioUrl, durationMs, filePath },
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
 }

@@ -332,6 +332,12 @@ export interface Message {
   readAt?: Date;
   message_type?: string;
   metadata?: Record<string, any>;
+  reply_to_id?: string;
+  reply_to?: { id: string; content: string; sender_id: string } | null;
+  reactions?: { id: string; emoji: string; user_id: string }[];
+  edited_at?: string | null;
+  deleted_at?: string | null;
+  senderName?: string;
 }
 
 export interface Conversation {

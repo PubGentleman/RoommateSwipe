@@ -16,7 +16,7 @@ import { PaywallSheet } from '../../components/PaywallSheet';
 import { RhomeAISheet, ScreenContext } from '../../components/RhomeAISheet';
 import { AIFloatingButton } from '../../components/AIFloatingButton';
 import { useNotificationContext } from '../../contexts/NotificationContext';
-import { getMessages as getSupabaseMessages, sendMessage as sendSupabaseMessage, markMessagesAsRead as markSupabaseMessagesAsRead, subscribeToMessages, joinChatPresence } from '../../services/messageService';
+import { getMessages as getSupabaseMessages, sendMessage as sendSupabaseMessage, markMessagesAsRead as markSupabaseMessagesAsRead, subscribeToMessages, joinChatPresence, addReaction, removeReaction, getReactions, sendReplyMessage, deleteMessage as deleteMessageService, editMessage as editMessageService, sendVoiceMessage } from '../../services/messageService';
 import { recordMessageActivity } from '../../utils/aiMemory';
 import { acceptInquiry, declineInquiry, linkListingToGroup, leaveGroup, removeMember, getGroupMessages, sendGroupMessage, subscribeToGroupMessages } from '../../services/groupService';
 import { supabase } from '../../lib/supabase';
@@ -25,7 +25,7 @@ import { normalizeRenterPlan, getRenterPlanLimits } from '../../constants/renter
 import { getProfileGateStatus, getItemsForTier, ProfileTier } from '../../utils/profileGate';
 import FeatureGateModal from '../../components/FeatureGateModal';
 import { GroupPropertySearchModal } from '../../components/GroupPropertySearchModal';
-import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSequence } from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSequence, FadeIn, FadeInDown } from 'react-native-reanimated';
 import { AdBanner } from '../../components/AdBanner';
 import { getDailyMessageCount, MESSAGING_LIMITS, getTimeUntilMidnight, incrementDailyColdMessageCount } from '../../utils/messagingUtils';
 import SmartUpgradePrompt from '../../components/SmartUpgradePrompt';
@@ -44,6 +44,8 @@ import ChatImageMessage from '../../components/ChatImageMessage';
 import ChatFileMessage from '../../components/ChatFileMessage';
 import { pickImage, takePhoto, pickDocument, uploadChatAttachment } from '../../services/chatAttachmentService';
 import * as Notifications from 'expo-notifications';
+import * as Haptics from 'expo-haptics';
+import * as Clipboard from 'expo-clipboard';
 import { createBooking } from '../../services/bookingService';
 import {
   updateRenterMessageTimestamp,
@@ -58,6 +60,71 @@ import {
   useFreeMessageUnlock,
   getMessagingUpgradePlan,
 } from '../../utils/messagingAccess';
+import { useVoiceRecording } from '../../hooks/useVoiceRecording';
+import VoiceMessageBubble from '../../components/VoiceMessageBubble';
+import LinkPreviewCard from '../../components/LinkPreviewCard';
+import MessageActionsSheet from '../../components/MessageActionsSheet';
+import { extractUrls } from '../../utils/linkPreview';
+
+const QUICK_REACTIONS = ['\uD83D\uDC4D', '\u2764\uFE0F', '\uD83D\uDE02', '\uD83D\uDE2E', '\uD83D\uDE22', '\uD83D\uDD25'];
+const EXTENDED_EMOJIS = [
+  '\uD83D\uDC4D', '\uD83D\uDC4E', '\u2764\uFE0F', '\uD83D\uDE02', '\uD83D\uDE2E', '\uD83D\uDE22', '\uD83D\uDD25',
+  '\uD83C\uDF89', '\uD83D\uDC4F', '\uD83D\uDE4F', '\uD83D\uDC40', '\uD83D\uDCAF', '\u2705', '\u274C',
+  '\uD83E\uDD14', '\uD83D\uDE0D', '\uD83D\uDE0E', '\uD83D\uDE44', '\uD83D\uDE2D', '\uD83D\uDE21',
+  '\uD83D\uDE0A', '\uD83E\uDD18', '\uD83D\uDCAA', '\uD83C\uDF31', '\u2B50', '\uD83D\uDC8E',
+  '\uD83C\uDFE0', '\uD83D\uDD11', '\uD83D\uDCAC', '\uD83D\uDCA1',
+];
+
+type DateSeparatorItem = { type: 'date_separator'; id: string; date: string };
+type ChatListItem = (Message & { type?: 'message'; isLastInCluster?: boolean; isFirstInCluster?: boolean }) | DateSeparatorItem;
+
+function formatDateLabel(date: Date): string {
+  const now = new Date();
+  const d = new Date(date);
+  const diffDays = Math.floor((now.getTime() - d.getTime()) / 86400000);
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Yesterday';
+  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return `${days[d.getDay()]}, ${months[d.getMonth()]} ${d.getDate()}`;
+}
+
+function formatTime(date: Date): string {
+  const d = new Date(date);
+  let h = d.getHours();
+  const m = d.getMinutes().toString().padStart(2, '0');
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+  return `${h}:${m} ${ampm}`;
+}
+
+function buildChatList(messages: Message[]): ChatListItem[] {
+  if (!messages.length) return [];
+  const items: ChatListItem[] = [];
+  let lastDate = '';
+  for (let i = 0; i < messages.length; i++) {
+    const msg = messages[i];
+    const ts = new Date(msg.timestamp);
+    const dateKey = `${ts.getFullYear()}-${ts.getMonth()}-${ts.getDate()}`;
+    if (dateKey !== lastDate) {
+      items.push({ type: 'date_separator', id: `sep-${dateKey}`, date: formatDateLabel(ts) });
+      lastDate = dateKey;
+    }
+    const prev = i > 0 ? messages[i - 1] : null;
+    const next = i < messages.length - 1 ? messages[i + 1] : null;
+    const sameSenderAsPrev = prev && prev.senderId === msg.senderId;
+    const withinClusterPrev = sameSenderAsPrev && (ts.getTime() - new Date(prev.timestamp).getTime() < 120000);
+    const sameSenderAsNext = next && next.senderId === msg.senderId;
+    const withinClusterNext = sameSenderAsNext && (new Date(next.timestamp).getTime() - ts.getTime() < 120000);
+    items.push({
+      ...msg,
+      type: 'message' as const,
+      isFirstInCluster: !withinClusterPrev,
+      isLastInCluster: !withinClusterNext,
+    });
+  }
+  return items;
+}
 
 const TypingDot = ({ delay }: { delay: number }) => {
   const opacity = useSharedValue(0.3);
@@ -161,6 +228,15 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   const [showUnlockModal, setShowUnlockModal] = useState(false);
   const [paywallRequiredPlan, setPaywallRequiredPlan] = useState<string>('elite');
   const isNearBottom = useRef(true);
+  const [replyToMessage, setReplyToMessage] = useState<Message | null>(null);
+  const [activeMessageActions, setActiveMessageActions] = useState<Message | null>(null);
+  const [showReactionBar, setShowReactionBar] = useState<string | null>(null);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [emojiPickerTargetId, setEmojiPickerTargetId] = useState<string | null>(null);
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editText, setEditText] = useState('');
+  const [reactionsMap, setReactionsMap] = useState<Record<string, { emoji: string; userIds: string[]; count: number }[]>>({});
+  const { isRecording, recordingDuration, startRecording, stopRecording, cancelRecording } = useVoiceRecording();
 
   const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
@@ -456,25 +532,34 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
     let isMounted = true;
     const unsubscribe = subscribeToMessages(matchIdFromConversation, (newMsg: any) => {
       if (!isMounted) return;
-      if (newMsg.sender_id !== user?.id || newMsg.sender_id === null || newMsg.is_system_message) {
-        setMessages(prev => {
-          if (prev.some(m => m.id === newMsg.id)) return prev;
-          const mapped: Message = {
-            id: newMsg.id,
-            senderId: newMsg.is_system_message ? 'system' : newMsg.sender_id,
-            text: newMsg.content,
-            content: newMsg.content,
-            timestamp: new Date(newMsg.created_at),
-            read: newMsg.read || false,
-            readAt: newMsg.read_at ? new Date(newMsg.read_at) : undefined,
-            message_type: newMsg.message_type || 'text',
-            metadata: newMsg.metadata || undefined,
-          };
-          return [...prev, mapped];
-        });
-        if (isNearBottom.current) {
-          setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+      const isOwnMsg = newMsg.sender_id === user?.id && !newMsg.is_system_message;
+      setMessages(prev => {
+        if (prev.some(m => m.id === newMsg.id)) return prev;
+        const mapped: Message = {
+          id: newMsg.id,
+          senderId: newMsg.is_system_message ? 'system' : newMsg.sender_id,
+          text: newMsg.content,
+          content: newMsg.content,
+          timestamp: new Date(newMsg.created_at),
+          read: newMsg.read || false,
+          readAt: newMsg.read_at ? new Date(newMsg.read_at) : undefined,
+          message_type: newMsg.message_type || 'text',
+          metadata: newMsg.metadata || undefined,
+          reply_to_id: newMsg.reply_to_id || undefined,
+          reply_to: newMsg.reply_to || undefined,
+          edited_at: newMsg.edited_at || undefined,
+          deleted_at: newMsg.deleted_at || undefined,
+        };
+        if (isOwnMsg) {
+          const optimistic = prev.filter(m => !(m.id.startsWith('voice-') && m.senderId === user?.id && m.message_type === 'voice'));
+          return [...optimistic, mapped];
         }
+        return [...prev, mapped];
+      });
+      if (isNearBottom.current) {
+        setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+      }
+      if (!isOwnMsg) {
         try { markSupabaseMessagesAsRead(user!.id, matchIdFromConversation); } catch (_e) {}
       }
     });
@@ -518,6 +603,176 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
     });
     return () => sub.remove();
   }, [conversationId, inquiryGroup?.id]);
+
+  useEffect(() => {
+    if (messages.length > 0) {
+      const msgIds = messages.map(m => m.id).filter(id => id && !id.startsWith('msg_') && !id.startsWith('sep-'));
+      if (msgIds.length) {
+        getReactions(msgIds).then(setReactionsMap).catch(() => {});
+      }
+    }
+  }, [messages]);
+
+  const processedMessages = useMemo(() => buildChatList(messages), [messages]);
+
+  const handleToggleReaction = useCallback(async (messageId: string, emoji: string) => {
+    if (!user?.id) return;
+    Haptics.selectionAsync();
+    const existing = reactionsMap[messageId];
+    const hasReacted = existing?.some(r => r.emoji === emoji && r.userIds.includes(user.id));
+    try {
+      if (hasReacted) {
+        await removeReaction(messageId, user.id, emoji);
+        setReactionsMap(prev => {
+          const updated = { ...prev };
+          if (updated[messageId]) {
+            updated[messageId] = updated[messageId]
+              .map(r => r.emoji === emoji ? { ...r, userIds: r.userIds.filter(u => u !== user.id), count: r.count - 1 } : r)
+              .filter(r => r.count > 0);
+          }
+          return updated;
+        });
+      } else {
+        await addReaction(messageId, user.id, emoji);
+        setReactionsMap(prev => {
+          const updated = { ...prev };
+          if (!updated[messageId]) updated[messageId] = [];
+          const ex = updated[messageId].find(r => r.emoji === emoji);
+          if (ex) {
+            updated[messageId] = updated[messageId].map(r =>
+              r.emoji === emoji ? { ...r, userIds: [...r.userIds, user.id], count: r.count + 1 } : r
+            );
+          } else {
+            updated[messageId] = [...updated[messageId], { emoji, userIds: [user.id], count: 1 }];
+          }
+          return updated;
+        });
+      }
+    } catch (err) {
+      console.error('Reaction toggle failed:', err);
+    }
+    setShowReactionBar(null);
+  }, [user?.id, reactionsMap]);
+
+  const handleLongPressMessage = useCallback((msg: Message) => {
+    if ((msg as any).deleted_at) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setActiveMessageActions(msg);
+  }, []);
+
+  const handleReplyAction = useCallback((msg: Message) => {
+    setReplyToMessage(msg);
+    setActiveMessageActions(null);
+  }, []);
+
+  const handleCopyAction = useCallback(async (msg: Message) => {
+    await Clipboard.setStringAsync(msg.text || msg.content || '');
+    setActiveMessageActions(null);
+  }, []);
+
+  const handleDeleteAction = useCallback(async (msg: Message) => {
+    if (!user?.id) return;
+    const confirmed = await confirm({
+      title: 'Delete Message',
+      message: 'This message will be removed for everyone.',
+      confirmText: 'Delete',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
+    try {
+      await deleteMessageService(msg.id, user.id);
+      setMessages(prev => prev.map(m =>
+        m.id === msg.id ? { ...m, text: 'This message was deleted', content: 'This message was deleted', deleted_at: new Date().toISOString() } : m
+      ));
+    } catch (err) {
+      console.error('Delete failed:', err);
+    }
+    setActiveMessageActions(null);
+  }, [user?.id, confirm]);
+
+  const handleEditAction = useCallback((msg: Message) => {
+    setEditingMessageId(msg.id);
+    setEditText(msg.text || msg.content || '');
+    setActiveMessageActions(null);
+  }, []);
+
+  const handleSaveEdit = useCallback(async () => {
+    if (!editingMessageId || !user?.id || !editText.trim()) return;
+    try {
+      await editMessageService(editingMessageId, user.id, editText.trim());
+      setMessages(prev => prev.map(m =>
+        m.id === editingMessageId ? { ...m, text: editText.trim(), content: editText.trim(), edited_at: new Date().toISOString() } : m
+      ));
+    } catch (err) {
+      console.error('Edit failed:', err);
+    }
+    setEditingMessageId(null);
+    setEditText('');
+  }, [editingMessageId, user?.id, editText]);
+
+  const handleStartRecording = useCallback(async () => {
+    if (userPlan === 'basic') {
+      setPaywallFeature('Voice Messages');
+      setShowPaywall(true);
+      return;
+    }
+    await startRecording();
+  }, [userPlan, startRecording]);
+
+  const handleStopRecording = useCallback(async () => {
+    const result = await stopRecording();
+    if (result?.uri && user?.id && matchIdFromConversation) {
+      try {
+        const maxDuration = userPlan === 'elite' ? 300000 : 60000;
+        if (result.durationMs > maxDuration) {
+          await alert({ title: 'Too Long', message: `Voice messages are limited to ${userPlan === 'elite' ? '5' : '1'} minute(s).`, variant: 'warning' });
+          return;
+        }
+        const voiceMsg: Message = {
+          id: `voice-${Date.now()}`,
+          senderId: user.id,
+          text: '',
+          content: '',
+          timestamp: new Date(),
+          read: false,
+          message_type: 'voice',
+          metadata: { voice_url: result.uri, duration_ms: result.durationMs },
+        };
+        setMessages(prev => [...prev, voiceMsg]);
+        await sendVoiceMessage(user.id, matchIdFromConversation, result.uri, result.durationMs);
+      } catch (err) {
+        console.error('Voice send failed:', err);
+      }
+    }
+  }, [stopRecording, user?.id, matchIdFromConversation, userPlan]);
+
+  const formatRecordingTime = (secs: number) => {
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  };
+
+  const canEditMessage = (msg: Message) => {
+    if (userPlan === 'basic') return false;
+    const windowMinutes = userPlan === 'elite' ? 30 : 15;
+    const msgTime = new Date(msg.timestamp).getTime();
+    return (Date.now() - msgTime) < windowMinutes * 60 * 1000;
+  };
+
+  const getMessageActions = useCallback((msg: Message) => {
+    const isOwn = msg.senderId === user?.id;
+    const actions: { label: string; icon: string; onPress: () => void; destructive?: boolean }[] = [];
+    actions.push({ label: 'Reply', icon: 'corner-up-left', onPress: () => handleReplyAction(msg) });
+    actions.push({ label: 'Copy', icon: 'copy', onPress: () => handleCopyAction(msg) });
+    if (isOwn && canEditMessage(msg)) {
+      actions.push({ label: 'Edit', icon: 'edit-2', onPress: () => handleEditAction(msg) });
+    }
+    if (isOwn) {
+      actions.push({ label: 'Delete', icon: 'trash-2', onPress: () => handleDeleteAction(msg), destructive: true });
+    }
+    actions.push({ label: 'React', icon: 'smile', onPress: () => { setShowReactionBar(msg.id); setActiveMessageActions(null); } });
+    return actions;
+  }, [user?.id, userPlan, handleReplyAction, handleCopyAction, handleEditAction, handleDeleteAction]);
 
   const handleTextChange = (text: string) => {
     setInputText(text);
@@ -731,6 +986,10 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
             readAt: msg.read_at ? new Date(msg.read_at) : undefined,
             message_type: msg.message_type || 'text',
             metadata: msg.metadata || undefined,
+            reply_to_id: msg.reply_to_id || undefined,
+            reply_to: msg.reply_to || undefined,
+            edited_at: msg.edited_at || undefined,
+            deleted_at: msg.deleted_at || undefined,
           }));
           loadedFromSupabase = true;
           try { markSupabaseMessagesAsRead(user!.id, matchIdFromConversation); } catch (_e) {}
@@ -1010,7 +1269,12 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
         } as any;
         sentViaSupabase = true;
       } else {
-        const supaMsg = await sendSupabaseMessage(user!.id, matchIdFromConversation, inputText.trim());
+        let supaMsg;
+        if (replyToMessage) {
+          supaMsg = await sendReplyMessage(user!.id, matchIdFromConversation, inputText.trim(), replyToMessage.id);
+        } else {
+          supaMsg = await sendSupabaseMessage(user!.id, matchIdFromConversation, inputText.trim());
+        }
         newMessage = {
           id: supaMsg.id,
           senderId: supaMsg.sender_id,
@@ -1018,6 +1282,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
           content: supaMsg.content,
           timestamp: new Date(supaMsg.created_at),
           read: false,
+          reply_to_id: replyToMessage?.id,
+          reply_to: replyToMessage ? { id: replyToMessage.id, content: replyToMessage.text || replyToMessage.content || '', sender_id: replyToMessage.senderId } : undefined,
         };
         sentViaSupabase = true;
       }
@@ -1090,6 +1356,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
 
     setMessages(prev => [...prev, newMessage]);
     setInputText('');
+    setReplyToMessage(null);
     typingPresenceRef.current?.setTyping(false);
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
@@ -1317,42 +1584,55 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
     }
   };
 
-  const renderMessage = ({ item }: { item: Message }) => {
-    if (item.senderId === 'system' || item.senderId === null || (item as any).is_system_message) {
+  const renderChatItem = ({ item }: { item: ChatListItem }) => {
+    if ((item as DateSeparatorItem).type === 'date_separator') {
+      const sep = item as DateSeparatorItem;
       return (
-        <View style={styles.systemMessageContainer}>
-          <View style={styles.systemMessageBubble}>
-            <ThemedText style={styles.systemMessageText}>{item.text}</ThemedText>
+        <View style={styles.dateSeparator}>
+          <View style={styles.dateSeparatorPill}>
+            <Text style={styles.dateSeparatorText}>{sep.date}</Text>
           </View>
         </View>
       );
     }
 
-    const msgType = (item as any).message_type;
-    const isOwnMsg = item.senderId === user?.id;
+    const msg = item as Message & { isLastInCluster?: boolean; isFirstInCluster?: boolean };
 
-    if (msgType === 'image' && (item as any).metadata?.url) {
+    if (msg.senderId === 'system' || msg.senderId === null || (msg as any).is_system_message) {
       return (
-        <View style={{ paddingHorizontal: 12, marginBottom: 8 }}>
-          <ChatImageMessage
-            url={(item as any).metadata.url}
-            isMine={isOwnMsg}
-            timestamp={item.timestamp?.toString() || new Date().toISOString()}
-          />
+        <View style={styles.systemMessageContainer}>
+          <View style={styles.systemMessageBubble}>
+            <ThemedText style={styles.systemMessageText}>{msg.text}</ThemedText>
+          </View>
         </View>
       );
     }
 
-    if (msgType === 'file' && (item as any).metadata?.url) {
+    const msgType = (msg as any).message_type;
+    const isOwnMsg = msg.senderId === user?.id;
+
+    if (msgType === 'image' && (msg as any).metadata?.url) {
+      return (
+        <Pressable onLongPress={() => handleLongPressMessage(msg)} style={{ paddingHorizontal: 12, marginBottom: 8 }}>
+          <ChatImageMessage
+            url={(msg as any).metadata.url}
+            isMine={isOwnMsg}
+            timestamp={msg.timestamp?.toString() || new Date().toISOString()}
+          />
+        </Pressable>
+      );
+    }
+
+    if (msgType === 'file' && (msg as any).metadata?.url) {
       return (
         <View style={{ paddingHorizontal: 12, marginBottom: 8 }}>
           <ChatFileMessage
-            url={(item as any).metadata.url}
-            filename={(item as any).metadata.filename || 'File'}
-            mimeType={(item as any).metadata.mimeType || ''}
-            sizeBytes={(item as any).metadata.sizeBytes || 0}
+            url={(msg as any).metadata.url}
+            filename={(msg as any).metadata.filename || 'File'}
+            mimeType={(msg as any).metadata.mimeType || ''}
+            sizeBytes={(msg as any).metadata.sizeBytes || 0}
             isMine={isOwnMsg}
-            timestamp={item.timestamp?.toString() || new Date().toISOString()}
+            timestamp={msg.timestamp?.toString() || new Date().toISOString()}
           />
         </View>
       );
@@ -1363,7 +1643,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
         return (
           <View style={{ opacity: 0.3, overflow: 'hidden' }}>
             <ChatActionCard
-              message={item}
+              message={msg}
               currentUserId={user?.id || ''}
               onConfirmVisit={() => {}}
               onDeclineVisit={() => {}}
@@ -1380,7 +1660,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
       }
       return (
         <ChatActionCard
-          message={item}
+          message={msg}
           currentUserId={user?.id || ''}
           onConfirmVisit={handleConfirmVisit}
           onDeclineVisit={handleDeclineVisit}
@@ -1395,83 +1675,197 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
       );
     }
 
-    const isOwnMessage = item.senderId === user?.id;
+    const isOwnMessage = msg.senderId === user?.id;
     const showReadReceipt = isOwnMessage && isEliteUser();
     const showLockedReceipt = isOwnMessage && showLockedReadReceipt;
-    const isRead = item.readAt || item.read;
-    const isHostMessage = isInquiryChat && inquiryGroup?.hostId && item.senderId === inquiryGroup.hostId;
+    const isRead = msg.readAt || msg.read;
+    const isHostMessage = isInquiryChat && inquiryGroup?.hostId && msg.senderId === inquiryGroup.hostId;
+    const isHighlighted = msg.id === highlightedId;
+    const isDeleted = !!(msg as any).deleted_at;
+    const isEdited = !!(msg as any).edited_at;
+    const replyTo = (msg as any).reply_to;
+    const msgReactions = reactionsMap[msg.id] || ((msg as any).reactions?.length ? (() => {
+      const grouped: { emoji: string; userIds: string[]; count: number }[] = [];
+      ((msg as any).reactions || []).forEach((r: any) => {
+        const ex = grouped.find(g => g.emoji === r.emoji);
+        if (ex) { ex.userIds.push(r.user_id); ex.count++; }
+        else grouped.push({ emoji: r.emoji, userIds: [r.user_id], count: 1 });
+      });
+      return grouped;
+    })() : []);
+    const isFirstInCluster = (msg as any).isFirstInCluster !== false;
+    const isLastInCluster = (msg as any).isLastInCluster !== false;
+    const messageText = msg.text || msg.content || '';
+    const urls = (userPlan !== 'basic' && !isDeleted) ? extractUrls(messageText) : [];
+    const isVoice = msgType === 'voice' && (msg as any).metadata?.audioUrl;
 
-    const isHighlighted = item.id === highlightedId;
+    const bubbleRadius = isOwnMessage
+      ? { borderTopLeftRadius: 18, borderTopRightRadius: 18, borderBottomLeftRadius: 18, borderBottomRightRadius: isLastInCluster ? 4 : 18 }
+      : { borderTopLeftRadius: 18, borderTopRightRadius: 18, borderBottomRightRadius: 18, borderBottomLeftRadius: isLastInCluster ? 4 : 18 };
 
     const bubbleContent = (
-      <View
+      <Pressable
+        onLongPress={() => !isDeleted && handleLongPressMessage(msg)}
+        delayLongPress={300}
         style={[
           styles.messageContainer,
           isOwnMessage ? styles.ownMessage : styles.otherMessage,
+          !isFirstInCluster ? { marginTop: 2, marginBottom: 0 } : null,
           isHighlighted ? { backgroundColor: 'rgba(255,107,91,0.12)', borderRadius: 16, padding: 4 } : null,
         ]}
       >
-        {isHostMessage && !isOwnMessage ? (
+        {isHostMessage && !isOwnMessage && isFirstInCluster ? (
           <View style={styles.hostBadge}>
             <Feather name="home" size={10} color="#ff6b5b" />
             <ThemedText style={styles.hostBadgeText}>Host</ThemedText>
           </View>
         ) : null}
-        <View
-          style={[
-            styles.messageBubble,
-            {
-              backgroundColor: isOwnMessage
-                ? theme.primary
-                : isHostMessage
-                  ? 'rgba(255,107,91,0.15)'
-                  : theme.backgroundSecondary,
-            },
-            isHostMessage && !isOwnMessage ? { borderLeftWidth: 3, borderLeftColor: '#ff6b5b' } : null,
-          ]}
-        >
-          <SafeMessageText
-            text={item.text}
-            safetyMode={!contactInfoVisible && !isOwnMessage}
-            style={[
-              Typography.body,
-              { color: isOwnMessage ? '#FFFFFF' : theme.text },
-            ]}
-            onUpgradePress={() => navigation.navigate('Plans' as any)}
-            onBookShowingPress={isInquiryChat ? () => {
-              setShowVisitModal(true);
-            } : undefined}
-          />
-        </View>
-        {showReadReceipt ? (
-          <View style={styles.readReceiptContainer}>
-            <Feather
-              name="check"
-              size={12}
-              color={isRead ? theme.primary : theme.textSecondary}
-            />
-            {isRead ? (
-              <Feather
-                name="check"
-                size={12}
-                color={theme.primary}
-                style={{ marginLeft: -6 }}
-              />
-            ) : null}
-            <ThemedText style={[Typography.caption, { color: isRead ? theme.primary : theme.textSecondary, marginLeft: 2, fontSize: 10 }]}>
-              {isRead ? 'Read' : 'Sent'}
-            </ThemedText>
-          </View>
-        ) : showLockedReceipt ? (
+
+        {replyTo && !isDeleted ? (
           <Pressable
-            style={styles.readReceiptContainer}
-            onPress={() => { setPaywallFeature('Read Receipts'); setShowPaywall(true); }}
+            style={styles.replyPreview}
+            onPress={() => {
+              const idx = messages.findIndex(m => m.id === replyTo.id);
+              if (idx >= 0) {
+                setHighlightedId(replyTo.id);
+                flatListRef.current?.scrollToIndex({ index: idx, animated: true, viewPosition: 0.5 });
+                setTimeout(() => setHighlightedId(null), 3000);
+              }
+            }}
           >
-            <Feather name="check" size={12} color="rgba(255,255,255,0.2)" />
-            <PlanBadgeInline plan="Elite" locked />
+            <Text style={styles.replyPreviewName}>
+              {replyTo.sender_id === user?.id ? 'You' : (otherUser?.name?.split(' ')[0] || 'Them')}
+            </Text>
+            <Text style={styles.replyPreviewText} numberOfLines={1}>
+              {(replyTo.content || '').slice(0, 80)}
+            </Text>
           </Pressable>
         ) : null}
-      </View>
+
+        {editingMessageId === msg.id ? (
+          <View style={[styles.messageBubble, { backgroundColor: theme.backgroundSecondary, ...bubbleRadius }]}>
+            <TextInput
+              style={[Typography.body, { color: theme.text, padding: 0 }]}
+              value={editText}
+              onChangeText={setEditText}
+              autoFocus
+              multiline
+              onSubmitEditing={handleSaveEdit}
+            />
+            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 6 }}>
+              <Pressable onPress={() => setEditingMessageId(null)}>
+                <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12 }}>Cancel</Text>
+              </Pressable>
+              <Pressable onPress={handleSaveEdit}>
+                <Text style={{ color: '#ff6b5b', fontSize: 12, fontWeight: '600' }}>Save</Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : isDeleted ? (
+          <View style={[styles.messageBubble, { backgroundColor: 'rgba(255,255,255,0.04)', ...bubbleRadius }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Feather name="slash" size={12} color="rgba(255,255,255,0.3)" />
+              <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 14, fontStyle: 'italic' }}>
+                This message was deleted
+              </Text>
+            </View>
+          </View>
+        ) : isVoice ? (
+          <VoiceMessageBubble
+            audioUrl={(msg as any).metadata.audioUrl}
+            durationMs={(msg as any).metadata.durationMs || 0}
+            isOwnMessage={isOwnMessage}
+          />
+        ) : (
+          <View
+            style={[
+              styles.messageBubble,
+              bubbleRadius,
+              {
+                backgroundColor: isOwnMessage
+                  ? theme.primary
+                  : isHostMessage
+                    ? 'rgba(255,107,91,0.15)'
+                    : theme.backgroundSecondary,
+              },
+              isHostMessage && !isOwnMessage ? { borderLeftWidth: 3, borderLeftColor: '#ff6b5b' } : null,
+            ]}
+          >
+            <SafeMessageText
+              text={messageText}
+              safetyMode={!contactInfoVisible && !isOwnMessage}
+              style={[Typography.body, { color: isOwnMessage ? '#FFFFFF' : theme.text }]}
+              onUpgradePress={() => navigation.navigate('Plans' as any)}
+              onBookShowingPress={isInquiryChat ? () => setShowVisitModal(true) : undefined}
+            />
+            {urls.length > 0 ? <LinkPreviewCard url={urls[0]} /> : null}
+          </View>
+        )}
+
+        {showReactionBar === msg.id ? (
+          <Animated.View entering={FadeIn.duration(150)} style={[styles.reactionBar, isOwnMessage ? { right: 0 } : { left: 0 }]}>
+            {QUICK_REACTIONS.map(emoji => (
+              <Pressable
+                key={emoji}
+                style={styles.reactionBarEmoji}
+                onPress={() => handleToggleReaction(msg.id, emoji)}
+              >
+                <Text style={{ fontSize: 20 }}>{emoji}</Text>
+              </Pressable>
+            ))}
+            <Pressable
+              style={[styles.reactionBarEmoji, { backgroundColor: 'rgba(255,255,255,0.1)' }]}
+              onPress={() => { setEmojiPickerTargetId(msg.id); setShowEmojiPicker(true); setShowReactionBar(null); }}
+            >
+              <Feather name="plus" size={16} color="rgba(255,255,255,0.6)" />
+            </Pressable>
+          </Animated.View>
+        ) : null}
+
+        {msgReactions.length > 0 && !isDeleted ? (
+          <View style={styles.reactionContainer}>
+            {msgReactions.map((r: any) => {
+              const isMine = r.userIds.includes(user?.id);
+              return (
+                <Pressable
+                  key={r.emoji}
+                  style={[styles.reactionPill, isMine ? styles.reactionPillActive : null]}
+                  onPress={() => handleToggleReaction(msg.id, r.emoji)}
+                >
+                  <Text style={styles.reactionEmoji}>{r.emoji}</Text>
+                  {r.count > 1 ? <Text style={styles.reactionCount}>{r.count}</Text> : null}
+                </Pressable>
+              );
+            })}
+          </View>
+        ) : null}
+
+        {isLastInCluster && !isDeleted ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2, paddingHorizontal: 4 }}>
+            {showReadReceipt ? (
+              <View style={styles.readReceiptContainer}>
+                <Feather name="check" size={12} color={isRead ? theme.primary : theme.textSecondary} />
+                {isRead ? <Feather name="check" size={12} color={theme.primary} style={{ marginLeft: -6 }} /> : null}
+                <ThemedText style={[Typography.caption, { color: isRead ? theme.primary : theme.textSecondary, marginLeft: 2, fontSize: 10 }]}>
+                  {isRead ? 'Read' : 'Sent'}
+                </ThemedText>
+              </View>
+            ) : showLockedReceipt ? (
+              <Pressable
+                style={styles.readReceiptContainer}
+                onPress={() => { setPaywallFeature('Read Receipts'); setShowPaywall(true); }}
+              >
+                <Feather name="check" size={12} color="rgba(255,255,255,0.2)" />
+                <PlanBadgeInline plan="Elite" locked />
+              </Pressable>
+            ) : null}
+            <Text style={{ color: 'rgba(255,255,255,0.25)', fontSize: 10 }}>
+              {formatTime(new Date(msg.timestamp))}
+            </Text>
+            {isEdited ? <Text style={{ color: 'rgba(255,255,255,0.25)', fontSize: 10 }}>(edited)</Text> : null}
+          </View>
+        ) : null}
+      </Pressable>
     );
 
     if (messagingLocked) {
@@ -2015,9 +2409,9 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
       <View style={{ flex: 1 }}>
         <FlatList
           ref={flatListRef}
-          data={messages}
-          renderItem={renderMessage}
-          keyExtractor={item => item.id}
+          data={processedMessages}
+          renderItem={renderChatItem as any}
+          keyExtractor={(item: any) => item.id}
           contentContainerStyle={[styles.messagesList, { paddingBottom: Spacing.lg }]}
           onContentSizeChange={() => {
             if (isNearBottom.current) {
@@ -2145,6 +2539,30 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
           onDismiss={() => setUpgradePromptData(null)}
         />
       ) : null}
+      {isRecording ? (
+        <Animated.View entering={FadeIn.duration(150)} style={styles.recordingOverlay}>
+          <Animated.View style={[styles.recordingDot, { opacity: recordingDuration % 2 === 0 ? 1 : 0.4 }]} />
+          <Text style={styles.recordingTimer}>{formatRecordingTime(recordingDuration)}</Text>
+          <Pressable onPress={cancelRecording}>
+            <Text style={styles.slideCancel}>Cancel</Text>
+          </Pressable>
+        </Animated.View>
+      ) : null}
+      {replyToMessage && !messagingLocked ? (
+        <View style={styles.replyInputBar}>
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: '#ff6b5b', fontSize: 12, fontWeight: '600' }}>
+              Replying to {replyToMessage.senderId === user?.id ? 'yourself' : (otherUser?.name?.split(' ')[0] || 'Them')}
+            </Text>
+            <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13 }} numberOfLines={1}>
+              {replyToMessage.text || replyToMessage.content || ''}
+            </Text>
+          </View>
+          <Pressable onPress={() => setReplyToMessage(null)}>
+            <Feather name="x" size={18} color="rgba(255,255,255,0.4)" />
+          </Pressable>
+        </View>
+      ) : null}
       <View style={[styles.inputContainer, { backgroundColor: theme.backgroundRoot, paddingBottom: TAB_BAR_HEIGHT }]}>
         {messagingLocked ? (
           <View style={styles.lockedInputRow}>
@@ -2191,18 +2609,29 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
               maxLength={500}
               editable={!inquiryGroup?.isArchived && canSendMessage()}
             />
-            <Pressable
-              onPress={sendMessage}
-              style={[
-                styles.sendButton,
-                {
-                  backgroundColor: inputText.trim() && canSendMessage() ? theme.primary : theme.backgroundSecondary,
-                },
-              ]}
-              disabled={!inputText.trim() || !canSendMessage()}
-            >
-              <Feather name="send" size={20} color="#FFFFFF" />
-            </Pressable>
+            {inputText.trim() ? (
+              <Pressable
+                onPress={sendMessage}
+                style={[
+                  styles.sendButton,
+                  { backgroundColor: canSendMessage() ? theme.primary : theme.backgroundSecondary },
+                ]}
+                disabled={!canSendMessage()}
+              >
+                <Feather name="send" size={20} color="#FFFFFF" />
+              </Pressable>
+            ) : (
+              <Pressable
+                onLongPress={handleStartRecording}
+                onPressOut={isRecording ? handleStopRecording : undefined}
+                style={[
+                  styles.sendButton,
+                  { backgroundColor: isRecording ? '#EF4444' : theme.backgroundSecondary },
+                ]}
+              >
+                <Feather name="mic" size={20} color={isRecording ? '#FFF' : theme.text} />
+              </Pressable>
+            )}
           </>
         )}
       </View>
@@ -2338,6 +2767,41 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
         address={inquiryGroup?.listingAddress || 'Property'}
         defaultRent={inquiryGroup?.listingPrice || 0}
       />
+
+      <MessageActionsSheet
+        visible={!!activeMessageActions}
+        onClose={() => setActiveMessageActions(null)}
+        messageText={activeMessageActions?.text || activeMessageActions?.content || ''}
+        isOwnMessage={activeMessageActions?.senderId === user?.id}
+        actions={activeMessageActions ? getMessageActions(activeMessageActions) : []}
+      />
+
+      {showEmojiPicker ? (
+        <Modal transparent animationType="fade" onRequestClose={() => setShowEmojiPicker(false)}>
+          <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' }} onPress={() => setShowEmojiPicker(false)}>
+            <View style={{ backgroundColor: '#1a1a1a', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 40 }}>
+              <Text style={{ color: '#fff', fontWeight: '600', fontSize: 16, marginBottom: 12 }}>Add Reaction</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                {(userPlan === 'basic' ? QUICK_REACTIONS : EXTENDED_EMOJIS).map(emoji => (
+                  <Pressable
+                    key={emoji}
+                    style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.06)', alignItems: 'center', justifyContent: 'center' }}
+                    onPress={() => {
+                      if (emojiPickerTargetId) {
+                        handleToggleReaction(emojiPickerTargetId, emoji);
+                      }
+                      setShowEmojiPicker(false);
+                      setEmojiPickerTargetId(null);
+                    }}
+                  >
+                    <Text style={{ fontSize: 22 }}>{emoji}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+          </Pressable>
+        </Modal>
+      ) : null}
 
       {showUnlockModal ? (
         <Modal transparent animationType="fade" onRequestClose={() => setShowUnlockModal(false)}>
@@ -2991,5 +3455,123 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: 'rgba(255,255,255,0.35)',
     fontStyle: 'italic' as const,
+  },
+  dateSeparator: {
+    alignItems: 'center' as const,
+    marginVertical: 16,
+  },
+  dateSeparatorPill: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  dateSeparatorText: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 12,
+    fontWeight: '500' as const,
+  },
+  reactionContainer: {
+    flexDirection: 'row' as const,
+    flexWrap: 'wrap' as const,
+    gap: 4,
+    marginTop: 4,
+    paddingHorizontal: 4,
+  },
+  reactionPill: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 4,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  reactionPillActive: {
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,91,0.4)',
+    backgroundColor: 'rgba(255,107,91,0.1)',
+  },
+  reactionEmoji: {
+    fontSize: 14,
+  },
+  reactionCount: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.5)',
+  },
+  reactionBar: {
+    flexDirection: 'row' as const,
+    gap: 4,
+    backgroundColor: 'rgba(30,30,30,0.95)',
+    borderRadius: 24,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    marginTop: 6,
+  },
+  reactionBarEmoji: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  replyPreview: {
+    borderLeftWidth: 3,
+    borderLeftColor: '#ff6b5b',
+    paddingLeft: 10,
+    paddingVertical: 4,
+    marginBottom: 4,
+    backgroundColor: 'rgba(255,107,91,0.06)',
+    borderRadius: 8,
+  },
+  replyPreviewName: {
+    fontSize: 11,
+    fontWeight: '600' as const,
+    color: '#ff6b5b',
+  },
+  replyPreviewText: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.4)',
+    marginTop: 1,
+  },
+  replyInputBar: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    backgroundColor: 'rgba(255,107,91,0.08)',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderLeftWidth: 3,
+    borderLeftColor: '#ff6b5b',
+  },
+  recordingOverlay: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 10,
+    backgroundColor: 'rgba(239,68,68,0.1)',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(239,68,68,0.2)',
+  },
+  recordingDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#EF4444',
+  },
+  recordingTimer: {
+    color: '#EF4444',
+    fontSize: 14,
+    fontWeight: '600' as const,
+    flex: 1,
+  },
+  slideCancel: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 13,
+    fontWeight: '500' as const,
+  },
+  editedText: {
+    color: 'rgba(255,255,255,0.25)',
+    fontSize: 10,
   },
 });
