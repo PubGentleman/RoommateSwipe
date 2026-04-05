@@ -136,8 +136,11 @@ export default function GroupSetupScreen({ onComplete, onSkip }: Props) {
         setGroupId(group.id);
         setInviteCode(group.invite_code);
         setGroupCreated(true);
+      } else {
+        setSaving(false);
       }
-    } finally {
+    } catch (e) {
+      console.error('[GroupSetup] Create failed:', e);
       setSaving(false);
     }
   };

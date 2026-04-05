@@ -26,50 +26,107 @@ export async function createPreformedGroup(userId: string, params: {
 
   const invite_code = generateInviteCode();
 
-  const { data: group, error } = await supabase
-    .from('preformed_groups')
-    .insert({
-      name: params.name || null,
-      group_lead_id: userId,
-      group_size: params.groupSize,
-      invite_code,
-      city: params.city || null,
-      combined_budget_min: params.budgetMin || null,
-      combined_budget_max: params.budgetMax || null,
-      desired_bedroom_count: params.bedroomCount || null,
-      move_in_date: params.moveInDate || null,
-      status: 'forming',
-    })
-    .select()
-    .single();
+  let supabaseGroup: PreformedGroup | null = null;
+  try {
+    const supabasePromise = supabase
+      .from('preformed_groups')
+      .insert({
+        name: params.name || null,
+        group_lead_id: userId,
+        group_size: params.groupSize,
+        invite_code,
+        city: params.city || null,
+        combined_budget_min: params.budgetMin || null,
+        combined_budget_max: params.budgetMax || null,
+        desired_bedroom_count: params.bedroomCount || null,
+        move_in_date: params.moveInDate || null,
+        status: 'forming',
+      })
+      .select()
+      .single();
 
-  if (error || !group) return null;
+    const result = await Promise.race([
+      supabasePromise,
+      new Promise<{ data: null; error: { message: string } }>(resolve =>
+        setTimeout(() => resolve({ data: null, error: { message: 'timeout' } }), 5000)
+      ),
+    ]);
 
-  await supabase.from('preformed_group_members').insert({
-    preformed_group_id: group.id,
-    user_id: userId,
-    name: 'You (Group Lead)',
-    status: 'joined',
-    joined_at: new Date().toISOString(),
-  });
+    if (result.data && !result.error) {
+      supabaseGroup = result.data as PreformedGroup;
 
-  const memberInserts = params.memberNames.filter(n => n.trim()).map(name => ({
-    preformed_group_id: group.id,
-    user_id: null,
-    name: name.trim(),
-    status: 'invited' as const,
-  }));
+      supabase.from('preformed_group_members').insert({
+        preformed_group_id: supabaseGroup.id,
+        user_id: userId,
+        name: 'You (Group Lead)',
+        status: 'joined',
+        joined_at: new Date().toISOString(),
+      }).then(() => {});
 
-  if (memberInserts.length > 0) {
-    await supabase.from('preformed_group_members').insert(memberInserts);
+      const memberInserts = params.memberNames.filter(n => n.trim()).map(name => ({
+        preformed_group_id: supabaseGroup!.id,
+        user_id: null,
+        name: name.trim(),
+        status: 'invited' as const,
+      }));
+
+      if (memberInserts.length > 0) {
+        supabase.from('preformed_group_members').insert(memberInserts).then(() => {});
+      }
+
+      supabase.from('profiles').update({ is_group_lead: true }).eq('user_id', userId).then(() => {});
+
+      return supabaseGroup;
+    }
+  } catch (e) {
+    console.warn('[createPreformedGroup] Supabase failed:', e);
   }
 
-  await supabase
-    .from('profiles')
-    .update({ is_group_lead: true })
-    .eq('user_id', userId);
+  const now = new Date().toISOString();
+  const localGroup: PreformedGroup = {
+    id: `pfg-${userId.slice(0, 6)}-${Date.now()}`,
+    name: params.name || 'My Group',
+    group_lead_id: userId,
+    group_size: params.groupSize,
+    status: 'forming',
+    invite_code,
+    city: params.city || null,
+    preferred_neighborhoods: [],
+    combined_budget_min: params.budgetMin || null,
+    combined_budget_max: params.budgetMax || null,
+    desired_bedroom_count: params.bedroomCount || null,
+    move_in_date: params.moveInDate || null,
+    created_at: now,
+    open_to_requests: false,
+  } as PreformedGroup;
 
-  return group as PreformedGroup;
+  const localMembers: PreformedGroupMember[] = [
+    {
+      id: `pgm-${userId.slice(0, 6)}-lead`,
+      preformed_group_id: localGroup.id,
+      user_id: userId,
+      name: 'You',
+      status: 'joined',
+      invited_at: now,
+      joined_at: now,
+    },
+    ...params.memberNames.filter(n => n.trim()).map((name, idx) => ({
+      id: `pgm-${userId.slice(0, 6)}-inv-${idx}`,
+      preformed_group_id: localGroup.id,
+      user_id: null as any,
+      name: name.trim(),
+      status: 'invited' as const,
+      invited_at: now,
+      joined_at: null as any,
+    })),
+  ];
+
+  await AsyncStorage.setItem(`@rhome/preformed_group_${userId}`, JSON.stringify(localGroup));
+  await AsyncStorage.setItem(`@rhome/preformed_members_${localGroup.id}`, JSON.stringify(localMembers));
+  await AsyncStorage.setItem(`@rhome/group_shortlist_${localGroup.id}`, JSON.stringify([]));
+  await AsyncStorage.setItem(`@rhome/group_tours_${localGroup.id}`, JSON.stringify([]));
+
+  return localGroup;
 }
 
 export async function getMyPreformedGroup(userId: string): Promise<PreformedGroup | null> {
