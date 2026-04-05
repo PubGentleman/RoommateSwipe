@@ -388,37 +388,123 @@ export default function MyGroupScreen() {
             />
           )}
           ListHeaderComponent={
-            pendingInvites.length > 0 ? (
-              <View style={{ marginBottom: 12 }}>
-                <Text style={{ color: '#999', fontSize: 12, fontWeight: '600', marginBottom: 8, textTransform: 'uppercase' }}>
-                  Pending Invites
-                </Text>
-                {pendingInvites.map((inv: any) => (
-                  <View key={inv.id} style={styles.pendingInviteRow}>
-                    <Feather name={inv.invite_email ? 'mail' : 'phone'} size={14} color="#F59E0B" />
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ color: '#ccc', fontSize: 13 }}>
-                        {inv.invite_email || inv.invite_phone}
-                      </Text>
-                      <Text style={{ color: '#666', fontSize: 11 }}>
-                        Waiting to join{inv.is_couple ? ' (couple)' : ''}
-                      </Text>
-                    </View>
-                    {isLead ? (
-                      <Pressable
-                        onPress={() => {
-                          resendGroupInvite(inv.id).catch(() => {});
-                          Alert.alert('Invite Resent', 'The invite has been resent.');
-                        }}
-                        style={{ paddingHorizontal: 10, paddingVertical: 6, backgroundColor: 'rgba(245,158,11,0.1)', borderRadius: 8 }}
-                      >
-                        <Text style={{ color: '#F59E0B', fontSize: 12, fontWeight: '600' }}>Resend</Text>
-                      </Pressable>
-                    ) : null}
+            <>
+              {hasDropout ? (
+                <Pressable
+                  style={styles.needRoommateBanner}
+                  onPress={() => {
+                    if (!isLead) {
+                      Alert.alert(
+                        `${openSlots} ${openSlots === 1 ? 'Spot' : 'Spots'} Open`,
+                        group.needs_replacement
+                          ? 'Your group lead has turned on roommate finding. New members will need approval to join.'
+                          : 'Ask your group lead to find a replacement if you need one.',
+                      );
+                      return;
+                    }
+
+                    if (group.needs_replacement) {
+                      if (pendingRequestCount > 0) {
+                        navigation.navigate('GroupRequestReview' as never, {
+                          groupId: group.id,
+                          groupType: 'preformed',
+                          isLead: true,
+                          memberCount: members.length,
+                        } as never);
+                      } else {
+                        Alert.alert(
+                          'Replacement Active',
+                          'Your group is visible to roommate seekers. No join requests yet \u2014 we\'ll notify you when someone is interested.',
+                          [
+                            { text: 'OK' },
+                            {
+                              text: 'Turn Off',
+                              style: 'destructive',
+                              onPress: async () => {
+                                await disableReplacement(group.id);
+                                loadData();
+                              },
+                            },
+                          ],
+                        );
+                      }
+                    } else {
+                      Alert.alert(
+                        'Need a Roommate?',
+                        `Your group has ${openSlots} open ${openSlots === 1 ? 'spot' : 'spots'}. Turn this on to make your group visible to people looking for roommates on Rhome. You'll review requests before accepting anyone.`,
+                        [
+                          { text: 'Not Now', style: 'cancel' },
+                          {
+                            text: 'Find a Roommate',
+                            onPress: async () => {
+                              await enableReplacement(group.id, openSlots);
+                              loadData();
+                            },
+                          },
+                        ],
+                      );
+                    }
+                  }}
+                >
+                  <View style={styles.needRoommateIcon}>
+                    <Feather name="user-plus" size={18} color="#ff6b5b" />
                   </View>
-                ))}
-              </View>
-            ) : null
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.needRoommateTitle}>
+                      {group.needs_replacement
+                        ? `Looking for ${openSlots} roommate${openSlots > 1 ? 's' : ''}`
+                        : `Need a roommate? ${openSlots} ${openSlots === 1 ? 'spot' : 'spots'} open`}
+                    </Text>
+                    <Text style={styles.needRoommateSubtext}>
+                      {group.needs_replacement
+                        ? pendingRequestCount > 0
+                          ? `${pendingRequestCount} join ${pendingRequestCount === 1 ? 'request' : 'requests'} to review`
+                          : 'Your group is visible to roommate seekers'
+                        : 'Tap to find a replacement through Rhome'}
+                    </Text>
+                  </View>
+                  {group.needs_replacement ? (
+                    <View style={styles.liveBadge}>
+                      <Text style={styles.liveBadgeText}>LIVE</Text>
+                    </View>
+                  ) : (
+                    <Feather name="chevron-right" size={18} color="rgba(255,255,255,0.3)" />
+                  )}
+                </Pressable>
+              ) : null}
+
+              {pendingInvites.length > 0 ? (
+                <View style={{ marginBottom: 12 }}>
+                  <Text style={{ color: '#999', fontSize: 12, fontWeight: '600', marginBottom: 8, textTransform: 'uppercase' }}>
+                    Pending Invites
+                  </Text>
+                  {pendingInvites.map((inv: any) => (
+                    <View key={inv.id} style={styles.pendingInviteRow}>
+                      <Feather name={inv.invite_email ? 'mail' : 'phone'} size={14} color="#F59E0B" />
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ color: '#ccc', fontSize: 13 }}>
+                          {inv.invite_email || inv.invite_phone}
+                        </Text>
+                        <Text style={{ color: '#666', fontSize: 11 }}>
+                          Waiting to join{inv.is_couple ? ' (couple)' : ''}
+                        </Text>
+                      </View>
+                      {isLead ? (
+                        <Pressable
+                          onPress={() => {
+                            resendGroupInvite(inv.id).catch(() => {});
+                            Alert.alert('Invite Resent', 'The invite has been resent.');
+                          }}
+                          style={{ paddingHorizontal: 10, paddingVertical: 6, backgroundColor: 'rgba(245,158,11,0.1)', borderRadius: 8 }}
+                        >
+                          <Text style={{ color: '#F59E0B', fontSize: 12, fontWeight: '600' }}>Resend</Text>
+                        </Pressable>
+                      ) : null}
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+            </>
           }
           ListFooterComponent={
             <Pressable style={styles.inviteMemberBtn} onPress={shareInvite}>
@@ -1114,6 +1200,47 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.4)',
     marginTop: 8,
     lineHeight: 18,
+  },
+  needRoommateBanner: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 12,
+    padding: 14,
+    marginBottom: 16,
+    backgroundColor: 'rgba(255,107,91,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,91,0.2)',
+    borderRadius: 12,
+  },
+  needRoommateIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,107,91,0.15)',
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  needRoommateTitle: {
+    color: '#ff6b5b',
+    fontSize: 14,
+    fontWeight: '700' as const,
+  },
+  needRoommateSubtext: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  liveBadge: {
+    backgroundColor: '#22C55E',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  liveBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '800' as const,
+    letterSpacing: 0.5,
   },
   pendingInviteRow: {
     flexDirection: 'row',
