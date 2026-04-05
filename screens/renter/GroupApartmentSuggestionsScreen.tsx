@@ -25,6 +25,8 @@ import { scoreListing, ListingSuggestion, detectGroupConflicts } from '../../uti
 import { NEIGHBORHOOD_TRAINS } from '../../constants/transitData';
 import { normalizeRenterPlan, getRenterPlanLimits } from '../../constants/renterPlanLimits';
 import { PlanBadgeInline } from '../../components/LockedFeatureOverlay';
+import { applyBoostRotation } from '../../utils/boostRotation';
+import { trackImpression } from '../../services/boostImpressionService';
 
 const CORAL = '#ff6b5b';
 const BG = '#111';
@@ -157,10 +159,38 @@ export default function GroupApartmentSuggestionsScreen() {
       .filter((l: Property) => l.available && l.id !== highlightListingId)
       .map((l: Property) => scoreListing(l, memberProfiles))
       .filter((s): s is ListingSuggestion => s !== null && s.totalScore > 20)
-      .sort((a, b) => b.totalScore - a.totalScore)
-      .slice(0, 5);
+      .sort((a, b) => b.totalScore - a.totalScore);
 
-    setSuggestions(scored);
+    const boostedSuggestions = scored.filter(s => {
+      const boost = s.listing.listingBoost;
+      return boost?.isActive && new Date(boost.expiresAt) > new Date();
+    });
+    const regularSuggestions = scored.filter(s => {
+      const boost = s.listing.listingBoost;
+      return !(boost?.isActive && new Date(boost.expiresAt) > new Date());
+    });
+
+    const rotatedBoosted = user
+      ? applyBoostRotation(boostedSuggestions, [], user.id)
+      : boostedSuggestions;
+
+    const renterPlan = normalizeRenterPlan(user?.subscription?.plan);
+    const maxBoostedSlots = renterPlan === 'elite' ? 3
+      : renterPlan === 'plus' ? 2
+      : 1;
+    const topBoosted = rotatedBoosted.slice(0, maxBoostedSlots);
+    const topRegular = regularSuggestions.slice(0, 5 - topBoosted.length);
+    const finalSuggestions = [...topBoosted, ...topRegular].slice(0, 5);
+
+    topBoosted.forEach(s => {
+      trackImpression(s.listing.id, 'card_view', {
+        boostType: s.listing.listingBoost?.includesTopPicks ? 'extended'
+          : s.listing.listingBoost?.includesFeaturedBadge ? 'standard' : 'quick',
+        section: 'group_suggestions',
+      });
+    });
+
+    setSuggestions(finalSuggestions);
 
     const { data: voteData } = await supabase
       .from('group_apartment_votes')
@@ -215,10 +245,30 @@ export default function GroupApartmentSuggestionsScreen() {
       .filter((l: Property) => l.available && l.id !== highlightListingId)
       .map((l: Property) => scoreListing(l, memberProfiles))
       .filter((s): s is ListingSuggestion => s !== null && s.totalScore > 20)
-      .sort((a, b) => b.totalScore - a.totalScore)
-      .slice(0, 5);
+      .sort((a, b) => b.totalScore - a.totalScore);
 
-    setSuggestions(scored);
+    const boostedSuggestions = scored.filter(s => {
+      const boost = s.listing.listingBoost;
+      return boost?.isActive && new Date(boost.expiresAt) > new Date();
+    });
+    const regularSuggestions = scored.filter(s => {
+      const boost = s.listing.listingBoost;
+      return !(boost?.isActive && new Date(boost.expiresAt) > new Date());
+    });
+
+    const rotatedBoosted = user
+      ? applyBoostRotation(boostedSuggestions, [], user.id)
+      : boostedSuggestions;
+
+    const renterPlan = normalizeRenterPlan(user?.subscription?.plan);
+    const maxBoostedSlots = renterPlan === 'elite' ? 3
+      : renterPlan === 'plus' ? 2
+      : 1;
+    const topBoosted = rotatedBoosted.slice(0, maxBoostedSlots);
+    const topRegular = regularSuggestions.slice(0, 5 - topBoosted.length);
+    const finalSuggestions = [...topBoosted, ...topRegular].slice(0, 5);
+
+    setSuggestions(finalSuggestions);
 
     const existingVotes = await StorageService.getGroupApartmentVotes(groupId);
     const voteMap: Record<string, Record<string, string>> = {};
@@ -337,6 +387,14 @@ export default function GroupApartmentSuggestionsScreen() {
           <ThemedText style={styles.pinnedLabel}>Property Manager Selected This For Your Group</ThemedText>
         </View>
         <View style={[styles.card, styles.highlightCard]}>
+          {renterLimits.label === 'Elite' &&
+           listing.listingBoost?.isActive &&
+           new Date(listing.listingBoost.expiresAt) > new Date() ? (
+            <View style={styles.promotedBadge}>
+              <Feather name="zap" size={10} color="#60a5fa" />
+              <ThemedText style={styles.promotedText}>Promoted</ThemedText>
+            </View>
+          ) : null}
           {listing.photos?.[0] ? (
             <Image
               source={{ uri: listing.photos[0] }}
@@ -449,6 +507,24 @@ export default function GroupApartmentSuggestionsScreen() {
     return (
       <Animated.View entering={FadeInDown.delay(index * 80).duration(300)}>
         <View style={styles.card}>
+          {renterLimits.label === 'Elite' &&
+           item.listing.listingBoost?.isActive &&
+           new Date(item.listing.listingBoost.expiresAt) > new Date() ? (
+            <View style={styles.promotedBadge}>
+              <Feather name="zap" size={10} color="#60a5fa" />
+              <ThemedText style={styles.promotedText}>Promoted</ThemedText>
+            </View>
+          ) : null}
+          {item.listing.listingBoost?.isActive &&
+           new Date(item.listing.listingBoost.expiresAt) > new Date() &&
+           item.listing.listingBoost?.includesFeaturedBadge &&
+           item.listing.photos?.[0] ? (
+            <Image
+              source={{ uri: item.listing.photos[0] }}
+              style={styles.boostedSuggestionPhoto}
+              resizeMode="cover"
+            />
+          ) : null}
           <View style={styles.cardHeader}>
             <View style={{ flex: 1 }}>
               <ThemedText style={styles.cardTitle}>
@@ -748,5 +824,29 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 15, color: '#666', textAlign: 'center',
     marginTop: 16, paddingHorizontal: 20,
+  },
+  promotedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    backgroundColor: 'rgba(96, 165, 250, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(96, 165, 250, 0.2)',
+    gap: 4,
+    marginBottom: 8,
+  },
+  promotedText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#60a5fa',
+  },
+  boostedSuggestionPhoto: {
+    width: '100%',
+    height: 120,
+    borderRadius: 10,
+    marginBottom: 10,
   },
 });

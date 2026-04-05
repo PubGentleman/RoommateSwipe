@@ -8,7 +8,7 @@ interface ImpressionEvent {
   viewer_id: string;
   impression_type: 'card_view' | 'detail_view' | 'search_result' | 'carousel_view';
   boost_type?: 'quick' | 'standard' | 'extended';
-  section?: 'main_feed' | 'top_picks' | 'boosted_carousel' | 'search';
+  section?: 'main_feed' | 'top_picks' | 'boosted_carousel' | 'search' | 'group_suggestions' | 'roommate_card';
   created_at: string;
 }
 

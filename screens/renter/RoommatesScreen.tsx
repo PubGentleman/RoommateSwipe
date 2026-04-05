@@ -11,7 +11,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../contexts/AuthContext';
 import { Colors, Spacing, BorderRadius, Typography } from '../../constants/theme';
 import { StorageService } from '../../utils/storage';
-import { RoommateProfile, Match, InterestCard, Group, Conversation } from '../../types/models';
+import { RoommateProfile, Match, InterestCard, Group, Conversation, Property } from '../../types/models';
 import { isBoostExpired, getBoostDuration, getBoostTimeRemaining, RENTER_BOOST_OPTIONS, RenterBoostOptionId } from '../../utils/boostUtils';
 import { dispatchInsightTrigger } from '../../utils/insightRefresh';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -28,7 +28,11 @@ import { MatchCelebrationModal } from '../../components/MatchCelebrationModal';
 import { PaywallSheet } from '../../components/PaywallSheet';
 import { VerificationBadgeInline, getVerificationLevel } from '../../components/VerificationBadge';
 import { checkVerificationGate } from '../../utils/verificationGating';
-import { supabase } from '../../lib/supabase';
+import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import { mapListingToProperty } from '../../services/listingService';
+import { applyBoostRotation } from '../../utils/boostRotation';
+import { NEIGHBORHOOD_TRAINS } from '../../constants/transitData';
+import { trackImpression } from '../../services/boostImpressionService';
 import { LinearGradient } from 'expo-linear-gradient';
 import CoachMarkOverlay from '../../components/CoachMark';
 import { useTourSetup } from '../../hooks/useTourSetup';
@@ -241,6 +245,13 @@ export const RoommatesScreen = () => {
   const [userOpenGroup, setUserOpenGroup] = useState<Group | null>(null);
   const [bannerDismissed, setBannerDismissed] = useState(false);
   const [showFirstSessionPrompt, setShowFirstSessionPrompt] = useState(false);
+  const [suggestedListingForPair, setSuggestedListingForPair] = useState<{
+    listing: Property;
+    perPersonRent: number;
+    sharedNeighborhoods: string[];
+    isBoosted: boolean;
+  } | null>(null);
+  const [allListingsCache, setAllListingsCache] = useState<Property[]>([]);
   const profileCompletion = user ? getCompletionPercentage(user) : 0;
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
@@ -632,6 +643,100 @@ export const RoommatesScreen = () => {
         return minutesAgo < 30;
       })()
     : false;
+
+  useEffect(() => {
+    const loadListings = async () => {
+      try {
+        if (isSupabaseConfigured) {
+          const { data } = await supabase
+            .from('listings')
+            .select('*')
+            .eq('is_active', true);
+          if (data) {
+            setAllListingsCache(data.map((l: any) => mapListingToProperty(l)));
+          }
+        } else {
+          const props = await StorageService.getProperties();
+          setAllListingsCache(props.filter((p: Property) => p.available));
+        }
+      } catch (err) {
+        console.warn('Failed to load listings for pair suggestions:', err);
+      }
+    };
+    loadListings();
+  }, []);
+
+  useEffect(() => {
+    if (!user || !currentProfile || allListingsCache.length === 0) {
+      setSuggestedListingForPair(null);
+      return;
+    }
+
+    const myNeighborhoods: string[] = user.profileData?.preferredNeighborhoods || user.preferred_neighborhoods || [];
+    const myBudget = user.profileData?.budget || user.budget || 1500;
+    const myTrains: string[] = user.profileData?.preferredTrains || user.required_train_lines || [];
+
+    const theirNeighborhoods: string[] = (currentProfile as any).preferredNeighborhoods || [];
+    const theirBudget = currentProfile.budget || 1500;
+    const theirTrains: string[] = (currentProfile as any).requiredTrainLines || [];
+
+    const allPreferredNeighborhoods = [...new Set([...myNeighborhoods, ...theirNeighborhoods])];
+    const sharedNeighborhoods = myNeighborhoods.filter(n => theirNeighborhoods.includes(n));
+
+    const combinedMaxBudget = myBudget + theirBudget;
+
+    const candidates = allListingsCache
+      .filter(l => {
+        if (!l.price || l.price > combinedMaxBudget) return false;
+        if (l.bedrooms && l.bedrooms < 2) return false;
+        const listingNeighborhood = l.neighborhood || '';
+        const isInPreferred = allPreferredNeighborhoods.includes(listingNeighborhood);
+        const listingTrains = NEIGHBORHOOD_TRAINS[listingNeighborhood] || [];
+        const allWantedTrains = [...new Set([...myTrains, ...theirTrains])];
+        const hasTransitOverlap = allWantedTrains.length === 0 ||
+          allWantedTrains.some(t => listingTrains.includes(t));
+        return isInPreferred || hasTransitOverlap;
+      })
+      .map(l => ({
+        listing: l,
+        perPersonRent: Math.round((l.price || 0) / 2),
+        sharedNeighborhoods: sharedNeighborhoods.filter(n =>
+          n === l.neighborhood || NEIGHBORHOOD_TRAINS[n]?.some(t =>
+            NEIGHBORHOOD_TRAINS[l.neighborhood || '']?.includes(t)
+          )
+        ),
+        isBoosted: !!(l.listingBoost?.isActive && new Date(l.listingBoost.expiresAt) > new Date()),
+      }));
+
+    if (candidates.length === 0) {
+      setSuggestedListingForPair(null);
+      return;
+    }
+
+    const boosted = candidates.filter(c => c.isBoosted);
+    const regular = candidates.filter(c => !c.isBoosted);
+
+    const rotatedBoosted = boosted.length > 0 && user
+      ? applyBoostRotation(boosted, [], user.id)
+      : boosted;
+
+    const best = rotatedBoosted[0]
+      || regular.sort((a, b) => a.perPersonRent - b.perPersonRent)[0]
+      || null;
+
+    if (best) {
+      setSuggestedListingForPair(best);
+      if (best.isBoosted) {
+        trackImpression(best.listing.id, 'card_view', {
+          boostType: best.listing.listingBoost?.includesTopPicks ? 'extended'
+            : best.listing.listingBoost?.includesFeaturedBadge ? 'standard' : 'quick',
+          section: 'roommate_card',
+        });
+      }
+    } else {
+      setSuggestedListingForPair(null);
+    }
+  }, [currentIndex, allListingsCache.length]);
 
   useEffect(() => {
     if (!renterLimits.hasPiDeckReranking || profiles.length === 0) return;
@@ -2101,6 +2206,63 @@ export const RoommatesScreen = () => {
                     {'\u03C0'} Pi's Take: {piCardSummary}
                   </ThemedText>
                 </View>
+              ) : null}
+              {(renterPlan === 'plus' || renterPlan === 'elite') && suggestedListingForPair ? (
+                <Pressable
+                  style={styles.pairListingSuggestion}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    (navigation as any).navigate('Explore', {
+                      highlightListingId: suggestedListingForPair.listing.id,
+                    });
+                  }}
+                >
+                  <View style={styles.pairListingHeader}>
+                    <Feather name="home" size={11} color="#ff6b5b" />
+                    <Text style={styles.pairListingHeaderText}>
+                      Perfect listing for you two
+                    </Text>
+                    {suggestedListingForPair.isBoosted ? (
+                      <View style={styles.pairListingPromoted}>
+                        <Feather name="zap" size={8} color="#60a5fa" />
+                      </View>
+                    ) : null}
+                  </View>
+                  <View style={styles.pairListingContent}>
+                    {suggestedListingForPair.listing.photos?.[0] ? (
+                      <Image
+                        source={{ uri: suggestedListingForPair.listing.photos[0] }}
+                        style={styles.pairListingThumb}
+                      />
+                    ) : (
+                      <View style={[styles.pairListingThumb, { backgroundColor: '#333', justifyContent: 'center', alignItems: 'center' }]}>
+                        <Feather name="home" size={16} color="#666" />
+                      </View>
+                    )}
+                    <View style={styles.pairListingInfo}>
+                      <Text style={styles.pairListingTitle} numberOfLines={1}>
+                        {suggestedListingForPair.listing.bedrooms}BR in {suggestedListingForPair.listing.neighborhood || suggestedListingForPair.listing.city}
+                      </Text>
+                      <Text style={styles.pairListingPrice}>
+                        ${suggestedListingForPair.perPersonRent.toLocaleString()}/person
+                      </Text>
+                    </View>
+                    <Feather name="chevron-right" size={14} color="rgba(255,255,255,0.3)" />
+                  </View>
+                </Pressable>
+              ) : renterPlan === 'free' && suggestedListingForPair ? (
+                <Pressable
+                  style={[styles.pairListingSuggestion, { opacity: 0.5 }]}
+                  onPress={() => setShowPaywall(true)}
+                >
+                  <View style={styles.pairListingHeader}>
+                    <Feather name="lock" size={11} color="rgba(255,255,255,0.3)" />
+                    <Text style={[styles.pairListingHeaderText, { color: 'rgba(255,255,255,0.3)' }]}>
+                      Listing suggestion for you two
+                    </Text>
+                    <PlanBadgeInline plan="Plus" locked />
+                  </View>
+                </Pressable>
               ) : null}
             </View>
           </Animated.View>
@@ -4583,5 +4745,58 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: 'rgba(255,255,255,0.4)',
     fontWeight: '500' as const,
+  },
+  pairListingSuggestion: {
+    marginTop: 10,
+    backgroundColor: 'rgba(255, 107, 91, 0.08)',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 107, 91, 0.15)',
+    padding: 10,
+  },
+  pairListingHeader: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 5,
+    marginBottom: 6,
+  },
+  pairListingHeaderText: {
+    fontSize: 10,
+    fontWeight: '700' as const,
+    color: 'rgba(255, 107, 91, 0.7)',
+    textTransform: 'uppercase' as const,
+    letterSpacing: 0.5,
+    flex: 1,
+  },
+  pairListingPromoted: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: 'rgba(96, 165, 250, 0.15)',
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  pairListingContent: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 8,
+  },
+  pairListingThumb: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+  },
+  pairListingInfo: {
+    flex: 1,
+  },
+  pairListingTitle: {
+    fontSize: 12,
+    fontWeight: '600' as const,
+    color: '#ddd',
+  },
+  pairListingPrice: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.5)',
+    marginTop: 1,
   },
 });
