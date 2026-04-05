@@ -1675,6 +1675,18 @@ export const ProfileQuestionnaireScreen = () => {
             <Pressable onPress={() => navigation.goBack()} style={styles.navButton}>
               <Feather name="x" size={24} color="rgba(255,255,255,0.5)" />
             </Pressable>
+          ) : !isLastStep ? (
+            <Pressable
+              onPress={() => {
+                setDirection('forward');
+                setCurrentFilteredIndex(prev => Math.min(prev + 1, stepsToShow.length - 1));
+                updateUser(buildProfileData()).catch(() => {});
+              }}
+              hitSlop={8}
+              style={{ paddingHorizontal: 4, paddingVertical: 4 }}
+            >
+              <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 14 }}>Skip</Text>
+            </Pressable>
           ) : null}
         </View>
         <View style={styles.progressWrap}>
