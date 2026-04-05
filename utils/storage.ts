@@ -1225,7 +1225,29 @@ export const StorageService = {
     if (!shouldLoadMockData()) return;
     const seedKey = `@rhome/user_mock_seeded_${userId}`;
     const alreadySeeded = await AsyncStorage.getItem(seedKey);
-    if (alreadySeeded) return;
+    if (alreadySeeded) {
+      const isHost = userRole === 'host' || hostType === 'individual' || hostType === 'agent' || hostType === 'company';
+      if (!isHost) {
+        const existingGroup = await AsyncStorage.getItem(`@rhome/preformed_group_${userId}`);
+        if (!existingGroup) {
+          try {
+            const { createMockPreformedGroup, createMockGroupMembers, createMockGroupShortlist, createMockGroupTours } = await import('./mockSeedData');
+            const mockGroup = createMockPreformedGroup(userId);
+            const mockMembers = createMockGroupMembers(userId, mockGroup.id);
+            const mockShortlist = createMockGroupShortlist(userId, mockGroup.id);
+            const mockTours = createMockGroupTours(userId, mockGroup.id);
+            await AsyncStorage.setItem(`@rhome/preformed_group_${userId}`, JSON.stringify(mockGroup));
+            await AsyncStorage.setItem(`@rhome/preformed_members_${mockGroup.id}`, JSON.stringify(mockMembers));
+            await AsyncStorage.setItem(`@rhome/group_shortlist_${mockGroup.id}`, JSON.stringify(mockShortlist));
+            await AsyncStorage.setItem(`@rhome/group_tours_${mockGroup.id}`, JSON.stringify(mockTours));
+            console.log('[StorageService] Backfilled preformed group mock data');
+          } catch (e) {
+            console.error('[StorageService] Failed to backfill preformed group:', e);
+          }
+        }
+      }
+      return;
+    }
 
     try {
       console.log('[StorageService] Seeding user-specific mock data...');
