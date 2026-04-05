@@ -28,6 +28,7 @@ import { AgentGroupDetailScreen } from '../screens/host/AgentGroupDetailScreen';
 import { HostGroupMatchesScreen } from '../screens/host/HostGroupMatchesScreen';
 import { CompanyFillPipelineScreen } from '../screens/host/CompanyFillPipelineScreen';
 import { CompanyListingAIScreen } from '../screens/host/CompanyListingAIScreen';
+import { ActivityFeedScreen } from '../screens/shared/ActivityFeedScreen';
 import { PiMatchedGroupsScreen } from '../screens/host/PiMatchedGroupsScreen';
 import { PiClaimedGroupDetailScreen } from '../screens/host/PiClaimedGroupDetailScreen';
 import { InviteExistingRoommatesScreen } from '../screens/host/InviteExistingRoommatesScreen';
@@ -82,6 +83,7 @@ export type HostDashboardStackParamList = {
   RevenueOverview: undefined;
   ComparativeInsights: { listingId?: string } | undefined;
   BoostManagement: undefined;
+  ActivityFeed: undefined;
 };
 
 export type HostGroupsStackParamList = {
@@ -153,6 +155,7 @@ function DashboardStackNavigator() {
       <DashboardStack.Screen name="RevenueOverview" component={RevenueOverviewScreen} />
       <DashboardStack.Screen name="ComparativeInsights" component={ComparativeInsightsScreen} />
       <DashboardStack.Screen name="BoostManagement" component={BoostManagementScreen} />
+      <DashboardStack.Screen name="ActivityFeed" component={ActivityFeedScreen} />
     </DashboardStack.Navigator>
   );
 }

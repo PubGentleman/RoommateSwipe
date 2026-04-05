@@ -47,6 +47,7 @@ import InteractiveMapView from '../../components/InteractiveMapView';
 import { RhomeAISheet } from '../../components/RhomeAISheet';
 import { RhomeLogo } from '../../components/RhomeLogo';
 import { AppHeader, HeaderIconButton } from '../../components/AppHeader';
+import { useFeedBadge } from '../../contexts/FeedBadgeContext';
 import { AIFloatingButton } from '../../components/AIFloatingButton';
 import { NeighborhoodAISheet } from '../../components/NeighborhoodAISheet';
 import { PropertyReviewsScreen } from '../shared/PropertyReviewsScreen';
@@ -138,6 +139,7 @@ export const ExploreScreen = () => {
   const navigation = useNavigation();
   const route = useRoute<any>();
   const insets = useSafeAreaInsets();
+  const { unreadFeedCount } = useFeedBadge();
   const { refreshUnreadCount } = useNotificationContext();
   const { alert: showAlert, confirm } = useConfirm();
   const [properties, setProperties] = useState<Property[]>([]);
@@ -1905,6 +1907,11 @@ export const ExploreScreen = () => {
         rightActions={
           <>
             <AIFloatingButton onPress={() => setShowAISheet(true)} position="inline" />
+            <HeaderIconButton
+              icon="bell"
+              onPress={() => (navigation as any).navigate('ActivityFeed')}
+              badge={unreadFeedCount > 0}
+            />
             <HeaderIconButton
               icon="bookmark"
               onPress={() => (navigation as any).navigate('SavedSearches')}

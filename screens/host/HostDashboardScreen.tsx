@@ -19,6 +19,7 @@ import { getReceivedInterestCards, acceptInterestCard, rejectInterestCard } from
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { RhomeLogo } from '../../components/RhomeLogo';
 import { AppHeader, HeaderIconButton } from '../../components/AppHeader';
+import { useFeedBadge } from '../../contexts/FeedBadgeContext';
 import { updateGroup } from '../../services/groupService';
 import { RhomeAISheet } from '../../components/RhomeAISheet';
 import { AIFloatingButton } from '../../components/AIFloatingButton';
@@ -111,6 +112,7 @@ export const HostDashboardScreen = () => {
   const canUseAI = isAgent ? (agentLimits?.hasAIChat ?? false) : true;
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
+  const { unreadFeedCount } = useFeedBadge();
   const [listings, setListings] = useState<Property[]>([]);
   const [inquiries, setInquiries] = useState<InterestCard[]>([]);
   const [messageCount, setMessageCount] = useState(0);
@@ -635,8 +637,8 @@ export const HostDashboardScreen = () => {
             {canUseAI ? <AIFloatingButton onPress={() => setShowAISheet(true)} position="inline" /> : null}
             <HeaderIconButton
               icon="bell"
-              onPress={() => navigation.navigate('Notifications')}
-              badge={pendingInquiries > 0}
+              onPress={() => navigation.navigate('ActivityFeed')}
+              badge={unreadFeedCount > 0 || pendingInquiries > 0}
             />
             <HeaderIconButton
               icon="settings"

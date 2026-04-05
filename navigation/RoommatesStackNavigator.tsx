@@ -3,11 +3,13 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { RoommatesScreen } from '../screens/renter/RoommatesScreen';
 import { AIAssistantScreen } from '../screens/renter/AIAssistantScreen';
 import { NotificationsScreen } from '../screens/shared/NotificationsScreen';
+import { ActivityFeedScreen } from '../screens/shared/ActivityFeedScreen';
 
 export type RoommatesStackParamList = {
   RoommatesList: undefined;
   AIAssistant: { listingContext?: any; profileContext?: any; mode?: string } | undefined;
   Notifications: undefined;
+  ActivityFeed: undefined;
 };
 
 const Stack = createNativeStackNavigator<RoommatesStackParamList>();
@@ -18,6 +20,7 @@ export const RoommatesStackNavigator = () => {
       <Stack.Screen name="RoommatesList" component={RoommatesScreen} />
       <Stack.Screen name="AIAssistant" component={AIAssistantScreen} options={{ presentation: 'fullScreenModal', headerShown: false }} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} />
+      <Stack.Screen name="ActivityFeed" component={ActivityFeedScreen} />
     </Stack.Navigator>
   );
 };

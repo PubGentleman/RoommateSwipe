@@ -43,6 +43,7 @@ import { getDailySwipeCount, incrementDailySwipeCount, decrementDailySwipeCount,
 import SmartUpgradePrompt from '../../components/SmartUpgradePrompt';
 import { getUpgradePromptData, shouldShowUpgradePrompt, type UpgradePromptData } from '../../services/upgradePromptService';
 import { useNotificationContext } from '../../contexts/NotificationContext';
+import { useFeedBadge } from '../../contexts/FeedBadgeContext';
 import { RhomeAISheet } from '../../components/RhomeAISheet';
 import type { ScreenContext } from '../../components/RhomeAISheet';
 import { trackSwipe, startSession, shouldShowRefinementQuestion, getQuestionsAsked } from '../../utils/refinementEngine';
@@ -176,6 +177,7 @@ export const RoommatesScreen = () => {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const { refreshUnreadCount } = useNotificationContext();
+  const { unreadFeedCount } = useFeedBadge();
   const { confirm, alert: showAlert } = useConfirm();
   const renterPlan = normalizeRenterPlan(user?.subscription?.plan);
   const renterLimits = getRenterPlanLimits(renterPlan);
@@ -1454,7 +1456,8 @@ export const RoommatesScreen = () => {
               />
               <HeaderIconButton
                 icon="bell"
-                onPress={() => (navigation as any).navigate('Notifications')}
+                onPress={() => (navigation as any).navigate('ActivityFeed')}
+                badge={unreadFeedCount > 0}
               />
             </>
           }
@@ -1699,7 +1702,8 @@ export const RoommatesScreen = () => {
             />
             <HeaderIconButton
               icon="bell"
-              onPress={() => (navigation as any).navigate('Notifications')}
+              onPress={() => (navigation as any).navigate('ActivityFeed')}
+              badge={unreadFeedCount > 0}
             />
           </>
         }

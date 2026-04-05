@@ -12,6 +12,7 @@ import { RootNavigator } from "./navigation/RootNavigator";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { AuthProvider } from "./contexts/AuthContext";
 import { NotificationProvider } from "./contexts/NotificationContext";
+import { FeedBadgeProvider } from "./contexts/FeedBadgeContext";
 import { CityProvider } from "./contexts/CityContext";
 import { ProfileReminderProvider } from "./contexts/ProfileReminderContext";
 import { ConfirmProvider } from "./contexts/ConfirmContext";
@@ -172,6 +173,7 @@ export default function App() {
                 <CityProvider>
                   <ProfileReminderProvider>
                     <NotificationProvider>
+                      <FeedBadgeProvider>
                       <ConfirmProvider>
                         <RevenueCatProvider>
                           <TourProvider>
@@ -204,6 +206,7 @@ export default function App() {
                           </TourProvider>
                         </RevenueCatProvider>
                       </ConfirmProvider>
+                      </FeedBadgeProvider>
                     </NotificationProvider>
                   </ProfileReminderProvider>
                 </CityProvider>

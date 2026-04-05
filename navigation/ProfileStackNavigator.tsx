@@ -44,6 +44,7 @@ import { AssignListingsScreen } from '../screens/host/AssignListingsScreen';
 import { PlanComparisonScreen } from '../screens/shared/PlanComparisonScreen';
 import { BillingHistoryScreen } from '../screens/shared/BillingHistoryScreen';
 import MatchPrioritiesScreen from '../screens/renter/MatchPrioritiesScreen';
+import { ActivityFeedScreen } from '../screens/shared/ActivityFeedScreen';
 
 export type ProfileStackParamList = {
   ProfileMain: undefined;
@@ -87,6 +88,7 @@ export type ProfileStackParamList = {
   PlanComparison: undefined;
   BillingHistory: undefined;
   MatchPriorities: undefined;
+  ActivityFeed: undefined;
 };
 
 const Stack = createNativeStackNavigator<ProfileStackParamList>();
@@ -447,6 +449,11 @@ export const ProfileStackNavigator = () => {
       <Stack.Screen
         name="SearchIntent"
         component={SearchIntentScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="ActivityFeed"
+        component={ActivityFeedScreen}
         options={{ headerShown: false }}
       />
     </Stack.Navigator>
