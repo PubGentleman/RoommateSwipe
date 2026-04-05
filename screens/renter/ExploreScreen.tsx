@@ -40,7 +40,7 @@ import { getBoostRotationIndex } from '../../utils/boostRotation';
 import { getAgentsWithCriticalStatus } from '../../services/responseTrackingService';
 import { shouldShowMatchScore, getHostBadgeLabel, getHostBadgeColor, getHostBadgeIcon } from '../../utils/hostTypeUtils';
 import type { HostType } from '../../utils/hostTypeUtils';
-import { PropertyMapView } from '../../components/PropertyMapView';
+import InteractiveMapView from '../../components/InteractiveMapView';
 import { RhomeAISheet } from '../../components/RhomeAISheet';
 import { RhomeLogo } from '../../components/RhomeLogo';
 import { AppHeader, HeaderIconButton } from '../../components/AppHeader';
@@ -1953,12 +1953,12 @@ export const ExploreScreen = () => {
         </ScrollView>
       ) : null}
       {displayMode === 'map' ? (
-        <PropertyMapView
+        <InteractiveMapView
           properties={filteredProperties}
-          saved={saved}
+          savedPropertyIds={saved}
           hostProfiles={hostProfiles}
           currentUser={user || null}
-          onPropertyPress={(property) => {
+          onPropertySelect={(property) => {
             const viewCheck = canViewListing();
             if (!viewCheck.canView) {
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
@@ -1972,7 +1972,8 @@ export const ExploreScreen = () => {
             setPhotoIndex(0);
             setShowPropertyDetail(true);
           }}
-          onToggleSave={toggleSave}
+          onSaveToggle={toggleSave}
+          activeFilters={filters}
           bottomInset={insets.bottom}
         />
       ) : (
