@@ -105,9 +105,6 @@ export const LoginScreen = () => {
         <View style={styles.field}>
           <Text style={styles.fieldLabel}>Email</Text>
           <View style={[styles.inputWrap, emailFocused && styles.inputWrapFocused]}>
-            <View style={styles.inputIconWrap}>
-              <Feather name="mail" size={16} color={emailFocused ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.35)'} />
-            </View>
             <TextInput
               style={styles.input}
               placeholder="you@example.com"
@@ -122,17 +119,17 @@ export const LoginScreen = () => {
               onFocus={() => setEmailFocused(true)}
               onBlur={() => setEmailFocused(false)}
             />
+            <View style={styles.inputIconLeft} pointerEvents="none">
+              <Feather name="mail" size={16} color={emailFocused ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.35)'} />
+            </View>
           </View>
         </View>
 
         <View style={styles.field}>
           <Text style={styles.fieldLabel}>Password</Text>
           <View style={[styles.inputWrap, passwordFocused && styles.inputWrapFocused]}>
-            <View style={styles.inputIconWrap}>
-              <Feather name="lock" size={16} color={passwordFocused ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.35)'} />
-            </View>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { paddingRight: 44 }]}
               placeholder="Enter your password"
               placeholderTextColor="rgba(255,255,255,0.3)"
               value={password}
@@ -144,7 +141,10 @@ export const LoginScreen = () => {
               onFocus={() => setPasswordFocused(true)}
               onBlur={() => setPasswordFocused(false)}
             />
-            <Pressable onPress={() => setShowPassword(!showPassword)} style={styles.eyeBtn} hitSlop={8}>
+            <View style={styles.inputIconLeft} pointerEvents="none">
+              <Feather name="lock" size={16} color={passwordFocused ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.35)'} />
+            </View>
+            <Pressable onPress={() => setShowPassword(!showPassword)} style={styles.inputIconRight} hitSlop={8}>
               <Feather name={showPassword ? 'eye-off' : 'eye'} size={18} color="rgba(255,255,255,0.4)" />
             </Pressable>
           </View>
@@ -256,32 +256,39 @@ const styles = StyleSheet.create({
     marginLeft: 2,
   },
   inputWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#242538',
+    position: 'relative' as const,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)',
     borderRadius: 14,
-    overflow: 'hidden',
+    overflow: 'hidden' as const,
   },
   inputWrapFocused: {
     borderColor: '#F06464',
   },
-  inputIconWrap: {
-    paddingLeft: 12,
-    zIndex: 2,
-    backgroundColor: '#242538',
-  },
   input: {
-    flex: 1,
+    width: '100%' as const,
     paddingVertical: 14,
-    paddingHorizontal: 12,
+    paddingLeft: 40,
+    paddingRight: 12,
     fontSize: 15,
-    fontWeight: '400',
+    fontWeight: '400' as const,
     color: '#FFFFFF',
-    backgroundColor: 'transparent',
+    backgroundColor: '#242538',
+    borderRadius: 14,
   },
-  eyeBtn: {
+  inputIconLeft: {
+    position: 'absolute' as const,
+    left: 12,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center' as const,
+  },
+  inputIconRight: {
+    position: 'absolute' as const,
+    right: 12,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center' as const,
     padding: 4,
   },
   forgotRow: {

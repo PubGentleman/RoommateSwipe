@@ -55,9 +55,6 @@ export const ForgotPasswordScreen: React.FC<Props> = ({ onResetSent, onBackToLog
         <View style={styles.field}>
           <Text style={styles.fieldLabel}>Email address</Text>
           <View style={[styles.inputWrap, emailFocused && styles.inputWrapFocused]}>
-            <View style={{ paddingLeft: 12 }}>
-              <Feather name="mail" size={16} color={emailFocused ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.35)'} />
-            </View>
             <TextInput
               style={styles.input}
               placeholder="you@example.com"
@@ -70,6 +67,9 @@ export const ForgotPasswordScreen: React.FC<Props> = ({ onResetSent, onBackToLog
               onFocus={() => setEmailFocused(true)}
               onBlur={() => setEmailFocused(false)}
             />
+            <View style={styles.inputIconLeft} pointerEvents="none">
+              <Feather name="mail" size={16} color={emailFocused ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.35)'} />
+            </View>
           </View>
         </View>
 
@@ -139,24 +139,31 @@ const styles = StyleSheet.create({
     marginLeft: 2,
   },
   inputWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#242538',
+    position: 'relative' as const,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)',
     borderRadius: 14,
-    overflow: 'hidden',
+    overflow: 'hidden' as const,
   },
   inputWrapFocused: {
     borderColor: '#F06464',
   },
   input: {
-    flex: 1,
+    width: '100%' as const,
     paddingVertical: 14,
-    paddingHorizontal: 12,
+    paddingLeft: 40,
+    paddingRight: 12,
     fontSize: 15,
     color: '#FFFFFF',
-    backgroundColor: 'transparent',
+    backgroundColor: '#242538',
+    borderRadius: 14,
+  },
+  inputIconLeft: {
+    position: 'absolute' as const,
+    left: 12,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center' as const,
   },
   errorBox: {
     flexDirection: 'row',

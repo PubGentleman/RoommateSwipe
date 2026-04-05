@@ -511,7 +511,6 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
               <View style={[styles.field, { flex: 1, marginRight: 6 }]}>
                 <Text style={styles.fieldLabel}>FIRST NAME</Text>
                 <View style={styles.inputWrap}>
-                  <Feather name="user" size={16} color="rgba(255,255,255,0.35)" />
                   <TextInput
                     style={styles.input}
                     placeholder="First name"
@@ -520,6 +519,9 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
                     onChangeText={(v) => updateState({ firstName: v })}
                     autoCapitalize="words"
                   />
+                  <View style={styles.inputIconLeft} pointerEvents="none">
+                    <Feather name="user" size={16} color="rgba(255,255,255,0.35)" />
+                  </View>
                 </View>
               </View>
               <View style={[styles.field, { flex: 1, marginLeft: 6 }]}>
@@ -540,7 +542,6 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
               <View style={styles.field}>
                 <Text style={styles.fieldLabel}>COMPANY NAME</Text>
                 <View style={styles.inputWrap}>
-                  <Feather name="briefcase" size={16} color="rgba(255,255,255,0.35)" />
                   <TextInput
                     style={styles.input}
                     placeholder="e.g. Skyline Property Group"
@@ -549,13 +550,15 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
                     onChangeText={(v) => updateState({ companyName: v })}
                     autoCapitalize="words"
                   />
+                  <View style={styles.inputIconLeft} pointerEvents="none">
+                    <Feather name="briefcase" size={16} color="rgba(255,255,255,0.35)" />
+                  </View>
                 </View>
               </View>
             ) : null}
             <View style={styles.field}>
               <Text style={styles.fieldLabel}>EMAIL</Text>
               <View style={styles.inputWrap}>
-                <Feather name="mail" size={16} color="rgba(255,255,255,0.35)" />
                 <TextInput
                   style={styles.input}
                   placeholder="you@example.com"
@@ -565,14 +568,16 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
                   keyboardType="email-address"
                   autoCapitalize="none"
                 />
+                <View style={styles.inputIconLeft} pointerEvents="none">
+                  <Feather name="mail" size={16} color="rgba(255,255,255,0.35)" />
+                </View>
               </View>
             </View>
             <View style={styles.field}>
               <Text style={styles.fieldLabel}>PASSWORD</Text>
               <View style={styles.inputWrap}>
-                <Feather name="lock" size={16} color="rgba(255,255,255,0.35)" />
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, { paddingRight: 44 }]}
                   placeholder="Create a password"
                   placeholderTextColor="rgba(255,255,255,0.35)"
                   value={state.password}
@@ -581,7 +586,10 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
                   textContentType="newPassword"
                   autoComplete="new-password"
                 />
-                <Pressable onPress={() => setShowPassword(!showPassword)} hitSlop={8}>
+                <View style={styles.inputIconLeft} pointerEvents="none">
+                  <Feather name="lock" size={16} color="rgba(255,255,255,0.35)" />
+                </View>
+                <Pressable onPress={() => setShowPassword(!showPassword)} style={styles.inputIconRight} hitSlop={8}>
                   <Feather name={showPassword ? 'eye-off' : 'eye'} size={16} color="rgba(255,255,255,0.35)" />
                 </Pressable>
               </View>
@@ -589,7 +597,6 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
             <View style={styles.field}>
               <Text style={styles.fieldLabel}>REFERRAL CODE (OPTIONAL)</Text>
               <View style={styles.inputWrap}>
-                <Feather name="gift" size={16} color="rgba(255,255,255,0.35)" />
                 <TextInput
                   style={styles.input}
                   placeholder="e.g. RHOME-X7K2"
@@ -598,6 +605,9 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
                   onChangeText={(v) => updateState({ referralCode: v.toUpperCase() })}
                   autoCapitalize="characters"
                 />
+                <View style={styles.inputIconLeft} pointerEvents="none">
+                  <Feather name="gift" size={16} color="rgba(255,255,255,0.35)" />
+                </View>
               </View>
             </View>
           </View>
@@ -751,7 +761,6 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
         <View style={styles.field}>
           <Text style={styles.fieldLabel}>LICENSE NUMBER</Text>
           <View style={styles.inputWrap}>
-            <Feather name="hash" size={16} color="rgba(255,255,255,0.35)" />
             <TextInput
               style={styles.input}
               placeholder="Required"
@@ -760,12 +769,14 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
               onChangeText={(v) => updateState({ licenseNumber: v })}
               autoCapitalize="characters"
             />
+            <View style={styles.inputIconLeft} pointerEvents="none">
+              <Feather name="hash" size={16} color="rgba(255,255,255,0.35)" />
+            </View>
           </View>
         </View>
         <View style={styles.field}>
           <Text style={styles.fieldLabel}>AGENCY NAME</Text>
           <View style={styles.inputWrap}>
-            <Feather name="briefcase" size={16} color="rgba(255,255,255,0.35)" />
             <TextInput
               style={styles.input}
               placeholder="Required"
@@ -773,6 +784,9 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
               value={state.agencyName}
               onChangeText={(v) => updateState({ agencyName: v })}
             />
+            <View style={styles.inputIconLeft} pointerEvents="none">
+              <Feather name="briefcase" size={16} color="rgba(255,255,255,0.35)" />
+            </View>
           </View>
         </View>
         <View style={styles.field}>
@@ -1203,20 +1217,36 @@ const styles = StyleSheet.create({
     letterSpacing: 0.6,
   },
   inputWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.07)',
+    position: 'relative' as const,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.12)',
     borderRadius: 14,
-    paddingHorizontal: 14,
-    gap: 10,
+    overflow: 'hidden' as const,
   },
   input: {
-    flex: 1,
+    width: '100%' as const,
     paddingVertical: 14,
+    paddingLeft: 40,
+    paddingRight: 12,
     fontSize: 14,
     color: 'rgba(255,255,255,0.85)',
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderRadius: 14,
+  },
+  inputIconLeft: {
+    position: 'absolute' as const,
+    left: 14,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center' as const,
+  },
+  inputIconRight: {
+    position: 'absolute' as const,
+    right: 12,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center' as const,
+    padding: 4,
   },
   errorBox: {
     flexDirection: 'row',

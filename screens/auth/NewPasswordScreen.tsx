@@ -55,11 +55,8 @@ export const NewPasswordScreen: React.FC<Props> = ({ onComplete }) => {
         <View style={styles.field}>
           <Text style={styles.fieldLabel}>New password</Text>
           <View style={[styles.inputWrap, pwFocused && styles.inputWrapFocused]}>
-            <View style={{ paddingLeft: 12 }}>
-              <Feather name="lock" size={16} color={pwFocused ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.35)'} />
-            </View>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { paddingRight: 44 }]}
               placeholder="Enter new password"
               placeholderTextColor="rgba(255,255,255,0.3)"
               value={password}
@@ -68,7 +65,10 @@ export const NewPasswordScreen: React.FC<Props> = ({ onComplete }) => {
               onFocus={() => setPwFocused(true)}
               onBlur={() => setPwFocused(false)}
             />
-            <Pressable onPress={() => setShowPassword(!showPassword)} style={styles.eyeBtn} hitSlop={8}>
+            <View style={styles.inputIconLeft} pointerEvents="none">
+              <Feather name="lock" size={16} color={pwFocused ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.35)'} />
+            </View>
+            <Pressable onPress={() => setShowPassword(!showPassword)} style={styles.inputIconRight} hitSlop={8}>
               <Feather name={showPassword ? 'eye-off' : 'eye'} size={18} color="rgba(255,255,255,0.4)" />
             </Pressable>
           </View>
@@ -77,11 +77,8 @@ export const NewPasswordScreen: React.FC<Props> = ({ onComplete }) => {
         <View style={styles.field}>
           <Text style={styles.fieldLabel}>Confirm password</Text>
           <View style={[styles.inputWrap, cfFocused && styles.inputWrapFocused]}>
-            <View style={{ paddingLeft: 12 }}>
-              <Feather name="lock" size={16} color={cfFocused ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.35)'} />
-            </View>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { paddingRight: 44 }]}
               placeholder="Confirm new password"
               placeholderTextColor="rgba(255,255,255,0.3)"
               value={confirmPassword}
@@ -90,7 +87,10 @@ export const NewPasswordScreen: React.FC<Props> = ({ onComplete }) => {
               onFocus={() => setCfFocused(true)}
               onBlur={() => setCfFocused(false)}
             />
-            <Pressable onPress={() => setShowConfirm(!showConfirm)} style={styles.eyeBtn} hitSlop={8}>
+            <View style={styles.inputIconLeft} pointerEvents="none">
+              <Feather name="lock" size={16} color={cfFocused ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.35)'} />
+            </View>
+            <Pressable onPress={() => setShowConfirm(!showConfirm)} style={styles.inputIconRight} hitSlop={8}>
               <Feather name={showConfirm ? 'eye-off' : 'eye'} size={18} color="rgba(255,255,255,0.4)" />
             </Pressable>
           </View>
@@ -163,27 +163,39 @@ const styles = StyleSheet.create({
     marginLeft: 2,
   },
   inputWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#242538',
+    position: 'relative' as const,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)',
     borderRadius: 14,
-    overflow: 'hidden',
+    overflow: 'hidden' as const,
   },
   inputWrapFocused: {
     borderColor: '#F06464',
   },
   input: {
-    flex: 1,
+    width: '100%' as const,
     paddingVertical: 14,
-    paddingHorizontal: 12,
+    paddingLeft: 40,
+    paddingRight: 12,
     fontSize: 15,
     color: '#FFFFFF',
-    backgroundColor: 'transparent',
+    backgroundColor: '#242538',
+    borderRadius: 14,
   },
-  eyeBtn: {
-    padding: 10,
+  inputIconLeft: {
+    position: 'absolute' as const,
+    left: 12,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center' as const,
+  },
+  inputIconRight: {
+    position: 'absolute' as const,
+    right: 12,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center' as const,
+    padding: 4,
   },
   reqRow: {
     flexDirection: 'row',
