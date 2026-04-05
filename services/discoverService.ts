@@ -183,7 +183,7 @@ export async function getSwipeDeck(userId: string, city?: string, filters?: {
     .filter((p: any) => isWithinActivityCutoff(p.last_active_at))
     .map((p: any) => ({
       ...p,
-      _decayScore: (p.profile?.compatibility ?? 1) * getRecencyMultiplier(p.last_active_at),
+      _decayScore: getRecencyMultiplier(p.last_active_at),
     }))
     .sort((a: any, b: any) => b._decayScore - a._decayScore);
 

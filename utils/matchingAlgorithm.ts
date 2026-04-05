@@ -529,9 +529,9 @@ export const calculateDetailedCompatibility = (
   // ========================================
   // 2. BUDGET (12 points) - Financial Reality
   // ========================================
-  if (userProfile.budget && roommateProfile.budget) {
-    const userBudget = userProfile.budget;
-    const roommateBudget = roommateProfile.budget;
+  const userBudget = userProfile.budget || userProfile.budget_max || (currentUser as any).budget_max;
+  const roommateBudget = roommateProfile.budget || roommateProfile.profileData?.budget || roommateProfile.profileData?.budget_max || roommateProfile.budget_max;
+  if (userBudget && roommateBudget) {
     const percentDiff = Math.abs(userBudget - roommateBudget) / Math.max(userBudget, roommateBudget);
     
     if (percentDiff <= 0.10) {
