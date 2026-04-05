@@ -629,14 +629,18 @@ export async function getGroupMessages(groupId: string): Promise<GroupMessage[]>
   }));
 }
 
-export async function sendGroupMessage(userId: string, groupId: string, content: string): Promise<void> {
+export async function sendGroupMessage(userId: string, groupId: string, content: string, messageType?: string, metadata?: any): Promise<void> {
   if (!userId) throw new Error('Not authenticated');
 
-  const { error } = await supabase.from('group_messages').insert({
+  const row: any = {
     group_id: groupId,
     sender_id: userId,
     content,
-  });
+  };
+  if (messageType) row.message_type = messageType;
+  if (metadata) row.metadata = metadata;
+
+  const { error } = await supabase.from('group_messages').insert(row);
   if (error) throw error;
 }
 

@@ -2,10 +2,13 @@ import { supabase } from '../lib/supabase';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
+import * as ImageManipulator from 'expo-image-manipulator';
 
 const BUCKET = 'chat-attachments';
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
+const MAX_IMAGE_DIMENSION = 1024;
+const THUMBNAIL_SIZE = 300;
 
 export interface ChatAttachment {
   url: string;
@@ -14,6 +17,25 @@ export interface ChatAttachment {
   sizeBytes: number;
   width?: number;
   height?: number;
+  thumbnailUrl?: string;
+}
+
+export async function compressImage(uri: string): Promise<{ uri: string; width: number; height: number }> {
+  const result = await ImageManipulator.manipulateAsync(
+    uri,
+    [{ resize: { width: MAX_IMAGE_DIMENSION } }],
+    { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
+  );
+  return { uri: result.uri, width: result.width, height: result.height };
+}
+
+async function generateThumbnail(uri: string): Promise<string> {
+  const result = await ImageManipulator.manipulateAsync(
+    uri,
+    [{ resize: { width: THUMBNAIL_SIZE } }],
+    { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG }
+  );
+  return result.uri;
 }
 
 export async function pickImage(): Promise<ImagePicker.ImagePickerResult | null> {
@@ -25,6 +47,8 @@ export async function pickImage(): Promise<ImagePicker.ImagePickerResult | null>
   const result = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ImagePicker.MediaTypeOptions.Images,
     allowsEditing: false,
+    allowsMultipleSelection: true,
+    selectionLimit: 5,
     quality: 0.7,
     exif: false,
   });
@@ -54,6 +78,9 @@ export async function pickDocument(): Promise<DocumentPicker.DocumentPickerResul
       'application/pdf',
       'application/msword',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'text/plain',
       'image/*',
     ],
     copyToCacheDirectory: true,
@@ -69,11 +96,24 @@ export async function uploadChatAttachment(
   filename: string,
   mimeType: string
 ): Promise<ChatAttachment> {
-  const fileInfo = await FileSystem.getInfoAsync(localUri);
+  const isImage = mimeType.startsWith('image/');
+
+  let uploadUri = localUri;
+  let width: number | undefined;
+  let height: number | undefined;
+  let thumbnailUrl: string | undefined;
+
+  if (isImage) {
+    const compressed = await compressImage(localUri);
+    uploadUri = compressed.uri;
+    width = compressed.width;
+    height = compressed.height;
+  }
+
+  const fileInfo = await FileSystem.getInfoAsync(uploadUri);
   if (!fileInfo.exists) throw new Error('File not found');
 
   const sizeBytes = (fileInfo as any).size || 0;
-  const isImage = mimeType.startsWith('image/');
   const maxSize = isImage ? MAX_IMAGE_SIZE : MAX_FILE_SIZE;
 
   if (sizeBytes > maxSize) {
@@ -85,7 +125,7 @@ export async function uploadChatAttachment(
   const safeName = filename.replace(/[^a-zA-Z0-9._-]/g, '_');
   const storagePath = `${userId}/${timestamp}-${safeName}`;
 
-  const base64 = await FileSystem.readAsStringAsync(localUri, {
+  const base64 = await FileSystem.readAsStringAsync(uploadUri, {
     encoding: FileSystem.EncodingType.Base64,
   });
 
@@ -98,7 +138,7 @@ export async function uploadChatAttachment(
   const { error: uploadError } = await supabase.storage
     .from(BUCKET)
     .upload(storagePath, bytes.buffer, {
-      contentType: mimeType,
+      contentType: isImage ? 'image/jpeg' : mimeType,
       upsert: false,
     });
 
@@ -108,10 +148,63 @@ export async function uploadChatAttachment(
     .from(BUCKET)
     .getPublicUrl(storagePath);
 
+  if (isImage) {
+    try {
+      const thumbUri = await generateThumbnail(localUri);
+      const thumbPath = `thumbnails/${userId}/${timestamp}-thumb_${safeName}`;
+      const thumbBase64 = await FileSystem.readAsStringAsync(thumbUri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      const thumbBinary = atob(thumbBase64);
+      const thumbBytes = new Uint8Array(thumbBinary.length);
+      for (let i = 0; i < thumbBinary.length; i++) {
+        thumbBytes[i] = thumbBinary.charCodeAt(i);
+      }
+      await supabase.storage
+        .from(BUCKET)
+        .upload(thumbPath, thumbBytes.buffer, { contentType: 'image/jpeg', upsert: false });
+      const { data: thumbUrlData } = supabase.storage.from(BUCKET).getPublicUrl(thumbPath);
+      thumbnailUrl = thumbUrlData.publicUrl;
+    } catch (_e) {}
+  }
+
   return {
     url: urlData.publicUrl,
     filename: safeName,
-    mimeType,
+    mimeType: isImage ? 'image/jpeg' : mimeType,
     sizeBytes,
+    width,
+    height,
+    thumbnailUrl,
   };
+}
+
+export function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+export async function getConversationMedia(matchId: string) {
+  const { data, error } = await supabase
+    .from('messages')
+    .select('id, metadata, message_type, created_at, sender_id')
+    .eq('match_id', matchId)
+    .in('message_type', ['image', 'images'])
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+
+  const allImages: { url: string; thumbnailUrl?: string; messageId: string; createdAt: string }[] = [];
+  (data || []).forEach((msg: any) => {
+    if (msg.metadata?.images) {
+      msg.metadata.images.forEach((img: any) => {
+        allImages.push({ url: img.url, thumbnailUrl: img.thumbnailUrl, messageId: msg.id, createdAt: msg.created_at });
+      });
+    } else if (msg.metadata?.url) {
+      allImages.push({ url: msg.metadata.url, thumbnailUrl: msg.metadata.thumbnailUrl, messageId: msg.id, createdAt: msg.created_at });
+    }
+  });
+
+  return allImages;
 }

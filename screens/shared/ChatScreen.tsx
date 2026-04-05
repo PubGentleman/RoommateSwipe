@@ -44,7 +44,9 @@ import { sendStructuredMessage, updateMessageMetadata } from '../../services/mes
 import ChatAttachmentPicker from '../../components/ChatAttachmentPicker';
 import ChatImageMessage from '../../components/ChatImageMessage';
 import ChatFileMessage from '../../components/ChatFileMessage';
-import { pickImage, takePhoto, pickDocument, uploadChatAttachment } from '../../services/chatAttachmentService';
+import { pickImage, takePhoto, pickDocument, uploadChatAttachment, formatFileSize } from '../../services/chatAttachmentService';
+import { ImageGalleryViewer } from '../../components/ImageGalleryViewer';
+import { MediaUploadProgress } from '../../components/MediaUploadProgress';
 import * as Notifications from 'expo-notifications';
 import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
@@ -186,6 +188,11 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   const [highlightedId, setHighlightedId] = useState<string | null>(highlightMessageId || null);
   const [showAttachmentPicker, setShowAttachmentPicker] = useState(false);
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState({ uploading: false, sent: 0, total: 0, previewUri: '' });
+  const uploadCancelledRef = useRef(false);
+  const [galleryVisible, setGalleryVisible] = useState(false);
+  const [galleryImages, setGalleryImages] = useState<{ url: string; senderName?: string; createdAt?: string }[]>([]);
+  const [galleryInitialIndex, setGalleryInitialIndex] = useState(0);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showGroupOption, setShowGroupOption] = useState(true);
   const [isOnline, setIsOnline] = useState(false);
@@ -791,26 +798,65 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   const handlePickImage = async () => {
     try {
       const result = await pickImage();
-      if (!result || result.canceled) return;
-      const asset = result.assets[0];
+      if (!result || result.canceled || result.assets.length === 0) return;
+
+      const assets = result.assets;
+      const total = assets.length;
+      uploadCancelledRef.current = false;
+
       setUploadingAttachment(true);
-      const attachment = await uploadChatAttachment(
-        user!.id,
-        asset.uri,
-        asset.fileName || `photo-${Date.now()}.jpg`,
-        asset.mimeType || 'image/jpeg'
-      );
+      setUploadProgress({ uploading: true, sent: 0, total, previewUri: assets[0].uri });
+
       const matchIdOrGroupId = matchIdFromConversation || conversationId;
-      if (isInquiryChat) {
-        const groupId = inquiryGroup?.id || conversationId.replace('inquiry_', '');
-        await sendGroupMessage(user!.id, groupId, `[Image: ${attachment.filename}]`);
+
+      if (total === 1) {
+        const asset = assets[0];
+        const attachment = await uploadChatAttachment(
+          user!.id, asset.uri, asset.fileName || `photo-${Date.now()}.jpg`, asset.mimeType || 'image/jpeg'
+        );
+        setUploadProgress(p => ({ ...p, sent: 1 }));
+        if (uploadCancelledRef.current) return;
+        const imgMeta = {
+          url: attachment.url, filename: attachment.filename, mimeType: attachment.mimeType,
+          sizeBytes: attachment.sizeBytes, thumbnailUrl: attachment.thumbnailUrl,
+          width: attachment.width, height: attachment.height,
+        };
+        if (isInquiryChat) {
+          const groupId = inquiryGroup?.id || conversationId.replace('inquiry_', '');
+          await sendGroupMessage(user!.id, groupId, 'Sent a photo', 'image', imgMeta);
+        } else {
+          await sendStructuredMessage(user!.id, matchIdOrGroupId, 'image', imgMeta, 'Sent a photo');
+        }
       } else {
-        await sendStructuredMessage(user!.id, matchIdOrGroupId, 'image', { url: attachment.url, filename: attachment.filename, mimeType: attachment.mimeType, sizeBytes: attachment.sizeBytes }, 'Sent a photo');
+        const uploaded: any[] = [];
+        for (let i = 0; i < total; i++) {
+          if (uploadCancelledRef.current) return;
+          const asset = assets[i];
+          const attachment = await uploadChatAttachment(
+            user!.id, asset.uri, asset.fileName || `photo-${Date.now()}-${i}.jpg`, asset.mimeType || 'image/jpeg'
+          );
+          uploaded.push({
+            url: attachment.url, filename: attachment.filename, mimeType: attachment.mimeType,
+            sizeBytes: attachment.sizeBytes, thumbnailUrl: attachment.thumbnailUrl,
+            width: attachment.width, height: attachment.height,
+          });
+          setUploadProgress(p => ({ ...p, sent: i + 1 }));
+        }
+        if (uploadCancelledRef.current) return;
+        if (isInquiryChat) {
+          const groupId = inquiryGroup?.id || conversationId.replace('inquiry_', '');
+          await sendGroupMessage(user!.id, groupId, `Sent ${total} photos`, 'images', { images: uploaded });
+        } else {
+          await sendStructuredMessage(user!.id, matchIdOrGroupId, 'images', { images: uploaded }, `Sent ${total} photos`);
+        }
       }
     } catch (err: any) {
-      await alert({ title: 'Upload Failed', message: err.message || 'Could not upload the image.', variant: 'warning' });
+      if (!uploadCancelledRef.current) {
+        await alert({ title: 'Upload Failed', message: err.message || 'Could not upload the image.', variant: 'warning' });
+      }
     } finally {
       setUploadingAttachment(false);
+      setUploadProgress({ uploading: false, sent: 0, total: 0, previewUri: '' });
     }
   };
 
@@ -820,20 +866,28 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
       if (!result || result.canceled) return;
       const asset = result.assets[0];
       setUploadingAttachment(true);
+      setUploadProgress({ uploading: true, sent: 0, total: 1, previewUri: asset.uri });
       const attachment = await uploadChatAttachment(
-        user!.id,
-        asset.uri,
-        `photo-${Date.now()}.jpg`,
-        'image/jpeg'
+        user!.id, asset.uri, `photo-${Date.now()}.jpg`, 'image/jpeg'
       );
+      setUploadProgress(p => ({ ...p, sent: 1 }));
       const matchIdOrGroupId = matchIdFromConversation || conversationId;
-      if (!isInquiryChat) {
-        await sendStructuredMessage(user!.id, matchIdOrGroupId, 'image', { url: attachment.url, filename: attachment.filename, mimeType: attachment.mimeType, sizeBytes: attachment.sizeBytes }, 'Sent a photo');
+      const photoMeta = {
+        url: attachment.url, filename: attachment.filename, mimeType: attachment.mimeType,
+        sizeBytes: attachment.sizeBytes, thumbnailUrl: attachment.thumbnailUrl,
+        width: attachment.width, height: attachment.height,
+      };
+      if (isInquiryChat) {
+        const groupId = inquiryGroup?.id || conversationId.replace('inquiry_', '');
+        await sendGroupMessage(user!.id, groupId, 'Sent a photo', 'image', photoMeta);
+      } else {
+        await sendStructuredMessage(user!.id, matchIdOrGroupId, 'image', photoMeta, 'Sent a photo');
       }
     } catch (err: any) {
       await alert({ title: 'Upload Failed', message: err.message || 'Could not take the photo.', variant: 'warning' });
     } finally {
       setUploadingAttachment(false);
+      setUploadProgress({ uploading: false, sent: 0, total: 0, previewUri: '' });
     }
   };
 
@@ -850,8 +904,12 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
         doc.mimeType || 'application/octet-stream'
       );
       const matchIdOrGroupId = matchIdFromConversation || conversationId;
-      if (!isInquiryChat) {
-        await sendStructuredMessage(user!.id, matchIdOrGroupId, 'file', { url: attachment.url, filename: attachment.filename, mimeType: attachment.mimeType, sizeBytes: attachment.sizeBytes }, `Sent a file: ${attachment.filename}`);
+      const fileMeta = { url: attachment.url, filename: attachment.filename, mimeType: attachment.mimeType, sizeBytes: attachment.sizeBytes };
+      if (isInquiryChat) {
+        const groupId = inquiryGroup?.id || conversationId.replace('inquiry_', '');
+        await sendGroupMessage(user!.id, groupId, `Sent a file: ${attachment.filename}`, 'file', fileMeta);
+      } else {
+        await sendStructuredMessage(user!.id, matchIdOrGroupId, 'file', fileMeta, `Sent a file: ${attachment.filename}`);
       }
     } catch (err: any) {
       await alert({ title: 'Upload Failed', message: err.message || 'Could not upload the file.', variant: 'warning' });
@@ -1597,12 +1655,37 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
     const isOwnMsg = msg.senderId === user?.id;
 
     if (msgType === 'image' && (msg as any).metadata?.url) {
+      const imgMeta = (msg as any).metadata;
+      const imagesList = [{ url: imgMeta.url, thumbnailUrl: imgMeta.thumbnailUrl }];
       return (
         <Pressable onLongPress={() => handleLongPressMessage(msg)} style={{ paddingHorizontal: 12, marginBottom: 8 }}>
           <ChatImageMessage
-            url={(msg as any).metadata.url}
+            images={imagesList}
             isMine={isOwnMsg}
             timestamp={msg.timestamp?.toString() || new Date().toISOString()}
+            onOpenGallery={(idx) => {
+              setGalleryImages(imagesList.map(i => ({ url: i.url, createdAt: msg.timestamp?.toString() })));
+              setGalleryInitialIndex(idx);
+              setGalleryVisible(true);
+            }}
+          />
+        </Pressable>
+      );
+    }
+
+    if (msgType === 'images' && (msg as any).metadata?.images) {
+      const imagesList = (msg as any).metadata.images as { url: string; thumbnailUrl?: string }[];
+      return (
+        <Pressable onLongPress={() => handleLongPressMessage(msg)} style={{ paddingHorizontal: 12, marginBottom: 8 }}>
+          <ChatImageMessage
+            images={imagesList}
+            isMine={isOwnMsg}
+            timestamp={msg.timestamp?.toString() || new Date().toISOString()}
+            onOpenGallery={(idx) => {
+              setGalleryImages(imagesList.map(i => ({ url: i.url, createdAt: msg.timestamp?.toString() })));
+              setGalleryInitialIndex(idx);
+              setGalleryVisible(true);
+            }}
           />
         </Pressable>
       );
@@ -2128,6 +2211,15 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
                   <Feather name="cpu" size={20} color="#FF6B6B" />
                 </Pressable>
               ) : null}
+              <Pressable
+                onPress={() => {
+                  const mid = matchIdFromConversation || conversationId;
+                  (navigation as any).navigate('ConversationMedia', { matchId: mid, title: otherUser?.name ? `Media with ${otherUser.name}` : 'Shared Media' });
+                }}
+                style={styles.moreButton}
+              >
+                <Feather name="grid" size={18} color={theme.textSecondary} />
+              </Pressable>
               <Pressable onPress={() => setShowOptionsMenu(true)} style={styles.moreButton}>
                 <Feather name="more-vertical" size={24} color={theme.text} />
               </Pressable>
@@ -2546,6 +2638,13 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
           </Pressable>
         </View>
       ) : null}
+      <MediaUploadProgress
+        uploading={uploadProgress.uploading}
+        sent={uploadProgress.sent}
+        total={uploadProgress.total}
+        imageUri={uploadProgress.previewUri}
+        onCancel={() => { uploadCancelledRef.current = true; setUploadProgress({ uploading: false, sent: 0, total: 0, previewUri: '' }); setUploadingAttachment(false); }}
+      />
       <View style={[styles.inputContainer, { backgroundColor: theme.backgroundRoot, paddingBottom: TAB_BAR_HEIGHT }]}>
         {messagingLocked ? (
           <View style={styles.lockedInputRow}>
@@ -2965,6 +3064,13 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
         onPickImage={handlePickImage}
         onTakePhoto={handleTakePhoto}
         onPickDocument={handlePickDocument}
+      />
+
+      <ImageGalleryViewer
+        visible={galleryVisible}
+        images={galleryImages}
+        initialIndex={galleryInitialIndex}
+        onClose={() => setGalleryVisible(false)}
       />
       {gateModal ? (
         <FeatureGateModal
