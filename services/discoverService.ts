@@ -38,8 +38,7 @@ export async function getSwipeDeck(userId: string, city?: string, filters?: {
     `)
     .eq('role', 'renter')
     .eq('onboarding_step', 'complete')
-    .not('id', 'in', `(${excludeIds.join(',')})`)
-    .or('is_deleted.is.null,is_deleted.eq.false');
+    .not('id', 'in', `(${excludeIds.join(',')})`);
 
   if (city) {
     query = query.eq('city', city);
