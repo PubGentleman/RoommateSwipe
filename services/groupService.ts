@@ -49,7 +49,7 @@ export async function getGroups(city?: string, type?: GroupType) {
     .from('groups')
     .select(`
       *,
-      members:group_members(user_id, is_couple, is_host, status)
+      members:group_members(user_id, role, status)
     `)
     .order('created_at', { ascending: false });
 
@@ -77,7 +77,7 @@ export async function getGroup(id: string) {
     .from('groups')
     .select(`
       *,
-      members:group_members(*, is_couple, partner_user_id, user:users(id, full_name, avatar_url, age, occupation)),
+      members:group_members(*, user:users(id, full_name, avatar_url, age, occupation)),
       creator:users!created_by(id, full_name, avatar_url)
     `)
     .eq('id', id)
@@ -93,7 +93,7 @@ export async function getGroupDetails(userId: string, groupId: string) {
     .select(`
       *,
       members:group_members(
-        user_id, role, is_admin, is_host, is_couple, partner_user_id, status,
+        user_id, role, status,
         user:users(id, full_name, avatar_url, age, role)
       ),
       listing:listings(id, title, address, city, state, rent, bedrooms, photos, status)
@@ -169,7 +169,7 @@ export async function getMyGroups(userId: string, type?: GroupType) {
     .from('groups')
     .select(`
       *,
-      members:group_members(user_id, is_couple, is_host, status),
+      members:group_members(user_id, role, status),
       listing:listings(id, title, photos, rent)
     `)
     .in('id', groupIds);
@@ -219,7 +219,7 @@ export async function createGroup(userId: string, group: GroupData) {
 
   await supabase
     .from('group_members')
-    .insert({ group_id: data.id, user_id: userId, role: 'admin', is_host: false });
+    .insert({ group_id: data.id, user_id: userId, role: 'admin' });
 
   return data;
 }
@@ -300,15 +300,13 @@ export async function createListingInquiryGroup(
       group_id: group.id,
       user_id: uid,
       role: 'member',
-      is_host: false,
       status: 'active',
     }));
 
     memberInserts.push({
       group_id: group.id,
       user_id: effectiveHostId,
-      role: 'member',
-      is_host: true,
+      role: 'host',
       status: 'active',
     });
 
@@ -373,10 +371,7 @@ export async function addMemberToGroup(
     .insert({
       group_id: groupId,
       user_id: userId,
-      role: 'member',
-      is_host: userRole === 'host',
-      is_couple: options?.isCouple || false,
-      partner_user_id: options?.partnerUserId || null,
+      role: userRole === 'host' ? 'host' : 'member',
     })
     .select()
     .single();
@@ -391,12 +386,17 @@ export async function updateMemberCouple(
   isCouple: boolean,
   partnerUserId?: string
 ) {
+  const updateData: any = {};
+  if (isCouple) {
+    updateData.is_couple = true;
+    if (partnerUserId) updateData.partner_user_id = partnerUserId;
+  } else {
+    updateData.is_couple = false;
+    updateData.partner_user_id = null;
+  }
   const { data, error } = await supabase
     .from('group_members')
-    .update({
-      is_couple: isCouple,
-      partner_user_id: isCouple ? (partnerUserId || null) : null,
-    })
+    .update(updateData)
     .eq('group_id', groupId)
     .eq('user_id', userId)
     .select()
@@ -455,7 +455,6 @@ export async function joinGroup(userId: string, groupId: string) {
             group_id: inquiryGroup.id,
             user_id: userId,
             role: 'member',
-            is_host: false,
             status: 'active',
             joined_at: new Date().toISOString(),
           })
@@ -623,7 +622,7 @@ export async function getGroupMembers(groupId: string): Promise<GroupMember[]> {
     `)
     .eq('group_id', groupId)
     .eq('status', 'active')
-    .order('is_host', { ascending: false });
+    .order('created_at', { ascending: true });
 
   if (error) throw error;
   return (data || []).map(mapGroupMember);
@@ -1561,7 +1560,6 @@ export async function sendGroupInvites(groupId: string, invites: GroupInviteInpu
     invite_email: inv.email || null,
     invite_phone: inv.phone || null,
     invite_code: generateGroupInviteCode(),
-    is_couple: inv.isCouple || false,
     delivery_method: inv.email ? 'email' : 'sms',
     delivery_status: 'pending',
     status: 'pending',
@@ -1647,7 +1645,7 @@ export async function acceptGroupInvite(inviteCode: string, userId: string): Pro
 
   await supabase.from('group_invites').update({ status: 'accepted' }).eq('id', invite.id);
 
-  await addMemberToGroup(invite.group_id, userId, 'renter', { isCouple: invite.is_couple });
+  await addMemberToGroup(invite.group_id, userId, 'renter');
   return { groupId: invite.group_id };
 }
 
@@ -1965,12 +1963,12 @@ export async function editGroupMessage(messageId: string, userId: string, newCon
 export async function adminDeleteGroupMessage(messageId: string, groupId: string, adminId: string) {
   const { data: member } = await supabase
     .from('group_members')
-    .select('is_admin')
+    .select('role')
     .eq('group_id', groupId)
     .eq('user_id', adminId)
     .single();
 
-  if (!member?.is_admin) throw new Error('Not an admin');
+  if (member?.role !== 'admin') throw new Error('Not an admin');
 
   const { error } = await supabase
     .from('group_messages')
