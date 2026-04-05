@@ -92,7 +92,7 @@ export const RootNavigator = () => {
 
   const step = user?.onboardingStep || 'complete';
   const isHostProfessional = !!user && user.role === 'host' && (user.hostType === 'agent' || user.hostType === 'company');
-  const shouldSkipProfile = !!user && step === 'profile' && isHostProfessional;
+  const shouldSkipProfile = false;
   const shouldSkipHostType = !!user && step === 'hostType' && user.role === 'host' && !!user.hostType;
 
   useEffect(() => {

@@ -149,6 +149,7 @@ export function HostAgentSetupScreen() {
       });
 
       setVerifying(true);
+      let localLicenseStatus: 'verified' | 'not_found' | 'manual_review' = 'manual_review';
 
       try {
         const result = await verifyAgentLicense({
@@ -160,22 +161,50 @@ export function HostAgentSetupScreen() {
 
         if (result.verified) {
           await updateUser({ licenseVerificationStatus: 'verified', licenseVerified: true, licenseVerifiedAt: new Date().toISOString() });
+          localLicenseStatus = 'verified';
           setVerificationResult('verified');
         } else if (result.reason === 'not_found') {
           await updateUser({ licenseVerificationStatus: 'pending' });
+          localLicenseStatus = 'not_found';
           setVerificationResult('not_found');
         } else {
           await updateUser({ licenseVerificationStatus: 'manual_review' });
+          localLicenseStatus = 'manual_review';
           setVerificationResult('manual_review');
         }
       } catch {
         await updateUser({ licenseVerificationStatus: 'manual_review' });
+        localLicenseStatus = 'manual_review';
         setVerificationResult('manual_review');
       }
 
       setVerifying(false);
 
-      await new Promise(r => setTimeout(r, 1500));
+      if (localLicenseStatus === 'not_found') {
+        const { Alert } = require('react-native');
+        const proceed = await new Promise<boolean>((resolve) => {
+          Alert.alert(
+            'License Not Found',
+            'We couldn\'t verify your license automatically. You can still continue, but your listings will show as "Unverified" until manual review is complete (24-48 hours).',
+            [
+              { text: 'Re-enter License', style: 'cancel', onPress: () => resolve(false) },
+              { text: 'Continue Anyway', onPress: () => resolve(true) },
+            ]
+          );
+        });
+        if (!proceed) { setSaving(false); return; }
+      } else if (localLicenseStatus === 'manual_review') {
+        const { Alert } = require('react-native');
+        await new Promise<void>((resolve) => {
+          Alert.alert(
+            'Under Review',
+            'Your license is being reviewed. You can start setting up while we verify (24-48 hours).',
+            [{ text: 'Continue', onPress: () => resolve() }]
+          );
+        });
+      } else {
+        await new Promise(r => setTimeout(r, 1500));
+      }
 
       if (isFromSettings) {
         navigation.replace('HostSubscription');

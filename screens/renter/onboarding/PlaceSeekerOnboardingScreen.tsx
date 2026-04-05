@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  View, Text, Pressable, ScrollView, StyleSheet, ActivityIndicator,
+  View, Text, Pressable, ScrollView, StyleSheet, ActivityIndicator, Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -420,6 +420,15 @@ export default function PlaceSeekerOnboardingScreen() {
       }
     } catch (err) {
       console.error('Error saving place seeker preferences:', err);
+      Alert.alert(
+        'Save Failed',
+        'We couldn\'t save your preferences. Please check your connection and try again.',
+        [
+          { text: 'Try Again', onPress: () => handleComplete() },
+          { text: 'Skip for Now', onPress: () => handleSkip() },
+        ]
+      );
+      return;
     } finally {
       setLoading(false);
     }
@@ -501,6 +510,14 @@ export default function PlaceSeekerOnboardingScreen() {
           style={{ borderRadius: 14, overflow: 'hidden', opacity: loading ? 0.6 : 1 }}
           onPress={() => {
             if (step < TOTAL_STEPS) {
+              if (step === 1 && budgetMax <= 0) {
+                Alert.alert('Budget Required', 'Please set your maximum budget to help us find the right listings.');
+                return;
+              }
+              if (step === 1 && budgetMin > budgetMax) {
+                Alert.alert('Budget Range', 'Your minimum budget cannot be higher than your maximum.');
+                return;
+              }
               setStep(s => s + 1);
               try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
             } else {

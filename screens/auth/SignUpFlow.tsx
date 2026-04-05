@@ -365,6 +365,12 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
               }
             } else {
               console.warn('[SignUp] Profile photo upload failed:', uploadErr.message);
+              const { Alert } = require('react-native');
+              Alert.alert(
+                'Photo Upload Issue',
+                'Your profile photo couldn\'t be uploaded. You can add it later in your profile settings.',
+                [{ text: 'OK' }]
+              );
             }
           }
         } catch (photoErr) {

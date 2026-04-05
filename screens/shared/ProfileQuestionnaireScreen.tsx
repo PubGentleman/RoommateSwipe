@@ -640,9 +640,15 @@ export const ProfileQuestionnaireScreen = () => {
         if (bio.trim().length < 20) { await showAlert({ title: 'Required', message: `Please write at least 20 characters ${bioLabel}`, variant: 'warning' }); return false; }
         return true;
       }
-      case 'budgetLocation':
-        if (!budget || parseInt(budget) < 100) {
-          await showAlert({ title: 'Required', message: 'Please enter your maximum monthly budget', variant: 'warning' });
+      case 'budgetLocation': {
+        const budgetMaxNum = parseInt(budget) || 0;
+        const budgetMinNum = parseInt(budgetMin) || 0;
+        if (budgetMaxNum < 100) {
+          await showAlert({ title: 'Required', message: 'Please set a maximum budget of at least $100', variant: 'warning' });
+          return false;
+        }
+        if (budgetMinNum > budgetMaxNum) {
+          await showAlert({ title: 'Budget Range', message: 'Minimum budget cannot be higher than maximum', variant: 'warning' });
           return false;
         }
         if (!selectedCity) {
@@ -650,6 +656,7 @@ export const ProfileQuestionnaireScreen = () => {
           return false;
         }
         return true;
+      }
       case 'dealbreakers':
         return true;
       case 'houseRules':
@@ -762,6 +769,18 @@ export const ProfileQuestionnaireScreen = () => {
       setCurrentFilteredIndex(nextIdx);
       try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
       updateUser(buildProfileData()).catch(() => {});
+
+      try {
+        if (user?.id) {
+          const partialData = buildProfileData();
+          updateProfile(user.id, {
+            preferred_neighborhoods: preferredNeighborhoods.length > 0 ? preferredNeighborhoods : undefined,
+            zip_code: zipCode.trim() || undefined,
+            listing_type_preference: user?.profileData?.listing_type_preference,
+            apartment_search_type: user?.profileData?.apartment_search_type,
+          }).catch(err => console.warn('[Onboarding] Auto-save failed:', err));
+        }
+      } catch (_) {}
 
       if (currentStepId === 'photos' && photos.length > 0) {
         showMilestone('Looking good! Let\'s keep going');
@@ -1134,17 +1153,17 @@ export const ProfileQuestionnaireScreen = () => {
               onCityChange={setSelectedCity}
               onNeighborhoodChange={(n) => {
                 setSelectedNeighborhood(n);
-                if (n && !preferredNeighborhoods.includes(n) && preferredNeighborhoods.length < 3) {
+                if (n && !preferredNeighborhoods.includes(n) && preferredNeighborhoods.length < 5) {
                   setPreferredNeighborhoods(prev => [...prev, n]);
                 }
               }}
             />
 
             <Text style={[styles.questionText, { marginTop: 20, fontSize: 16 }]}>
-              Preferred neighborhoods (pick up to 3)
+              Preferred neighborhoods (pick up to 5)
             </Text>
             <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginBottom: 12 }}>
-              {preferredNeighborhoods.length}/3 selected
+              {preferredNeighborhoods.length}/5 selected
             </Text>
             {preferredNeighborhoods.length > 0 ? (
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>

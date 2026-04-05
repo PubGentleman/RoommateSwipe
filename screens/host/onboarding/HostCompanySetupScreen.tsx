@@ -65,14 +65,21 @@ export function HostCompanySetupScreen() {
 
   async function handleContinue() {
     if (!canContinue) return;
+    const trimmedLicense = licenseNumber.trim();
+    if (trimmedLicense.length < 4) {
+      const { Alert } = require('react-native');
+      Alert.alert('Invalid License', 'Please enter a valid brokerage license number (at least 4 characters).');
+      return;
+    }
     setSaving(true);
     try {
       await updateUser({
         hostType: 'company',
         companyName: companyName.trim(),
         unitsManaged: unitsManaged ? parseInt(unitsManaged, 10) : undefined,
-        brokerageLicense: licenseNumber.trim(),
+        brokerageLicense: trimmedLicense,
         licensingState,
+        licenseVerificationStatus: 'pending',
         hostTypeLockedAt: new Date().toISOString(),
       });
       if (isFromSettings) {

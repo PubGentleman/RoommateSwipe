@@ -757,6 +757,38 @@ export const HostDashboardScreen = () => {
           />
         ) : null}
 
+        {listings.length === 0 ? (
+          <View style={{
+            backgroundColor: '#1a1a1a',
+            borderRadius: 16,
+            padding: 24,
+            marginBottom: 20,
+            marginHorizontal: 16,
+            borderWidth: 1,
+            borderColor: 'rgba(255,107,91,0.2)',
+          }}>
+            <Text style={{ color: '#fff', fontSize: 20, fontWeight: '700', marginBottom: 8 }}>
+              Welcome to Rhome!
+            </Text>
+            <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 14, marginBottom: 20, lineHeight: 20 }}>
+              Create your first listing to start receiving inquiries from verified renters.
+            </Text>
+            <Pressable
+              onPress={() => navigation.navigate('CreateEditListing')}
+              style={{
+                backgroundColor: '#ff6b5b',
+                borderRadius: 12,
+                paddingVertical: 14,
+                alignItems: 'center',
+              }}
+            >
+              <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>
+                Create Your First Listing
+              </Text>
+            </Pressable>
+          </View>
+        ) : null}
+
         <View style={styles.roleRow}>
           <View style={styles.hostBadge}>
             <Feather name={isAgent ? 'briefcase' : isCompany ? 'grid' : 'home'} size={12} color={ACCENT} />
