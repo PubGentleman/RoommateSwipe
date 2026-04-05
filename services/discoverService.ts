@@ -105,6 +105,64 @@ export async function getSwipeDeck(userId: string, city?: string, filters?: {
     });
   }
 
+  const { data: currentUserProfile } = await supabase
+    .from('profiles')
+    .select('dealbreakers, smoking, pets, pet_type, guest_policy')
+    .eq('user_id', userId)
+    .single();
+
+  if (currentUserProfile?.dealbreakers?.length > 0) {
+    profiles = profiles.filter(p => {
+      const candidateProfile = p.profile || {};
+      for (const db of currentUserProfile.dealbreakers) {
+        switch (db) {
+          case 'no_smokers':
+            if (candidateProfile.smoking === 'yes' || candidateProfile.smoking === 'only_outside') return false;
+            break;
+          case 'no_cats':
+            if (candidateProfile.pets === 'have_pets' && candidateProfile.pet_type === 'cat') return false;
+            break;
+          case 'no_dogs':
+            if (candidateProfile.pets === 'have_pets' && candidateProfile.pet_type === 'dog') return false;
+            break;
+          case 'no_pets':
+            if (candidateProfile.pets === 'have_pets') return false;
+            break;
+          case 'no_overnight_guests':
+            if (candidateProfile.guest_policy === 'frequently') return false;
+            break;
+        }
+      }
+      return true;
+    });
+  }
+
+  if (currentUserProfile) {
+    profiles = profiles.filter(p => {
+      const candidateDealbreakers: string[] = p.profile?.dealbreakers || [];
+      for (const db of candidateDealbreakers) {
+        switch (db) {
+          case 'no_smokers':
+            if (currentUserProfile.smoking === 'yes' || currentUserProfile.smoking === 'only_outside') return false;
+            break;
+          case 'no_cats':
+            if (currentUserProfile.pets === 'have_pets' && currentUserProfile.pet_type === 'cat') return false;
+            break;
+          case 'no_dogs':
+            if (currentUserProfile.pets === 'have_pets' && currentUserProfile.pet_type === 'dog') return false;
+            break;
+          case 'no_pets':
+            if (currentUserProfile.pets === 'have_pets') return false;
+            break;
+          case 'no_overnight_guests':
+            if (currentUserProfile.guest_policy === 'frequently') return false;
+            break;
+        }
+      }
+      return true;
+    });
+  }
+
   if (filters?.budgetMin || filters?.budgetMax) {
     profiles = profiles.filter(p => {
       const budget = p.profile?.budget_max;

@@ -21,7 +21,7 @@ export async function getBestMatchToday(userId: string): Promise<{
     .from('match_scores')
     .select('user_id, target_id, score, breakdown')
     .or(`user_id.eq.${userId},target_id.eq.${userId}`)
-    .gte('score', 80)
+    .gte('score', 70)
     .order('score', { ascending: false })
     .limit(1);
 
@@ -40,10 +40,19 @@ export async function getBestMatchToday(userId: string): Promise<{
 
   let reason = '';
   const b = row.breakdown ?? {};
-  if (b.sleep >= 20 && b.cleanliness >= 15) {
-    reason = 'Same sleep schedule and cleanliness level';
-  } else if (b.budget >= 20) {
-    reason = 'Budget and lifestyle are a strong match';
+
+  const highlights: string[] = [];
+  if (b.sleep >= 10) highlights.push('sleep schedule');
+  if (b.cleanliness >= 10) highlights.push('cleanliness');
+  if (b.budget >= 10) highlights.push('budget');
+  if (b.location >= 12) highlights.push('neighborhood');
+  if (b.age >= 6) highlights.push('age');
+  if (b.personality >= 10) highlights.push('personality');
+
+  if (highlights.length >= 2) {
+    reason = `Strong match on ${highlights.slice(0, 3).join(', ')}`;
+  } else if (highlights.length === 1) {
+    reason = `Great ${highlights[0]} compatibility and solid overall match`;
   } else {
     reason = 'High compatibility across multiple factors';
   }

@@ -35,7 +35,36 @@ interface CandidateProfile {
   profileData: Record<string, any>;
 }
 
+function checkDealbreakers(profileA: Record<string, any>, profileB: Record<string, any>): boolean {
+  const dealbreakers: string[] = profileA?.dealbreakers || [];
+  for (const db of dealbreakers) {
+    switch (db) {
+      case 'no_smokers':
+        if (profileB?.smoking === 'yes' || profileB?.smoking === 'only_outside') return true;
+        break;
+      case 'no_cats':
+        if (profileB?.pets === 'have_pets' && profileB?.pet_type === 'cat') return true;
+        break;
+      case 'no_dogs':
+        if (profileB?.pets === 'have_pets' && profileB?.pet_type === 'dog') return true;
+        break;
+      case 'no_pets':
+        if (profileB?.pets === 'have_pets') return true;
+        break;
+      case 'no_overnight_guests':
+        if (profileB?.guest_policy === 'frequently') return true;
+        break;
+    }
+  }
+  return false;
+}
+
 function calculatePairwiseScore(a: CandidateProfile, b: CandidateProfile): number {
+  if (checkDealbreakers(a.profileData, b.profileData) ||
+      checkDealbreakers(b.profileData, a.profileData)) {
+    return 0;
+  }
+
   let score = 0;
   const maxScore = 100;
 

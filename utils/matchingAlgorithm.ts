@@ -323,31 +323,36 @@ export const calculateDetailedCompatibility = (
   const userProfile = currentUser.profileData;
   
   if (!userPrefs || !userProfile) {
-    // Return neutral baseline score (60-65%) to maintain backward compatibility
-    // When user data is missing, default to a neutral compatibility level
-    // This preserves historical color thresholds (60-65% = orange/blue range)
     const neutralBreakdown = {
       ...breakdown,
-      age: 4,
-      location: 10,
-      budget: 8,
-      sleepSchedule: 8,
-      cleanliness: 8,
-      smoking: 7,
+      age: 3,
+      location: 6,
+      budget: 5,
+      sleepSchedule: 5,
+      cleanliness: 5,
+      smoking: 5,
       moveInTimeline: 2,
-      workLocation: 3,
-      guestPolicy: 3,
-      noiseTolerance: 3,
-      pets: 3,
+      workLocation: 2,
+      guestPolicy: 2,
+      noiseTolerance: 2,
+      pets: 2,
       roommateRelationship: 1,
       sharedExpenses: 1,
       lifestyle: 1,
       zodiac: 0,
-      personality: 7,
+      personality: 5,
       piPreference: 0,
     };
     const neutralScore = Object.values(neutralBreakdown).reduce((sum, score) => sum + score, 0);
-    return { totalScore: neutralScore, breakdown: neutralBreakdown, reasons };
+    return {
+      totalScore: neutralScore,
+      breakdown: neutralBreakdown,
+      reasons: {
+        strengths: [],
+        concerns: [],
+        notes: ['Limited profile data — complete your profile for accurate matching'],
+      },
+    };
   }
 
   // ========================================
