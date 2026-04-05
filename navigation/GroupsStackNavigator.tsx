@@ -21,6 +21,9 @@ import InviteFriendsScreen from '../screens/renter/InviteFriendsScreen';
 import OpenGroupsScreen from '../screens/renter/OpenGroupsScreen';
 import GroupRequestScreen from '../screens/renter/GroupRequestScreen';
 import GroupRequestReviewScreen from '../screens/renter/GroupRequestReviewScreen';
+import { EventsScreen } from '../screens/shared/EventsScreen';
+import { EventDetailScreen } from '../screens/shared/EventDetailScreen';
+import { CreateEventScreen } from '../screens/shared/CreateEventScreen';
 import { RoommateProfile, OpenGroupListing } from '../types/models';
 
 export type GroupsStackParamList = {
@@ -93,6 +96,9 @@ export type GroupsStackParamList = {
     inviteCode: string;
     groupName?: string;
   };
+  Events: undefined;
+  EventDetail: { eventId: string };
+  CreateEvent: { groupId?: string };
 };
 
 const Stack = createNativeStackNavigator<GroupsStackParamList>();
@@ -119,6 +125,9 @@ export const GroupsStackNavigator = () => {
       <Stack.Screen name="OpenGroups" component={OpenGroupsScreen} />
       <Stack.Screen name="GroupRequest" component={GroupRequestScreen} />
       <Stack.Screen name="GroupRequestReview" component={GroupRequestReviewScreen} />
+      <Stack.Screen name="Events" component={EventsScreen} />
+      <Stack.Screen name="EventDetail" component={EventDetailScreen} />
+      <Stack.Screen name="CreateEvent" component={CreateEventScreen} />
       <Stack.Screen name="GroupSetup">
         {({ navigation: nav }) => (
           <GroupSetupScreen

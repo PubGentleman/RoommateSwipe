@@ -36,10 +36,13 @@ import {
 import * as Clipboard from 'expo-clipboard';
 import { GroupPropertySearchModal } from '../../components/GroupPropertySearchModal';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { StorageService } from '../../utils/storage';
 import { ReportBlockModal } from '../../components/ReportBlockModal';
 import { reportGroup, reportUser, blockUser as blockUserRemote } from '../../services/moderationService';
+import { EventCard } from '../../components/EventCard';
+import { getGroupEvents, type RhomeEvent } from '../../services/eventService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -126,6 +129,7 @@ export function GroupInfoScreen({ route, navigation }: Props) {
   const [showMemberReport, setShowMemberReport] = useState(false);
   const [reportMemberTarget, setReportMemberTarget] = useState<{ id: string; name: string } | null>(null);
   const [groupChatSettings, setGroupChatSettings] = useState<Record<string, any>>({});
+  const [groupEvents, setGroupEvents] = useState<RhomeEvent[]>([]);
 
   const isAdmin = group?.adminId === user?.id;
   const memberCount = group?.members?.length || 0;
@@ -181,6 +185,16 @@ export function GroupInfoScreen({ route, navigation }: Props) {
         .finally(() => setLoadingLikers(false));
     }
   }, [group?.id, isAdmin]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      if (group?.id && user?.id) {
+        getGroupEvents(groupId, user.id)
+          .then(setGroupEvents)
+          .catch(() => {});
+      }
+    }, [group?.id, user?.id])
+  );
 
   useEffect(() => {
     if (!group?.members || !user) return;
@@ -1249,6 +1263,27 @@ export function GroupInfoScreen({ route, navigation }: Props) {
             )}
           </Section>
         ) : null}
+
+        <Section
+          label="UPCOMING EVENTS"
+          theme={theme}
+          action={{ label: 'Add', icon: 'plus', onPress: () => navigation.navigate('CreateEvent', { groupId }) }}
+        >
+          {groupEvents.length > 0 ? (
+            groupEvents.map((ev: RhomeEvent) => (
+              <EventCard
+                key={ev.id}
+                event={ev}
+                compact
+                onPress={() => navigation.navigate('EventDetail', { eventId: ev.id })}
+              />
+            ))
+          ) : (
+            <ThemedText style={[Typography.body, { color: theme.textSecondary, textAlign: 'center', paddingVertical: 20 }]}>
+              No upcoming events
+            </ThemedText>
+          )}
+        </Section>
 
         <Section label="SETTINGS" theme={theme}>
           {isAdmin ? (

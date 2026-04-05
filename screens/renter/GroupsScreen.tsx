@@ -1615,7 +1615,15 @@ export const GroupsScreen = () => {
         role="renter"
         hideSeparator
         rightActions={
-          <AIFloatingButton onPress={() => setShowAISheet(true)} position="inline" />
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <Pressable
+              onPress={() => navigation.navigate('Events')}
+              style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(108,92,231,0.15)', alignItems: 'center', justifyContent: 'center' }}
+            >
+              <Feather name="calendar" size={16} color="#6C5CE7" />
+            </Pressable>
+            <AIFloatingButton onPress={() => setShowAISheet(true)} position="inline" />
+          </View>
         }
       />
 
