@@ -62,10 +62,26 @@ export default function App() {
             await AsyncStorage.setItem('pending_invite_code', inviteCode);
           }
         }
+
+        const referralMatch = initialUrl.match(/invite\/(RHOME-[A-Za-z0-9]+)/i);
+        if (referralMatch && referralMatch[1]) {
+          await AsyncStorage.setItem('pending_referral_code', referralMatch[1].toUpperCase());
+        }
       } catch {}
     };
 
     handleInitialDeepLink();
+
+    const subscription = Linking.addEventListener('url', async (event: { url: string }) => {
+      try {
+        const rm = event.url.match(/invite\/(RHOME-[A-Za-z0-9]+)/i);
+        if (rm && rm[1]) {
+          await AsyncStorage.setItem('pending_referral_code', rm[1].toUpperCase());
+        }
+      } catch {}
+    });
+
+    return () => subscription.remove();
   }, []);
 
   useEffect(() => {

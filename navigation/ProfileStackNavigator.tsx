@@ -47,6 +47,7 @@ import MatchPrioritiesScreen from '../screens/renter/MatchPrioritiesScreen';
 import { ActivityFeedScreen } from '../screens/shared/ActivityFeedScreen';
 import TestimonialsScreen from '../screens/shared/TestimonialsScreen';
 import WriteTestimonialScreen from '../screens/shared/WriteTestimonialScreen';
+import InviteFriendsScreen from '../screens/shared/InviteFriendsScreen';
 
 export type ProfileStackParamList = {
   ProfileMain: undefined;
@@ -93,6 +94,7 @@ export type ProfileStackParamList = {
   ActivityFeed: undefined;
   Testimonials: undefined;
   WriteTestimonial: { recipientId: string; recipientName: string; recipientPhoto?: string; relationship?: string };
+  InviteFriends: undefined;
 };
 
 const Stack = createNativeStackNavigator<ProfileStackParamList>();
@@ -468,6 +470,11 @@ export const ProfileStackNavigator = () => {
       <Stack.Screen
         name="WriteTestimonial"
         component={WriteTestimonialScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="InviteFriends"
+        component={InviteFriendsScreen}
         options={{ headerShown: false }}
       />
     </Stack.Navigator>

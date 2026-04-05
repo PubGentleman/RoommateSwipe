@@ -731,6 +731,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.warn('Failed to create initial profile row:', profileErr);
       }
 
+      try {
+        const pendingCode = await AsyncStorage.getItem('pending_referral_code');
+        if (pendingCode) {
+          const { processReferralSignup } = await import('../services/referralService');
+          await processReferralSignup(data.user.id, pendingCode);
+          await AsyncStorage.removeItem('pending_referral_code');
+        }
+      } catch (refErr) {
+        console.warn('Failed to process referral code:', refErr);
+      }
+
       if (role === 'host' && hostType) {
         try {
           const userUpdate: Record<string, any> = {
@@ -798,6 +809,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .eq('id', user.id);
     } catch (e) {
       console.warn('[Auth] Supabase onboarding step sync failed:', e);
+    }
+
+    if (step === 'complete') {
+      try {
+        const { updateReferralProgress } = await import('../services/referralService');
+        await updateReferralProgress(user.id, 'onboarded');
+      } catch {}
     }
 
     setUser(updated);

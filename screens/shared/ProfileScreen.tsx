@@ -1145,6 +1145,15 @@ export const ProfileScreen = () => {
           </View>
           <View style={styles.settingsCard}>
             <SettingsItem
+              iconName="gift"
+              iconColor="#ff6b5b"
+              iconBgColor="rgba(255,107,91,0.12)"
+              iconBorderColor="rgba(255,107,91,0.18)"
+              title="Invite Friends"
+              subtitle="Earn credits when friends join Rhome"
+              onPress={() => navigation.navigate('InviteFriends')}
+            />
+            <SettingsItem
               iconName="users"
               iconColor="#ff6b5b"
               iconBgColor="rgba(255,107,91,0.12)"
