@@ -40,6 +40,8 @@ import { PlanBadge } from '../../components/PlanBadge';
 import { normalizeRenterPlan, getRenterPlanLimits, canSwipe } from '../../constants/renterPlanLimits';
 import { PlanBadgeInline } from '../../components/LockedFeatureOverlay';
 import { getDailySwipeCount, incrementDailySwipeCount, decrementDailySwipeCount, getTimeUntilMidnight } from '../../utils/dailySwipeLimit';
+import SmartUpgradePrompt from '../../components/SmartUpgradePrompt';
+import { getUpgradePromptData, shouldShowUpgradePrompt, type UpgradePromptData } from '../../services/upgradePromptService';
 import { useNotificationContext } from '../../contexts/NotificationContext';
 import { RhomeAISheet } from '../../components/RhomeAISheet';
 import type { ScreenContext } from '../../components/RhomeAISheet';
@@ -223,6 +225,7 @@ export const RoommatesScreen = () => {
   const [totalSwipeCount, setTotalSwipeCount] = useState(0);
   const [dailySwipesUsed, setDailySwipesUsed] = useState(-1);
   const [showSwipeLimitModal, setShowSwipeLimitModal] = useState(false);
+  const [swipeUpgradePrompt, setSwipeUpgradePrompt] = useState<UpgradePromptData | null>(null);
   const [bestMatch, setBestMatch] = useState<{ profile: any; score: number; reason: string } | null>(null);
   const [highlightedProfileId, setHighlightedProfileId] = useState<string | null>(null);
   const [showBoostModal, setShowBoostModal] = useState(false);
@@ -712,6 +715,9 @@ export const RoommatesScreen = () => {
 
     const effectiveSwipes = dailySwipesUsed === -1 ? 0 : dailySwipesUsed;
     if (!canSwipe(renterPlan, effectiveSwipes)) {
+      setSwipeUpgradePrompt(getUpgradePromptData('swipe_limit_reached', renterPlan, {
+        used: effectiveSwipes, limit: renterLimits.dailySwipes,
+      }));
       setShowSwipeLimitModal(true);
       return;
     }
@@ -719,6 +725,15 @@ export const RoommatesScreen = () => {
     if (renterLimits.dailySwipes !== -1) {
       const newCount = await incrementDailySwipeCount();
       setDailySwipesUsed(newCount);
+      if (newCount >= renterLimits.dailySwipes * 0.8 && newCount < renterLimits.dailySwipes) {
+        shouldShowUpgradePrompt('swipe_limit_approaching').then(canShow => {
+          if (canShow) {
+            setSwipeUpgradePrompt(getUpgradePromptData('swipe_limit_approaching', renterPlan, {
+              used: newCount, limit: renterLimits.dailySwipes,
+            }));
+          }
+        });
+      }
     }
 
     if (action === 'superlike') {
@@ -1825,6 +1840,18 @@ export const RoommatesScreen = () => {
         </View>
       ) : null}
 
+      {swipeUpgradePrompt && !showSwipeLimitModal ? (
+        <SmartUpgradePrompt
+          data={swipeUpgradePrompt}
+          variant="banner"
+          onUpgrade={() => {
+            setSwipeUpgradePrompt(null);
+            (navigation as any).navigate('Plans');
+          }}
+          onDismiss={() => setSwipeUpgradePrompt(null)}
+        />
+      ) : null}
+
       <View style={styles.cardArea}>
         {pendingQuestion && questionInjectedAtIndex === currentIndex ? (
           <View style={[styles.card, { zIndex: 1, justifyContent: 'center' }]}>
@@ -2229,36 +2256,25 @@ export const RoommatesScreen = () => {
         animationType="fade"
         onRequestClose={() => setShowSwipeLimitModal(false)}
       >
-        <View style={styles.swipeLimitOverlay}>
-          <View style={styles.swipeLimitCard}>
-            <View style={styles.swipeLimitIconWrap}>
-              <Feather name="zap-off" size={32} color="#ff6b5b" />
-            </View>
-            <ThemedText style={styles.swipeLimitTitle}>Daily Swipe Limit Reached</ThemedText>
-            <ThemedText style={styles.swipeLimitMessage}>
-              You've used all {renterLimits.dailySwipes} free swipes today. Upgrade to Plus for unlimited swipes.
-            </ThemedText>
-            <ThemedText style={styles.swipeLimitTimer}>
-              Swipes reset in {getTimeUntilMidnight()}
-            </ThemedText>
-            <Pressable
-              style={styles.swipeLimitUpgradeBtn}
-              onPress={() => {
-                setShowSwipeLimitModal(false);
-                (navigation as any).navigate('Plans');
-              }}
-            >
-              <Feather name="arrow-up-circle" size={18} color="#fff" />
-              <ThemedText style={styles.swipeLimitUpgradeBtnText}>Subscribe to Plus</ThemedText>
-            </Pressable>
-            <Pressable
-              style={styles.swipeLimitDismissBtn}
-              onPress={() => setShowSwipeLimitModal(false)}
-            >
-              <ThemedText style={styles.swipeLimitDismissText}>Maybe Later</ThemedText>
-            </Pressable>
-          </View>
-        </View>
+        <Pressable style={styles.swipeLimitOverlay} onPress={() => { setShowSwipeLimitModal(false); setSwipeUpgradePrompt(null); }}>
+          <Pressable onPress={() => {}}>
+            {swipeUpgradePrompt ? (
+              <SmartUpgradePrompt
+                data={swipeUpgradePrompt}
+                variant="card"
+                onUpgrade={() => {
+                  setShowSwipeLimitModal(false);
+                  setSwipeUpgradePrompt(null);
+                  (navigation as any).navigate('Plans');
+                }}
+                onDismiss={() => {
+                  setShowSwipeLimitModal(false);
+                  setSwipeUpgradePrompt(null);
+                }}
+              />
+            ) : null}
+          </Pressable>
+        </Pressable>
       </Modal>
 
       <Modal visible={showFirstSessionPrompt} transparent animationType="fade" onRequestClose={async () => {

@@ -16,6 +16,8 @@ import { getMyListings, mapListingToProperty, getListingViewStats, type ListingV
 import { getReceivedInterestCards } from '../../services/discoverService';
 import { canAccessAnalytics } from '../../utils/planGates';
 import { LockedFeatureWall } from '../../components/host/LockedFeatureWall';
+import SmartUpgradePrompt from '../../components/SmartUpgradePrompt';
+import { getUpgradePromptData } from '../../services/upgradePromptService';
 import { getPlanLimits, type HostPlan } from '../../constants/planLimits';
 import { getOutreachLogForHost } from '../../services/hostOutreachService';
 
@@ -291,12 +293,11 @@ export const HostAnalyticsScreen = () => {
           </Pressable>
           <ThemedText type="h2" style={{ marginLeft: 8 }}>Analytics</ThemedText>
         </View>
-        <LockedFeatureWall
-          icon="bar-chart-2"
-          title="Analytics"
-          description="Track listing views, match rates, and outreach performance. Upgrade to Pro to unlock detailed insights."
-          requiredPlan="Pro"
+        <SmartUpgradePrompt
+          data={getUpgradePromptData('analytics_locked', hostPlan)}
+          variant="card"
           onUpgrade={() => navigation.navigate('HostSubscription')}
+          onDismiss={() => navigation.goBack()}
         />
       </ScreenScrollView>
     );

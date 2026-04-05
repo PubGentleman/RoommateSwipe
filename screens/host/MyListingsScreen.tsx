@@ -21,6 +21,8 @@ import { isListingBoosted } from '../../utils/hostPricing';
 import { canUseBoosts, hasVerifiedBadge as planHasVerifiedBadge } from '../../utils/planGates';
 import { type HostPlan, getAgentPlanLimits, type AgentPlan } from '../../constants/planLimits';
 import { ListingLimitModal, OverageModal } from '../../components/ListingLimitModal';
+import SmartUpgradePrompt from '../../components/SmartUpgradePrompt';
+import { getUpgradePromptData, type UpgradePromptData } from '../../services/upgradePromptService';
 import { PropertyReviewsScreen } from '../shared/PropertyReviewsScreen';
 
 const BG = '#111';
@@ -99,6 +101,7 @@ export const MyListingsScreen = () => {
   const [showOverageModal, setShowOverageModal] = useState(false);
   const [limitMessage, setLimitMessage] = useState('');
   const [overageMessage, setOverageMessage] = useState('');
+  const [listingUpgradePrompt, setListingUpgradePrompt] = useState<UpgradePromptData | null>(null);
   const [reviewsListingId, setReviewsListingId] = useState<string | null>(null);
   const [reviewsListingTitle, setReviewsListingTitle] = useState('');
   const [companyAgents, setCompanyAgents] = useState<{ id: string; full_name: string; avatar_url?: string }[]>([]);
@@ -685,7 +688,11 @@ export const MyListingsScreen = () => {
                 const result = canAddListing(activeCount);
                 if (!result.allowed) {
                   Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-                  setLimitMessage(result.reason || 'You have reached your listing limit.');
+                  const hostPlanStr = getHostPlan() as string;
+                  setListingUpgradePrompt(getUpgradePromptData('listing_limit_reached', hostPlanStr, {
+                    used: activeCount,
+                    limit: result.limit || activeCount,
+                  }));
                   setShowLimitModal(true);
                   return;
                 }
@@ -766,17 +773,29 @@ export const MyListingsScreen = () => {
         onDismiss={() => setShowHostPaywall(false)}
       />
 
-      <ListingLimitModal
-        visible={showLimitModal}
-        message={limitMessage}
-        onCancel={() => setShowLimitModal(false)}
-        onUpgrade={() => {
-          setShowLimitModal(false);
-          const parent = navigation.getParent();
-          if (parent) parent.navigate('Dashboard', { screen: 'HostSubscription' });
-          else navigation.navigate('HostSubscription' as any);
-        }}
-      />
+      <Modal visible={showLimitModal} transparent animationType="fade" onRequestClose={() => setShowLimitModal(false)}>
+        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center' }} onPress={() => { if (listingUpgradePrompt?.dismissible !== false) { setShowLimitModal(false); setListingUpgradePrompt(null); } }}>
+          <Pressable onPress={() => {}}>
+            {listingUpgradePrompt ? (
+              <SmartUpgradePrompt
+                data={listingUpgradePrompt}
+                variant="card"
+                onUpgrade={() => {
+                  setShowLimitModal(false);
+                  setListingUpgradePrompt(null);
+                  const parent = navigation.getParent();
+                  if (parent) parent.navigate('Dashboard', { screen: 'HostSubscription' });
+                  else navigation.navigate('HostSubscription' as any);
+                }}
+                onDismiss={() => {
+                  setShowLimitModal(false);
+                  setListingUpgradePrompt(null);
+                }}
+              />
+            ) : null}
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       <OverageModal
         visible={showOverageModal}

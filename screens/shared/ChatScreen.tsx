@@ -28,6 +28,8 @@ import { GroupPropertySearchModal } from '../../components/GroupPropertySearchMo
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSequence } from 'react-native-reanimated';
 import { AdBanner } from '../../components/AdBanner';
 import { getDailyMessageCount, MESSAGING_LIMITS, getTimeUntilMidnight, incrementDailyColdMessageCount } from '../../utils/messagingUtils';
+import SmartUpgradePrompt from '../../components/SmartUpgradePrompt';
+import { getUpgradePromptData, shouldShowUpgradePrompt, type UpgradePromptData } from '../../services/upgradePromptService';
 import { calculateTrustScore } from '../../utils/trustScore';
 import { dispatchInsightTrigger } from '../../utils/insightRefresh';
 import { useConfirm } from '../../contexts/ConfirmContext';
@@ -134,6 +136,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   const [coldMessagesRemaining, setColdMessagesRemaining] = useState<number>(3);
   const [showDailyLimitModal, setShowDailyLimitModal] = useState(false);
   const [showChatLimitModal, setShowChatLimitModal] = useState(false);
+  const [upgradePromptData, setUpgradePromptData] = useState<UpgradePromptData | null>(null);
   const [linkedListing, setLinkedListing] = useState<any>(null);
   const [showPropertySearch, setShowPropertySearch] = useState(false);
   const [myGroupRole, setMyGroupRole] = useState<'admin' | 'member' | null>(null);
@@ -926,8 +929,20 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
     }
 
     if (!canSendMessage()) {
+      setUpgradePromptData(getUpgradePromptData('message_limit_reached', userPlan, {
+        used: dailyCount, limit: dailyLimit,
+      }));
       setShowDailyLimitModal(true);
       return;
+    }
+    if (dailyLimit > 0 && dailyCount >= dailyLimit * 0.8 && dailyCount < dailyLimit && !upgradePromptData) {
+      shouldShowUpgradePrompt('message_limit_approaching').then(canShow => {
+        if (canShow) {
+          setUpgradePromptData(getUpgradePromptData('message_limit_approaching', userPlan, {
+            used: dailyCount, limit: dailyLimit,
+          }));
+        }
+      });
     }
 
     const conversations = await StorageService.getConversations();
@@ -2119,6 +2134,17 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
           </Text>
         </View>
       ) : null}
+      {upgradePromptData && !showDailyLimitModal ? (
+        <SmartUpgradePrompt
+          data={upgradePromptData}
+          variant="banner"
+          onUpgrade={() => {
+            setUpgradePromptData(null);
+            (navigation as any).navigate('Plans');
+          }}
+          onDismiss={() => setUpgradePromptData(null)}
+        />
+      ) : null}
       <View style={[styles.inputContainer, { backgroundColor: theme.backgroundRoot, paddingBottom: TAB_BAR_HEIGHT }]}>
         {messagingLocked ? (
           <View style={styles.lockedInputRow}>
@@ -2343,39 +2369,25 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
       ) : null}
 
       <Modal visible={showDailyLimitModal} transparent animationType="fade" onRequestClose={() => setShowDailyLimitModal(false)}>
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' }}>
-          <View style={{ backgroundColor: theme.backgroundSecondary, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, paddingBottom: insets.bottom + 24 }}>
-            <View style={{ alignItems: 'center', marginBottom: 16 }}>
-              <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: theme.border, marginBottom: 16 }} />
-              <Feather name="message-circle" size={32} color="#ff6b5b" />
-            </View>
-            <ThemedText style={[Typography.h2, { textAlign: 'center', marginBottom: 8 }]}>
-              Daily Message Limit
-            </ThemedText>
-            <ThemedText style={[Typography.body, { textAlign: 'center', color: theme.textSecondary, marginBottom: 24 }]}>
-              {userPlan === 'basic'
-                ? `You've used all 20 messages for today. Resets at midnight or upgrade for more.`
-                : `You've used all 200 messages for today. Upgrade to Elite for unlimited messaging.`}
-            </ThemedText>
-            <Pressable
-              style={{ backgroundColor: theme.primary, paddingVertical: 14, borderRadius: 12, alignItems: 'center', marginBottom: 12 }}
-              onPress={() => {
-                setShowDailyLimitModal(false);
-                (navigation as any).navigate('Plans');
-              }}
-            >
-              <ThemedText style={[Typography.h3, { color: '#FFFFFF' }]}>
-                {userPlan === 'basic' ? 'Upgrade to Plus (200/day)' : 'Upgrade to Elite (Unlimited)'}
-              </ThemedText>
-            </Pressable>
-            <Pressable
-              style={{ paddingVertical: 14, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: theme.border }}
-              onPress={() => setShowDailyLimitModal(false)}
-            >
-              <ThemedText style={[Typography.h3, { color: theme.textSecondary }]}>Maybe Later</ThemedText>
-            </Pressable>
-          </View>
-        </View>
+        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center' }} onPress={() => { setShowDailyLimitModal(false); setUpgradePromptData(null); }}>
+          <Pressable onPress={() => {}}>
+            {upgradePromptData ? (
+              <SmartUpgradePrompt
+                data={upgradePromptData}
+                variant="card"
+                onUpgrade={() => {
+                  setShowDailyLimitModal(false);
+                  setUpgradePromptData(null);
+                  (navigation as any).navigate('Plans');
+                }}
+                onDismiss={() => {
+                  setShowDailyLimitModal(false);
+                  setUpgradePromptData(null);
+                }}
+              />
+            ) : null}
+          </Pressable>
+        </Pressable>
       </Modal>
 
       <Modal visible={showChatLimitModal} transparent animationType="fade" onRequestClose={() => setShowChatLimitModal(false)}>
