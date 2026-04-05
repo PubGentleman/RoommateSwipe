@@ -13,6 +13,7 @@ import { BOOST_OPTIONS, BOOST_PACKS, calculateBoostExpiry, isListingBoosted, get
 import { getListing } from '../../services/listingService';
 import { getPlanLimits, type HostPlan } from '../../constants/planLimits';
 import { getImpressionStats } from '../../services/boostImpressionService';
+import { recordBoostActivation } from '../../services/boostManagementService';
 
 const isDev = __DEV__;
 const BG = '#111';
@@ -165,6 +166,18 @@ export const ListingBoostScreen = () => {
         : option.duration === '24h' ? '24 hours'
         : option.duration === '72h' ? '3 days'
         : '7 days';
+      recordBoostActivation({
+        hostId: user.id,
+        listingId: listing.id,
+        listingTitle: listing.title,
+        boostType: option.id,
+        duration: option.duration,
+        startedAt: boost.startedAt,
+        expiresAt: boost.expiresAt,
+        usedFreeBoost: useFree,
+        usedCredit: false,
+        pricePaidCents: useFree ? 0 : Math.round(option.price * 100),
+      }).catch(() => {});
       const resultLabel = option.includesFeaturedBadge
         ? `Your listing is now featured for ${durationLabel} with a Featured badge!`
         : `Your listing has been boosted to the top of search for ${durationLabel}.`;
@@ -221,6 +234,18 @@ export const ListingBoostScreen = () => {
     setBoostCredits(newCredits);
     await StorageService.updateHostSubscription(user.id, { boostCredits: newCredits });
 
+    recordBoostActivation({
+      hostId: user.id,
+      listingId: listing.id,
+      listingTitle: listing.title,
+      boostType: option.id,
+      duration: option.duration,
+      startedAt: boost.startedAt,
+      expiresAt: boost.expiresAt,
+      usedFreeBoost: false,
+      usedCredit: true,
+      pricePaidCents: 0,
+    }).catch(() => {});
     const durationLabel = option.duration === '6h' ? '6 hours' : option.duration === '12h' ? '12 hours' : '24 hours';
     await showAlert({ title: 'Boost Applied!', message: `Your listing has been boosted for ${durationLabel} using a credit.`, variant: 'success' });
     navigation.goBack();
@@ -581,6 +606,15 @@ export const ListingBoostScreen = () => {
             ? 'Unlimited simultaneous boosts on your plan. Boosts cannot be cancelled once applied.'
             : `Your plan allows up to ${maxSimultaneous} simultaneous boost${maxSimultaneous !== 1 ? 's' : ''}. Boosts cannot be cancelled once applied.`}
         </Text>
+
+        <Pressable
+          style={styles.manageAllBtn}
+          onPress={() => navigation.navigate('BoostManagement')}
+        >
+          <Feather name="bar-chart-2" size={14} color={BLUE} />
+          <Text style={styles.manageAllText}>Manage All Boosts</Text>
+          <Feather name="chevron-right" size={14} color={BLUE} />
+        </Pressable>
 
         <View style={{ height: 40 }} />
       </ScrollView>
@@ -1005,5 +1039,22 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: GREEN,
     marginTop: 4,
+  },
+  manageAllBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    marginTop: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(96,165,250,0.2)',
+    backgroundColor: 'rgba(96,165,250,0.06)',
+  },
+  manageAllText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: BLUE,
   },
 });

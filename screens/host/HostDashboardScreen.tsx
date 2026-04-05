@@ -1432,6 +1432,10 @@ export const HostDashboardScreen = () => {
               return needsPro ? <View style={styles.proBadge}><Text style={styles.proBadgeText}>Pro</Text></View> : null;
             })()}
           </Pressable>
+          <Pressable style={styles.qaSecondary} onPress={() => navigation.navigate('BoostManagement')}>
+            <Feather name="zap" size={15} color={PURPLE} />
+            <Text style={styles.qaSecondaryText}>Boosts</Text>
+          </Pressable>
           <Pressable style={styles.qaSecondary} onPress={() => navigation.navigate('HostSubscription')}>
             <Feather name="star" size={15} color={GOLD} />
             <Text style={styles.qaSecondaryText}>Plans</Text>

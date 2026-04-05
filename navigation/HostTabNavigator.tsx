@@ -15,6 +15,7 @@ import { HostAnalyticsScreen } from '../screens/host/HostAnalyticsScreen';
 import { HostPricingScreen } from '../screens/host/HostPricingScreen';
 import { HostSubscriptionScreen } from '../screens/host/HostSubscriptionScreen';
 import { ListingBoostScreen } from '../screens/host/ListingBoostScreen';
+import { BoostManagementScreen } from '../screens/host/BoostManagementScreen';
 import { HostGroupOutreachScreen } from '../screens/host/HostGroupOutreachScreen';
 import { BrowseRenterGroupsScreen } from '../screens/host/BrowseRenterGroupsScreen';
 import { HostRenterGroupDetailScreen } from '../screens/host/HostRenterGroupDetailScreen';
@@ -52,6 +53,7 @@ export type HostListingsStackParamList = {
   HostGroupOutreach: { listingId: string; listingTitle: string };
   InviteExistingRoommates: { listingId: string; count: number; listingAddress?: string };
   ListingPerformance: { listingId: string };
+  BoostManagement: undefined;
 };
 
 export type HostDashboardStackParamList = {
@@ -79,6 +81,7 @@ export type HostDashboardStackParamList = {
   InquiryTrends: undefined;
   RevenueOverview: undefined;
   ComparativeInsights: { listingId?: string } | undefined;
+  BoostManagement: undefined;
 };
 
 export type HostGroupsStackParamList = {
@@ -149,6 +152,7 @@ function DashboardStackNavigator() {
       <DashboardStack.Screen name="InquiryTrends" component={InquiryTrendsScreen} />
       <DashboardStack.Screen name="RevenueOverview" component={RevenueOverviewScreen} />
       <DashboardStack.Screen name="ComparativeInsights" component={ComparativeInsightsScreen} />
+      <DashboardStack.Screen name="BoostManagement" component={BoostManagementScreen} />
     </DashboardStack.Navigator>
   );
 }
@@ -160,6 +164,7 @@ function ListingsStackNavigator() {
       <ListingsStack.Screen name="CreateEditListing" component={CreateEditListingScreen} />
       <ListingsStack.Screen name="HostListingDetail" component={HostListingDetailScreen} />
       <ListingsStack.Screen name="ListingBoost" component={ListingBoostScreen} />
+      <ListingsStack.Screen name="BoostManagement" component={BoostManagementScreen} />
       <ListingsStack.Screen name="HostGroupOutreach" component={HostGroupOutreachScreen} />
       <ListingsStack.Screen name="InviteExistingRoommates" component={InviteExistingRoommatesScreen} />
       <ListingsStack.Screen name="ListingPerformance" component={ListingPerformanceScreen} />
