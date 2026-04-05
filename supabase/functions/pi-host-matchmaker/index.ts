@@ -100,6 +100,20 @@ serve(async (req) => {
 
     const { plan, limit } = await getHostPlanAndLimit(supabase, user.id);
 
+    const freePlans = ['free', 'none', 'pay_per_use'];
+    if (!freePlans.includes(plan)) {
+      const { data: activeSub } = await supabase
+        .from('subscriptions')
+        .select('status')
+        .eq('user_id', user.id)
+        .in('status', ['active', 'trialing'])
+        .limit(1)
+        .maybeSingle();
+      if (!activeSub) {
+        return errorResponse('Subscription expired or inactive. Please renew to use AI matching.', 403);
+      }
+    }
+
     if (limit !== -1) {
       const monthStart = new Date();
       monthStart.setDate(1);

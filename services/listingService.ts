@@ -164,7 +164,7 @@ export async function updateListing(id: string, updates: Partial<ListingData>, u
     .eq('id', id);
 
   if (userId) {
-    query = query.eq('created_by', userId);
+    query = query.eq('host_id', userId);
   }
 
   const { data, error } = await query.select().single();
@@ -290,13 +290,13 @@ export async function reassignListingAgent(listingId: string, newAgentId: string
   try {
     const { data: listing } = await supabase
       .from('listings')
-      .select('created_by')
+      .select('host_id')
       .eq('id', listingId)
       .single();
 
     if (!listing) return false;
 
-    if (callerId && listing.created_by !== callerId) {
+    if (callerId && listing.host_id !== callerId) {
       const { data: callerTeam } = await supabase
         .from('company_team_members')
         .select('company_id, role')
@@ -313,7 +313,7 @@ export async function reassignListingAgent(listingId: string, newAgentId: string
       const { data: ownerTeam } = await supabase
         .from('company_team_members')
         .select('company_id')
-        .eq('user_id', listing.created_by)
+        .eq('user_id', listing.host_id)
         .eq('company_id', callerTeam.company_id)
         .limit(1)
         .single();

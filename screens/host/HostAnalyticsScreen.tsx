@@ -115,8 +115,8 @@ export const HostAnalyticsScreen = () => {
     ? Math.round((acceptedInquiries / totalInquiries) * 100) : 0;
 
   const totalRealViews    = viewStats.reduce((sum, s) => sum + s.last30Days, 0);
-  const estimatedViews    = totalInquiries * 15;
-  const estimatedSaves    = totalInquiries * 8;
+  const estimatedViews    = totalInquiries * 8;
+  const estimatedSaves    = totalInquiries * 4;
   const displayViews      = isAdvanced ? totalRealViews : estimatedViews;
   const displayViewsLabel = isAdvanced ? 'Unique Viewers' : 'Est. Views';
 
@@ -171,7 +171,7 @@ export const HostAnalyticsScreen = () => {
   const outreachConversions = inquiries.filter(i => {
     const inquiryTime = new Date(i.createdAt).getTime();
     return outreachLog.some((e: any) =>
-      e.groupId === i.renterId &&
+      e.groupId === i.groupId &&
       Math.abs(inquiryTime - new Date(e.sentAt).getTime()) < 7 * 24 * 60 * 60 * 1000
     );
   }).length;

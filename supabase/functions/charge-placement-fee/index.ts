@@ -37,14 +37,20 @@ serve(async (req) => {
       .from('agent_placements')
       .update({ billing_status: 'processing', updated_at: new Date().toISOString() })
       .eq('id', placementId)
-      .eq('agent_id', user.id)
-      .neq('billing_status', 'charged')
-      .neq('billing_status', 'processing')
+      .eq('billing_status', 'pending')
       .select()
       .single();
 
     if (updateError || !placement) {
-      return errorResponse('Placement not found or already charged/processing', 400);
+      return errorResponse('Placement already being processed or not found', 409);
+    }
+
+    if (placement.agent_id !== user.id) {
+      await supabase
+        .from('agent_placements')
+        .update({ billing_status: 'pending' })
+        .eq('id', placementId);
+      return errorResponse('Not authorized for this placement', 403);
     }
 
     const amountCents = placement.placement_fee_cents;

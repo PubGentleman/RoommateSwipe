@@ -238,7 +238,7 @@ export const HostSubscriptionScreen = () => {
         : rawPlan as HostPlanType;
       const basePlan = rawPlan.replace(/^(agent_|company_)/, '') as HostPlanType;
       const planData = HOST_PLANS[storedPlan] || HOST_PLANS[basePlan];
-      const matchedTypePlan = hostTypePlans.find(p => p.id === selectedPlan || p.id === basePlan);
+      const matchedTypePlan = typePlans.find(p => p.id === selectedPlan || p.id === basePlan);
     const price = getDisplayPrice(matchedTypePlan, planData.price, billingCycle);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       const newSub = subscriptionFromPlan(storedPlan, hostSub);
@@ -310,8 +310,6 @@ export const HostSubscriptionScreen = () => {
 
   const currentPlanIsFree = isFreePlan(hostSub.plan);
 
-  const hostTypePlans = getHostPlans(hostType);
-
   const getCompanyMetrics = (planId: string) => {
     const isEnterprise = planId.includes('enterprise');
     const companyKey = isEnterprise ? 'enterprise' : planId.includes('pro') ? 'pro' : planId.includes('starter') ? 'starter' : null;
@@ -339,7 +337,7 @@ export const HostSubscriptionScreen = () => {
   const renderPlanCard = (display: PlanDisplayInfo) => {
     const planKey = display.id;
     const hostPlanConfig = HOST_PLANS[planKey as HostPlanType];
-    const typePlanConfig = hostTypePlans.find(p => p.id === planKey);
+    const typePlanConfig = typePlans.find(p => p.id === planKey);
     const isContactSales = display.ctaLabel === 'Contact Sales';
     const hostSubBase = (hostSub.plan || '').replace(/^(agent_|company_)/, '');
     const isCurrentPlan = hostSubBase === planKey || hostSub.plan === planKey || (isFreePlan(hostSub.plan) && isFreePlan(planKey as HostPlanType));
@@ -650,7 +648,7 @@ export const HostSubscriptionScreen = () => {
             <Text style={styles.costTitle}>Monthly Cost Summary</Text>
             <View style={styles.costRow}>
               <Text style={styles.costLabel}>Plan base</Text>
-              <Text style={styles.costValue}>${getDisplayPrice(hostTypePlans.find(p => p.id === hostSub.plan || p.id === (hostSub.plan || '').replace(/^(agent_|company_)/, '')), (HOST_PLANS[hostSub.plan as HostPlanType] || HOST_PLANS[(hostSub.plan || '').replace(/^(agent_|company_)/, '') as HostPlanType])?.price ?? 0, billingCycle).toFixed(2)}</Text>
+              <Text style={styles.costValue}>${getDisplayPrice(typePlans.find(p => p.id === hostSub.plan || p.id === (hostSub.plan || '').replace(/^(agent_|company_)/, '')), (HOST_PLANS[hostSub.plan as HostPlanType] || HOST_PLANS[(hostSub.plan || '').replace(/^(agent_|company_)/, '') as HostPlanType])?.price ?? 0, billingCycle).toFixed(2)}</Text>
             </View>
             {((hostSub.plan || '').replace(/^(agent_|company_)/, '') === 'business') && hostSub.activeListingCount > hostSub.listingsIncluded ? (
               <View style={styles.costRow}>
@@ -665,7 +663,7 @@ export const HostSubscriptionScreen = () => {
             <View style={[styles.costRow, styles.costTotal]}>
               <Text style={[styles.costLabel, { fontWeight: '700' }]}>Total</Text>
               <Text style={[styles.costValue, { fontWeight: '700', color: '#fff' }]}>
-                ${getDisplayPrice(hostTypePlans.find(p => p.id === hostSub.plan || p.id === (hostSub.plan || '').replace(/^(agent_|company_)/, '')), calculateHostMonthlyCost(hostSub.plan, hostSub.activeListingCount), billingCycle).toFixed(2)}/mo
+                ${getDisplayPrice(typePlans.find(p => p.id === hostSub.plan || p.id === (hostSub.plan || '').replace(/^(agent_|company_)/, '')), calculateHostMonthlyCost(hostSub.plan, hostSub.activeListingCount), billingCycle).toFixed(2)}/mo
               </Text>
             </View>
           </View>

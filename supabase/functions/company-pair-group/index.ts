@@ -97,7 +97,7 @@ serve(async (req) => {
       });
     }
 
-    if (listing.created_by !== user.id) {
+    if (listing.host_id !== user.id) {
       return new Response(JSON.stringify({ error: 'Listing does not belong to this company' }), {
         status: 403,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

@@ -26,7 +26,7 @@ serve(async (req) => {
 
     const { data: hosts } = await supabase
       .from('users')
-      .select('id, host_type, created_at, response_rate, license_verification_status, agent_plan, company_name, company_plan')
+      .select('id, host_type, created_at, response_rate, license_verification_status, agent_plan, company_name, host_plan')
       .in('host_type', ['individual', 'agent', 'company']);
 
     if (!hosts) {
@@ -165,7 +165,8 @@ async function checkTopAgentServer(supabase: any, host: any): Promise<string | n
 
 async function checkTopCompanyServer(supabase: any, host: any): Promise<string | null> {
   if (!host.company_name) return null;
-  if (host.company_plan !== 'pro' && host.company_plan !== 'enterprise') return null;
+  const companyPlan = (host.host_plan || '').replace(/^company_/, '');
+  if (companyPlan !== 'pro' && companyPlan !== 'enterprise') return null;
 
   const cutoff = new Date();
   cutoff.setMonth(cutoff.getMonth() - 3);

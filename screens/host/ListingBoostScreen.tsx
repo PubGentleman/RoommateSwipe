@@ -188,7 +188,7 @@ export const ListingBoostScreen = () => {
     if (useFree) {
       const confirmed = await confirm({
         title: 'Use Free Boost',
-        message: `Apply your free ${hostSub.freeBoostDuration} boost to "${listing.title}"?`,
+        message: `Apply your free ${hostSub.freeBoostDuration || '12-hour'} boost to "${listing.title}"?`,
         confirmText: 'Apply',
         variant: 'info',
       });

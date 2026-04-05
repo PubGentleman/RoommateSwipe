@@ -70,11 +70,11 @@ serve(async (req) => {
 
     const { data: listingOwner } = await supabase
       .from('listings')
-      .select('created_by')
+      .select('host_id')
       .eq('id', listingId)
       .single();
 
-    if (!listingOwner || listingOwner.created_by !== user.id) {
+    if (!listingOwner || listingOwner.host_id !== user.id) {
       return new Response(JSON.stringify({ error: 'Listing does not belong to this company' }), {
         status: 403,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

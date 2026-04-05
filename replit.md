@@ -86,7 +86,11 @@ The architecture includes a Babel module resolver, platform-specific UI, perform
 # Security Notes
 
 *   **Migration 103**: Comprehensive RLS hardening — enables RLS on affiliates, affiliate_referrals, boost_purchases, zip_code_data. Tightens preformed_groups/members/shortlist SELECT to members-only. Restricts notification INSERT to service_role. Adds DELETE policies for messages and notifications.
-*   **Edge Functions**: All user-facing Edge Functions (generate-group-suggestions, places-proxy, calculate-match-scores) now validate JWT tokens. Persona webhook verifies HMAC signatures. CRON functions use timing-safe comparison via shared `verifyCronAuth`.
+*   **Edge Functions**: All user-facing Edge Functions (generate-group-suggestions, places-proxy, calculate-match-scores) now validate JWT tokens. Persona webhook verifies HMAC signatures. CRON functions use timing-safe comparison via shared `verifyCronAuth`. match-groups-to-listings, aggregate-demand secured with cron/service auth. charge-placement-fee uses atomic billing_status update to prevent double-charge. pi-host-matchmaker validates subscription status for paid plans.
+*   **Migration 104**: Host hardening — team seat limit trigger on team_members, performance indexes for listings, group matches, outreach, agent placements.
+*   **Server-Side Plan Enforcement**: `_shared/planEnforcement.ts` provides `getEffectivePlan`, `verifyActiveSub`, `getPlanLimits`, `enforceListingLimit` for Edge Functions.
+*   **Listing ownership**: All listing ownership checks use `host_id` column (not `created_by`). Fixed in listingService.ts, company-pair-group, company-auto-invite.
+*   **recalculate-badges**: Uses `host_plan` (not `company_plan`) for company badge eligibility.
 *   **Client**: Hardcoded Supabase anon key fallback removed from `lib/supabase.ts`. `select('*')` replaced with explicit column lists in AuthContext, backgroundCheckService, boostService, agentMatchmakerService.
 *   **SQL Injection**: Fixed in calculate-match-scores — excludeIds are now validated against UUID regex before query interpolation.
-*   **Next migration**: 104.
+*   **Next migration**: 105.

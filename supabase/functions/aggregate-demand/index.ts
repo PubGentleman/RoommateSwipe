@@ -7,6 +7,18 @@ const supabase = createClient(
 );
 
 serve(async (req) => {
+  const authHeader = req.headers.get('Authorization');
+  const cronSecret = req.headers.get('x-cron-secret');
+  const isServiceRole = authHeader?.replace('Bearer ', '') === Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  const isCron = !!cronSecret && cronSecret === Deno.env.get('CRON_SECRET');
+
+  if (!isServiceRole && !isCron) {
+    return new Response(
+      JSON.stringify({ error: 'Unauthorized — cron or service role required' }),
+      { status: 401, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+
   try {
     const today = new Date();
     const yesterday = new Date(today);

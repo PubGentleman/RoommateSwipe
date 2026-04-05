@@ -161,23 +161,24 @@ export async function checkHourlyLimit(hostId: string, plan: string): Promise<bo
   return recentCount < hourlyCap;
 }
 
-export async function checkGroupCooldown(hostId: string, groupId: string): Promise<boolean> {
+export async function checkGroupCooldown(hostId: string, groupId: string, cooldownDays: number = 30): Promise<boolean> {
+  const cooldownMs = cooldownDays * 24 * 60 * 60 * 1000;
   const online = await isSupabaseAvailable();
   if (online) {
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const cutoff = new Date(Date.now() - cooldownMs).toISOString();
     const { data, error } = await supabase
       .from('host_group_outreach')
       .select('id')
       .eq('host_id', hostId)
       .eq('group_id', groupId)
-      .gte('sent_at', thirtyDaysAgo)
+      .gte('sent_at', cutoff)
       .maybeSingle();
     if (!error) return !data;
   }
 
   const log = await getLocalLog();
-  const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
-  const recent = log.find(e => e.hostId === hostId && e.groupId === groupId && new Date(e.sentAt).getTime() > thirtyDaysAgo);
+  const cutoffTs = Date.now() - cooldownMs;
+  const recent = log.find(e => e.hostId === hostId && e.groupId === groupId && new Date(e.sentAt).getTime() > cutoffTs);
   return !recent;
 }
 

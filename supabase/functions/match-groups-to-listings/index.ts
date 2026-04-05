@@ -37,19 +37,21 @@ serve(async (req) => {
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
   const authHeader = req.headers.get('Authorization');
-  const serviceHeader = req.headers.get('x-service-key');
-  if (!authHeader && serviceHeader !== SUPABASE_SERVICE_KEY) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-      status: 401,
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-    });
-  }
+  const cronSecret = req.headers.get('x-cron-secret');
+  const token = authHeader?.replace('Bearer ', '') || '';
+  const isServiceRole = token === SUPABASE_SERVICE_KEY;
+  const isCron = !!cronSecret && cronSecret === Deno.env.get('CRON_SECRET');
 
-  if (authHeader) {
-    const { data: { user } } = await supabase.auth.getUser(
-      authHeader.replace('Bearer ', '')
-    );
-    if (!user) {
+  if (!isServiceRole && !isCron) {
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: 'Missing authorization' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+      });
+    }
+    const anonClient = createClient(SUPABASE_URL, Deno.env.get('SUPABASE_ANON_KEY')!);
+    const { data: { user }, error: authError } = await anonClient.auth.getUser(token);
+    if (authError || !user) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
         headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
@@ -164,14 +166,27 @@ serve(async (req) => {
 
       const { data: hostData } = await supabase
         .from('users')
-        .select('plan, host_type')
+        .select('host_type, host_plan, agent_plan')
         .eq('id', listing.host_id)
         .single();
 
-      const hostPlan = hostData?.plan ?? 'free';
-      let unlockFeeCents = 2900;
-      if (hostPlan === 'pro') unlockFeeCents = 1900;
-      if (hostPlan === 'business') unlockFeeCents = 0;
+      let effectivePlan = 'free';
+      if (hostData) {
+        if (hostData.host_type === 'agent') {
+          effectivePlan = hostData.agent_plan || 'pay_per_use';
+        } else {
+          effectivePlan = hostData.host_plan || 'free';
+        }
+      }
+
+      const UNLOCK_FEES: Record<string, number> = {
+        'free': 2900, 'none': 2900,
+        'starter': 2400, 'pro': 1900, 'business': 0,
+        'pay_per_use': 2900,
+        'agent_starter': 2400, 'agent_pro': 1900, 'agent_business': 0,
+        'company_starter': 2000, 'company_pro': 1000, 'company_enterprise': 0,
+      };
+      const unlockFeeCents = UNLOCK_FEES[effectivePlan] ?? 2900;
 
       await supabase
         .from('group_listing_matches')
