@@ -90,6 +90,7 @@ export function mapListingToProperty(l: any, fallbackHostName?: string): Propert
     preferred_tenant_gender: l.preferred_tenant_gender || 'any',
     isArchived: l.is_archived ?? false,
     archivedAt: l.archived_at ?? undefined,
+    listingBoost: l.listingBoost || l.listing_boost || undefined,
   };
 }
 
