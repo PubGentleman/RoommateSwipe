@@ -69,15 +69,19 @@ export default function ApartmentGroupScreen() {
   const loadData = useCallback(async () => {
     if (!user?.id) return;
     setLoading(true);
+
+    const withTimeout = <T,>(p: Promise<T>, fallback: T, ms = 5000): Promise<T> =>
+      Promise.race([p, new Promise<T>(resolve => setTimeout(() => resolve(fallback), ms))]);
+
     try {
-      const myGroup = await getUserPreformedGroup(user.id);
+      const myGroup = await withTimeout(getUserPreformedGroup(user.id), null);
       setGroup(myGroup);
       if (myGroup) {
         const [mbrs, sl, trs, inv] = await Promise.all([
-          getGroupMembers(myGroup.id),
-          getShortlistWithVotes(myGroup.id, user.id),
-          getGroupTours(myGroup.id).catch(() => []),
-          getPendingInvitesForGroup(myGroup.id).catch(() => []),
+          withTimeout(getGroupMembers(myGroup.id), []),
+          withTimeout(getShortlistWithVotes(myGroup.id, user.id).catch(() => []), []),
+          withTimeout(getGroupTours(myGroup.id).catch(() => []), []),
+          withTimeout(getPendingInvitesForGroup(myGroup.id).catch(() => []), []),
         ]);
         setMembers(mbrs);
         setShortlistItems(sl);
