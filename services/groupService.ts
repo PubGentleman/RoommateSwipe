@@ -2083,3 +2083,38 @@ export async function getReadStatusForMessage(groupId: string, messageId: string
   if (!data) return [];
   return data.filter(m => m.last_read_message_id === messageId).map(m => m.user_id);
 }
+
+export async function markGroupMessagesAsRead(userId: string, groupId: string): Promise<void> {
+  if (!userId || !groupId) return;
+
+  const { data: unreadMsgs } = await supabase
+    .from('group_messages')
+    .select('id, read_by')
+    .eq('group_id', groupId)
+    .neq('sender_id', userId);
+
+  if (!unreadMsgs || unreadMsgs.length === 0) return;
+
+  const toUpdate = unreadMsgs.filter(
+    (m: any) => !m.read_by || !m.read_by.includes(userId)
+  );
+
+  for (const msg of toUpdate) {
+    const newReadBy = [...(msg.read_by || []), userId];
+    await supabase
+      .from('group_messages')
+      .update({ read_by: newReadBy })
+      .eq('id', msg.id);
+  }
+}
+
+export async function getGroupUnreadCount(userId: string, groupId: string): Promise<number> {
+  const { data } = await supabase
+    .from('group_messages')
+    .select('id, read_by')
+    .eq('group_id', groupId)
+    .neq('sender_id', userId);
+
+  if (!data) return 0;
+  return data.filter((m: any) => !m.read_by || !m.read_by.includes(userId)).length;
+}

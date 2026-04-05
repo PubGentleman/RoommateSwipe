@@ -1132,11 +1132,18 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
     return () => { supabase.removeChannel(channel); };
   }, [conversationId]);
 
+  const lastAnalyzeRef = useRef<number>(0);
+
   const analyzeIntentAfterMessage = async () => {
     if (isInquiryChat || conversationId.startsWith('group-')) return;
-    if (messages.length % 3 !== 0) return;
     if (meetupSuggestion) return;
     if (!otherUser) return;
+    if (messages.length < 6) return;
+    const now = Date.now();
+    if (now - lastAnalyzeRef.current < 5 * 60 * 1000) return;
+    if (messages.length % 6 !== 0) return;
+
+    lastAnalyzeRef.current = now;
 
     try {
       const sortedIds = [otherUser.id, user!.id].sort();
@@ -1182,12 +1189,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
           }));
           loadedFromSupabase = true;
           try {
-            await supabase
-              .from('group_messages')
-              .update({ read: true })
-              .eq('group_id', groupId)
-              .neq('sender_id', user?.id || '')
-              .eq('read', false);
+            const { markGroupMessagesAsRead } = await import('../../services/groupService');
+            await markGroupMessagesAsRead(user?.id || '', groupId);
           } catch (_markErr) {
             console.warn('[Chat] Failed to mark group messages as read:', _markErr);
           }

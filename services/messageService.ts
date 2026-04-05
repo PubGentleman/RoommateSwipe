@@ -47,8 +47,7 @@ export async function getConversations(userId: string) {
       compatibility_score,
       created_at,
       user1:users!user_id_1(id, full_name, avatar_url, city),
-      user2:users!user_id_2(id, full_name, avatar_url, city),
-      messages(id, content, created_at, sender_id, read, read_at)
+      user2:users!user_id_2(id, full_name, avatar_url, city)
     `)
     .eq('status', 'matched')
     .or(`user_id_1.eq.${userId},user_id_2.eq.${userId}`)
@@ -57,29 +56,40 @@ export async function getConversations(userId: string) {
 
   if (!matches || matches.length === 0) return [];
 
-  const conversations = matches.map((match: any) => {
-    const otherUser = match.user_id_1 === userId ? match.user2 : match.user1;
-    const msgs = match.messages || [];
-    const sortedMsgs = [...msgs].sort(
-      (a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    );
-    const lastMsg = sortedMsgs[0];
-    const unreadCount = msgs.filter(
-      (m: any) => m.sender_id !== userId && !m.read && !m.read_at
-    ).length;
+  const conversationData = await Promise.all(
+    matches.map(async (match: any) => {
+      const [lastMsgResult, unreadResult] = await Promise.all([
+        supabase
+          .from('messages')
+          .select('id, content, created_at, sender_id')
+          .eq('match_id', match.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+        supabase
+          .from('messages')
+          .select('*', { count: 'exact', head: true })
+          .eq('match_id', match.id)
+          .neq('sender_id', userId)
+          .eq('read', false),
+      ]);
 
-    return {
-      matchId: match.id,
-      matchType: match.match_type,
-      compatibilityScore: match.compatibility_score,
-      participant: otherUser,
-      lastMessage: lastMsg?.content || null,
-      lastMessageAt: lastMsg?.created_at || match.created_at,
-      unreadCount,
-    };
-  });
+      const otherUser = match.user_id_1 === userId ? match.user2 : match.user1;
+      const lastMsg = lastMsgResult.data;
 
-  return conversations.sort((a: any, b: any) =>
+      return {
+        matchId: match.id,
+        matchType: match.match_type,
+        compatibilityScore: match.compatibility_score,
+        participant: otherUser,
+        lastMessage: lastMsg?.content || null,
+        lastMessageAt: lastMsg?.created_at || match.created_at,
+        unreadCount: unreadResult.count || 0,
+      };
+    })
+  );
+
+  return conversationData.sort((a: any, b: any) =>
     new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime()
   );
 }
@@ -112,6 +122,32 @@ export async function sendMessage(userId: string, matchId: string, content: stri
 
   await checkEmailVerification();
   await checkMessagingPaywall(userId, matchId);
+
+  const { data: sub } = await supabase
+    .from('subscriptions')
+    .select('plan')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  const plan = sub?.plan || 'basic';
+
+  if (plan !== 'elite') {
+    const DAILY_LIMITS: Record<string, number> = { basic: 20, plus: 200 };
+    const limit = DAILY_LIMITS[plan] ?? 20;
+
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    const { count } = await supabase
+      .from('messages')
+      .select('*', { count: 'exact', head: true })
+      .eq('sender_id', userId)
+      .gte('created_at', todayStart.toISOString());
+
+    if (count !== null && count >= limit) {
+      throw new Error('Daily message limit reached. Upgrade your plan for more messages.');
+    }
+  }
 
   const { data, error } = await supabase
     .from('messages')
@@ -190,6 +226,30 @@ export async function sendColdMessage(userId: string, recipientId: string, conte
   if (!userId) throw new Error('Not authenticated');
 
   await checkEmailVerification();
+
+  const { data: sub } = await supabase
+    .from('subscriptions')
+    .select('plan')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  const plan = sub?.plan || 'basic';
+  const COLD_LIMITS: Record<string, number> = { basic: 3, plus: 10, elite: 99999 };
+  const limit = COLD_LIMITS[plan] ?? 3;
+
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+
+  const { count, error: countError } = await supabase
+    .from('matches')
+    .select('*', { count: 'exact', head: true })
+    .eq('match_type', 'cold')
+    .gte('created_at', todayStart.toISOString())
+    .or(`user_id_1.eq.${userId},user_id_2.eq.${userId}`);
+
+  if (!countError && count !== null && count >= limit) {
+    throw new Error('Daily cold message limit reached. Upgrade your plan for more.');
+  }
 
   const userId1 = userId < recipientId ? userId : recipientId;
   const userId2 = userId < recipientId ? recipientId : userId;
@@ -271,55 +331,70 @@ export function subscribeToAllMessages(userId: string, onUpdate: () => void) {
 export async function getHostConversations(hostId: string): Promise<any[]> {
   try {
     const { data: inquiryGroups, error } = await supabase
-      .from('inquiry_groups')
+      .from('groups')
       .select(`
         id,
         host_id,
         listing_id,
         listing_address,
-        status,
+        inquiry_status,
         created_at,
         updated_at,
         members:group_members(
           user_id,
           users:user_id(id, full_name, avatar_url)
-        ),
-        messages:group_messages(
-          id, content, sender_id, created_at, read
         )
       `)
       .eq('host_id', hostId)
+      .eq('type', 'listing_inquiry')
       .order('updated_at', { ascending: false })
       .limit(50);
 
     if (error || !inquiryGroups) return [];
 
-    return inquiryGroups.map((group: any) => {
-      const sortedMsgs = (group.messages || []).sort(
-        (a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      );
-      const lastMsg = sortedMsgs[0];
-      const unread = (group.messages || []).filter(
-        (m: any) => m.sender_id !== hostId && !m.read
-      ).length;
-      const memberUser = group.members?.[0]?.users;
+    const results = await Promise.all(
+      inquiryGroups.map(async (group: any) => {
+        const [lastMsgResult, unreadResult] = await Promise.all([
+          supabase
+            .from('group_messages')
+            .select('id, content, sender_id, created_at')
+            .eq('group_id', group.id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle(),
+          supabase
+            .from('group_messages')
+            .select('id, read_by')
+            .eq('group_id', group.id)
+            .neq('sender_id', hostId),
+        ]);
 
-      return {
-        id: `conv-interest-${group.id}`,
-        hostId: group.host_id,
-        listingId: group.listing_id,
-        listingAddress: group.listing_address,
-        isInquiryThread: true,
-        inquiryStatus: group.status,
-        name: memberUser?.full_name || 'Renter',
-        avatar: memberUser?.avatar_url || null,
-        participant: memberUser || null,
-        lastMessage: lastMsg?.content || '',
-        timestamp: new Date(lastMsg?.created_at || group.updated_at),
-        unread,
-        messages: [],
-      };
-    });
+        const lastMsg = lastMsgResult.data;
+        const unreadMsgs = unreadResult.data || [];
+        const unread = unreadMsgs.filter(
+          (m: any) => !m.read_by || !m.read_by.includes(hostId)
+        ).length;
+        const memberUser = group.members?.[0]?.users;
+
+        return {
+          id: `conv-interest-${group.id}`,
+          hostId: group.host_id,
+          listingId: group.listing_id,
+          listingAddress: group.listing_address,
+          isInquiryThread: true,
+          inquiryStatus: group.inquiry_status,
+          name: memberUser?.full_name || 'Renter',
+          avatar: memberUser?.avatar_url || null,
+          participant: memberUser || null,
+          lastMessage: lastMsg?.content || '',
+          timestamp: new Date(lastMsg?.created_at || group.updated_at),
+          unread,
+          messages: [],
+        };
+      })
+    );
+
+    return results;
   } catch (e) {
     console.warn('[messageService] Failed to load host conversations:', e);
     return [];
