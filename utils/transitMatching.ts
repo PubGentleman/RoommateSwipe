@@ -5,6 +5,33 @@ import {
   hasReasonableTransfer,
   NEIGHBORHOOD_TRAINS,
 } from '../constants/transitData';
+import { getGroupUnitCount } from './groupUtils';
+
+function profileToUser(profile: RoommateProfile): any {
+  return {
+    id: profile.id,
+    name: profile.name,
+    age: profile.age,
+    birthday: (profile as any).birthday,
+    budget: profile.budget,
+    zodiacSign: (profile as any).zodiacSign,
+    profileData: profile.profileData || {
+      preferences: {
+        sleepSchedule: profile.lifestyle?.sleepSchedule,
+        cleanliness: profile.lifestyle?.cleanliness,
+        smoking: profile.lifestyle?.smoking,
+        pets: profile.lifestyle?.pets,
+        workLocation: profile.lifestyle?.workSchedule,
+        guestPolicy: (profile as any).preferences?.guestPolicy,
+        noiseTolerance: (profile as any).preferences?.noiseTolerance,
+        moveInDate: profile.apartmentPrefs?.moveInDate,
+      },
+      budget: profile.budget,
+      preferred_neighborhoods: profile.preferredNeighborhoods,
+      dealbreakers: (profile as any).dealbreakers || [],
+    },
+  };
+}
 
 export interface GroupCompatibilityResult {
   total: number;
@@ -28,8 +55,8 @@ export function calculateGroupCompatibilityScore(
   const prefsB = userB.apartmentPrefs;
 
   const lifestyleScore = calculateCompatibility(
-    { id: userA.id, name: userA.name } as any,
-    userA
+    profileToUser(userA),
+    userB
   );
 
   let budgetScore = 50;
@@ -91,15 +118,22 @@ export function calculateGroupCompatibilityScore(
   const sharedAmenities = (prefsA?.amenityMustHaves ?? []).filter(a =>
     (prefsB?.amenityMustHaves ?? []).includes(a)
   );
-  const amenityScore = sharedAmenities.length > 0
-    ? Math.min(100, sharedAmenities.length * 25)
-    : 50;
+  const totalMustHaves = Math.max(
+    (prefsA?.amenityMustHaves ?? []).length,
+    (prefsB?.amenityMustHaves ?? []).length
+  );
+  let amenityScore = 50;
+  if (totalMustHaves > 0) {
+    const overlapRatio = sharedAmenities.length / totalMustHaves;
+    amenityScore = Math.round(overlapRatio * 100);
+  }
 
   const total = Math.round(
-    lifestyleScore * 0.35 +
-    budgetScore    * 0.30 +
-    transitScore   * 0.25 +
-    moveInScore    * 0.10
+    lifestyleScore * 0.30 +
+    budgetScore    * 0.25 +
+    transitScore   * 0.20 +
+    moveInScore    * 0.10 +
+    amenityScore   * 0.15
   );
 
   return {
@@ -154,14 +188,38 @@ export function detectGroupConflicts(
     }
   }
 
-  const desiredBedrooms = members[0]?.apartmentPrefs?.desiredBedrooms ?? 2;
-  if (members.length > desiredBedrooms) {
-    conflicts.push(
-      `Group has ${members.length} people but you're looking for a ${desiredBedrooms}BR`
+  const roomsNeeded = getGroupUnitCount(
+    members.map(m => ({
+      is_couple: (m as any).is_couple || (m as any).isCouple,
+      is_host: false,
+    }))
+  );
+
+  const bedroomVotes = members
+    .map(m => m.apartmentPrefs?.desiredBedrooms)
+    .filter((v): v is number => v != null && v > 0);
+
+  if (bedroomVotes.length > 0) {
+    const consensusBedrooms = Math.round(
+      bedroomVotes.reduce((s, n) => s + n, 0) / bedroomVotes.length
     );
-    suggestions.push(
-      `Remove ${members.length - desiredBedrooms} member(s) or switch to a ${members.length}BR search`
-    );
+
+    if (roomsNeeded > consensusBedrooms) {
+      conflicts.push(
+        `Group needs ${roomsNeeded} rooms but consensus is a ${consensusBedrooms}BR. Consider a bigger apartment.`
+      );
+      suggestions.push(
+        `Switch to a ${roomsNeeded}BR search, or reduce the group to ${consensusBedrooms} member${consensusBedrooms > 1 ? 's' : ''}.`
+      );
+    }
+
+    const minBR = Math.min(...bedroomVotes);
+    const maxBR = Math.max(...bedroomVotes);
+    if (maxBR - minBR >= 2) {
+      conflicts.push(
+        `Bedroom preferences vary widely (${minBR}BR to ${maxBR}BR). Align before searching.`
+      );
+    }
   }
 
   const budgetConflicts = conflicts.filter(c => c.includes('Budget'));
@@ -238,8 +296,14 @@ export function scoreListing(
     amenityScore * 0.25
   );
 
-  const perPersonRent = members.length > 0
-    ? Math.round((listing.price ?? 0) / members.length)
+  const roomCount = getGroupUnitCount(
+    members.map(m => ({
+      is_couple: (m as any).is_couple || (m as any).isCouple,
+      is_host: false,
+    }))
+  );
+  const perPersonRent = roomCount > 0
+    ? Math.round((listing.price ?? 0) / roomCount)
     : listing.price ?? 0;
   const trainsNearby = NEIGHBORHOOD_TRAINS[listing.neighborhood ?? ''] ?? [];
   const memberNames = members.map(m => m.name.split(' ')[0]).join(' and ');

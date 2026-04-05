@@ -136,7 +136,7 @@ serve(async (req: Request) => {
           .select('id')
           .eq('pi_auto_group_id', auto_group_id)
           .limit(1)
-          .single();
+          .maybeSingle();
         if (raceGroup) {
           return new Response(JSON.stringify({ group_id: raceGroup.id }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },

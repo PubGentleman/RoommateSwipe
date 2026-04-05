@@ -1,6 +1,7 @@
 import { RoommateProfile } from '../types/models';
 import { StorageService } from './storage';
 import { detectGroupConflicts, calculateGroupCompatibilityScore } from './transitMatching';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 export type GroupHealthStatus = 'strong' | 'good' | 'at_risk' | 'conflict';
 
@@ -23,34 +24,100 @@ export async function getGroupHealth(
   currentUserId: string
 ): Promise<GroupHealthResult | null> {
   try {
-    const groups = await StorageService.getGroups();
-    const group = groups.find((g: any) => g.id === groupId);
-    if (!group) return null;
+    let group: any = null;
+    let memberProfiles: RoommateProfile[] = [];
 
-    const rawMembers = group.members || [];
-    const memberIds: string[] = rawMembers.map((m: any) =>
-      typeof m === 'string' ? m : m.id || m.user_id
-    ).filter(Boolean);
-    if (memberIds.length < 2) {
-      return {
-        score: 0,
-        status: 'at_risk',
-        statusLabel: 'Needs Members',
-        statusColor: '#f39c12',
-        topConflict: 'Your group only has 1 member. Invite someone to get started.',
-        conflicts: [],
-        suggestions: ['Invite a roommate to join your group'],
-        sharedNeighborhoods: [],
-        memberCount: memberIds.length,
-        desiredBedrooms: null,
-        readyToSearch: false,
-      };
+    if (isSupabaseConfigured) {
+      const { data: groupData } = await supabase
+        .from('groups')
+        .select(`
+          id, name, max_members,
+          members:group_members(user_id, is_couple, is_host, status)
+        `)
+        .eq('id', groupId)
+        .single();
+
+      if (groupData) {
+        group = groupData;
+        const activeMembers = (groupData.members || [])
+          .filter((m: any) => m.status === 'active' || !m.status);
+        const memberIds = activeMembers.map((m: any) => m.user_id).filter(Boolean);
+
+        if (memberIds.length >= 2) {
+          const [profilesResult, usersResult] = await Promise.all([
+            supabase.from('profiles').select('*').in('user_id', memberIds),
+            supabase.from('users').select('id, full_name, age, birthday, gender, zodiac_sign, city').in('id', memberIds),
+          ]);
+
+          const profiles = profilesResult.data || [];
+          const users = usersResult.data || [];
+
+          memberProfiles = memberIds.map((id: string) => {
+            const profile = profiles.find((p: any) => p.user_id === id);
+            const user = users.find((u: any) => u.id === id);
+            return {
+              id,
+              name: user?.full_name || 'Unknown',
+              age: user?.age,
+              budget: profile?.budget_max,
+              lifestyle: {
+                sleepSchedule: profile?.sleep_schedule,
+                cleanliness: profile?.cleanliness,
+                smoking: profile?.smoking,
+                pets: profile?.pets,
+                workSchedule: profile?.work_schedule,
+                socialLevel: profile?.social_level,
+              },
+              preferredNeighborhoods: profile?.preferred_neighborhoods || [],
+              profileData: profile,
+              apartmentPrefs: {
+                budgetPerPersonMin: profile?.budget_min || 0,
+                budgetPerPersonMax: profile?.budget_max || 0,
+                desiredBedrooms: profile?.desired_bedrooms,
+                moveInDate: profile?.move_in_date,
+                preferredTrains: profile?.preferred_trains || [],
+                amenityMustHaves: profile?.amenity_must_haves || [],
+                locationFlexible: profile?.location_flexible || false,
+                wfh: profile?.work_schedule === 'wfh_fulltime',
+                apartmentPrefsComplete: !!profile?.apartment_prefs_complete,
+              },
+            } as RoommateProfile;
+          }).filter(p => p != null);
+        }
+      }
     }
 
-    const allProfiles = await StorageService.getRoommateProfiles();
-    const memberProfiles: RoommateProfile[] = memberIds
-      .map(id => allProfiles.find((p: any) => p.id === id))
-      .filter((p): p is RoommateProfile => p != null);
+    if (!group || memberProfiles.length < 2) {
+      const groups = await StorageService.getGroups();
+      group = groups.find((g: any) => g.id === groupId);
+      if (!group) return null;
+
+      const rawMembers = group.members || [];
+      const memberIds: string[] = rawMembers.map((m: any) =>
+        typeof m === 'string' ? m : m.id || m.user_id
+      ).filter(Boolean);
+
+      if (memberIds.length < 2) {
+        return {
+          score: 0,
+          status: 'at_risk',
+          statusLabel: 'Needs Members',
+          statusColor: '#f39c12',
+          topConflict: 'Your group needs at least 2 members.',
+          conflicts: [],
+          suggestions: ['Invite a roommate to join your group'],
+          sharedNeighborhoods: [],
+          memberCount: memberIds.length,
+          desiredBedrooms: null,
+          readyToSearch: false,
+        };
+      }
+
+      const allProfiles = await StorageService.getRoommateProfiles();
+      memberProfiles = memberIds
+        .map(id => allProfiles.find((p: any) => p.id === id))
+        .filter((p): p is RoommateProfile => p != null);
+    }
 
     if (memberProfiles.length < 2) {
       return {

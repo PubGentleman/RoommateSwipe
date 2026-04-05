@@ -32,29 +32,46 @@ export async function getOpenGroups(
   const { data: piGroups } = await piQuery;
 
   if (piGroups) {
+    const allMemberIds = new Set<string>();
+    const groupAcceptedMap = new Map<string, any[]>();
+
     for (const g of piGroups) {
       const accepted = (g.pi_auto_group_members || []).filter(
         (m: any) => m.status === 'accepted' || m.status === 'pending'
       );
+      groupAcceptedMap.set(g.id, accepted);
+      accepted.forEach((m: any) => {
+        if (m.user_id) allMemberIds.add(m.user_id);
+      });
+    }
+
+    const { data: allUsers } = allMemberIds.size > 0
+      ? await supabase
+          .from('users')
+          .select('id, name, photos, age, occupation')
+          .in('id', Array.from(allMemberIds))
+      : { data: [] };
+
+    const userMap = new Map((allUsers || []).map((u: any) => [u.id, u]));
+
+    for (const g of piGroups) {
+      const accepted = groupAcceptedMap.get(g.id) || [];
       const spotsOpen = g.max_members - accepted.filter((m: any) => m.status === 'accepted').length;
       if (spotsOpen <= 0) continue;
-
-      const memberIds = accepted.map((m: any) => m.user_id);
-      const { data: memberUsers } = await supabase
-        .from('users')
-        .select('id, name, photos, age, occupation')
-        .in('id', memberIds);
 
       results.push({
         id: g.id,
         groupType: 'pi_auto',
-        members: (memberUsers || []).map((u: any) => ({
-          user_id: u.id,
-          name: u.name || 'Member',
-          age: u.age,
-          photo: u.photos?.[0],
-          occupation: u.occupation,
-        })),
+        members: accepted.map((m: any) => {
+          const u = userMap.get(m.user_id);
+          return {
+            user_id: m.user_id,
+            name: u?.name || 'Member',
+            age: u?.age,
+            photo: u?.photos?.[0],
+            occupation: u?.occupation,
+          };
+        }),
         spotsOpen,
         maxSize: g.max_members,
         city: g.city,

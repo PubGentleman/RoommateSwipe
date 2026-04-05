@@ -6,7 +6,11 @@ export interface GroupMemberUnit {
 }
 
 export function getGroupUnitCount(members: GroupMemberUnit[]): number {
-  return members.filter(m => !m.is_host && !m.isHost).length;
+  const nonHost = members.filter(m => !m.is_host && !m.isHost);
+  const coupleCount = nonHost.filter(m => m.is_couple || m.isCouple).length;
+  const coupleRooms = Math.ceil(coupleCount / 2);
+  const singleCount = nonHost.length - coupleCount;
+  return coupleRooms + singleCount;
 }
 
 export function getGroupRoomsNeeded(members: GroupMemberUnit[]): number {
@@ -17,7 +21,7 @@ export function getGroupCompositionLabel(members: GroupMemberUnit[]): string {
   const nonHost = members.filter(m => !m.is_host && !m.isHost);
   const couples = nonHost.filter(m => m.is_couple || m.isCouple).length;
   const singles = nonHost.length - couples;
-  const roomsNeeded = nonHost.length;
+  const roomsNeeded = getGroupUnitCount(members);
 
   const parts: string[] = [];
   if (couples > 0) parts.push(`${couples} couple${couples > 1 ? 's' : ''}`);
