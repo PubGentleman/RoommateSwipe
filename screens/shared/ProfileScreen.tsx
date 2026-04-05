@@ -668,7 +668,7 @@ export const ProfileScreen = () => {
                     <Text style={styles.rpVerifiedText}>Verified</Text>
                   </View>
                 ) : null}
-                {renterPlan && renterPlan !== 'basic' ? (
+                {renterPlan && renterPlan !== 'basic' && renterPlan !== 'free' ? (
                   <View style={[styles.rpPlanBadge, {
                     backgroundColor: renterPlan === 'elite' ? 'rgba(255,215,0,0.1)' : 'rgba(99,102,241,0.1)',
                   }]}>
