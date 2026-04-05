@@ -119,15 +119,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [passwordRecoveryMode, setPasswordRecoveryMode] = useState(false);
 
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
+  const initialLoadDoneRef = useRef(false);
 
   useEffect(() => {
-    loadUser();
+    loadUser().finally(() => {
+      initialLoadDoneRef.current = true;
+    });
 
     if (!isSupabaseConfigured) return;
 
     const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') && session) {
+          if (!initialLoadDoneRef.current) return;
           await loadUserFromSupabase(session);
         } else if (event === 'SIGNED_OUT') {
           setUser(null);
@@ -559,6 +563,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             fallbackUser.licenseState = 'NY';
             await StorageService.setCurrentUser(fallbackUser);
           }
+
+          if (fallbackUser.profileData && !fallbackUser.profileData.apartment_search_type) {
+            try {
+              const savedIntent = await AsyncStorage.getItem('@rhome/renter_intent');
+              if (savedIntent) {
+                const parsed = JSON.parse(savedIntent);
+                if (parsed.apartment_search_type) {
+                  fallbackUser.profileData = {
+                    ...fallbackUser.profileData,
+                    apartment_search_type: parsed.apartment_search_type,
+                    listing_type_preference: parsed.listing_type_preference || fallbackUser.profileData.listing_type_preference,
+                  };
+                  await StorageService.setCurrentUser(fallbackUser);
+                }
+              }
+            } catch (_) {}
+          }
+
           setUser(fallbackUser);
         }
       } catch {
