@@ -149,8 +149,11 @@ export const HostPricingScreen = () => {
         if (user) {
           const planPrefix = plan.id === 'free' ? '' : plan.id.startsWith('agent_') || plan.id.startsWith('company_') ? plan.id : `host_${plan.id}`;
           const hostPlanType = plan.id.startsWith('agent_') ? 'agent' : plan.id.startsWith('company_') ? 'company' : 'host';
-          const { success } = await processPayment(user.id, user.email || '', planPrefix, billingCycle, hostPlanType as any);
-          if (!success) return;
+          const { success, error: paymentError } = await processPayment(user.id, user.email || '', planPrefix, billingCycle, hostPlanType as any);
+          if (!success) {
+            await showAlert({ title: 'Payment Failed', message: paymentError || 'Unable to process payment. Please try again.', variant: 'warning' });
+            return;
+          }
         }
         await upgradeHostPlan(plan.id as any, billingCycle);
         if (isFirstTimeHost) {

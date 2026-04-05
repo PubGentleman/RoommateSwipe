@@ -2,12 +2,10 @@ import { Platform } from 'react-native';
 import { useStripe } from '@stripe/stripe-react-native';
 import { supabase } from '../lib/supabase';
 import { getPriceId } from '../constants/stripePrices';
-import { useConfirm } from '../contexts/ConfirmContext';
 import { useRevenueCat } from '../contexts/RevenueCatContext';
 
 export function useStripePayment() {
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
-  const { alert: showAlert } = useConfirm();
   const { purchase } = useRevenueCat();
 
   const processPayment = async (
@@ -16,9 +14,9 @@ export function useStripePayment() {
     plan: string,
     billingCycle: 'monthly' | '3month' | 'annual',
     planType?: 'renter' | 'host' | 'agent' | 'company'
-  ): Promise<{ success: boolean; subscriptionId?: string }> => {
+  ): Promise<{ success: boolean; subscriptionId?: string; error?: string }> => {
     const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('Payment timed out. Please try again.')), 90000)
+      setTimeout(() => reject(new Error('Payment timed out. Please try again.')), 30000)
     );
 
     if (Platform.OS === 'ios' || Platform.OS === 'android') {
@@ -32,22 +30,20 @@ export function useStripePayment() {
           purchase(rcPlan, billingCycle, effectivePlanType as 'renter' | 'host'),
           timeoutPromise,
         ]);
-        if (!result.success) {
-          const errorMsg = result.error || 'Purchase could not be completed. Please try again.';
-          await showAlert({ title: 'Purchase Failed', message: errorMsg, variant: 'warning' });
-        }
-        return { success: result.success, subscriptionId: result.success ? `rc_${plan}_${billingCycle}` : undefined };
+        return {
+          success: result.success,
+          subscriptionId: result.success ? `rc_${plan}_${billingCycle}` : undefined,
+          error: result.success ? undefined : (result.error || 'Purchase could not be completed.'),
+        };
       } catch (err: any) {
         const msg = err.message?.includes('timed out') ? 'Payment timed out. Please try again.' : (err.message || 'Something went wrong. Please try again.');
-        await showAlert({ title: 'Purchase Failed', message: msg, variant: 'warning' });
-        return { success: false };
+        return { success: false, error: msg };
       }
     }
 
     const priceId = getPriceId(plan, billingCycle);
     if (!priceId) {
-      await showAlert({ title: 'Error', message: 'Could not find pricing for this plan.', variant: 'warning' });
-      return { success: false };
+      return { success: false, error: 'Could not find pricing for this plan.' };
     }
 
     try {
@@ -71,10 +67,10 @@ export function useStripePayment() {
         const { error: paymentError } = await presentPaymentSheet();
 
         if (paymentError) {
-          if (paymentError.code !== 'Canceled') {
-            await showAlert({ title: 'Payment Failed', message: paymentError.message, variant: 'warning' });
+          if (paymentError.code === 'Canceled') {
+            return { success: false as const, error: 'Payment was canceled.' };
           }
-          return { success: false } as const;
+          return { success: false as const, error: paymentError.message };
         }
 
         return { success: true as const, subscriptionId: data.subscriptionId };
@@ -83,8 +79,7 @@ export function useStripePayment() {
       return await Promise.race([stripeFlow(), timeoutPromise]);
     } catch (err: any) {
       const msg = err.message?.includes('timed out') ? 'Payment timed out. Please try again.' : (err.message || 'Something went wrong. Please try again.');
-      await showAlert({ title: 'Error', message: msg, variant: 'warning' });
-      return { success: false };
+      return { success: false, error: msg };
     }
   };
 

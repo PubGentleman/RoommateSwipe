@@ -195,18 +195,18 @@ export const PlanSelectionScreen = () => {
       setProcessing(false);
       setShowConfirm(false);
       alert({ title: 'Timed Out', message: 'Payment is taking too long. Please check your connection and try again.', variant: 'warning' });
-    }, 60000);
+    }, 30000);
 
     try {
       const stripePlan = planId;
       const planType = isHost ? 'host' : 'renter';
-      const { success, subscriptionId } = await processPayment(user.id, user.email || '', stripePlan, billingCycle, planType as any);
+      const { success, subscriptionId, error: paymentError } = await processPayment(user.id, user.email || '', stripePlan, billingCycle, planType as any);
 
       if (!success) {
         clearTimeout(safetyTimeout);
         setProcessing(false);
         setShowConfirm(false);
-        await alert({ title: 'Payment Failed', message: 'Unable to process payment. Please try again.', variant: 'warning' });
+        await alert({ title: 'Payment Failed', message: paymentError || 'Unable to process payment. Please try again.', variant: 'warning' });
         return;
       }
 

@@ -222,12 +222,14 @@ export const PlansScreen = () => {
       setSubscribing(false);
       setSelectedPlan(null);
       alert({ title: 'Timed Out', message: 'The purchase is taking too long. Please check your subscription status in Account Settings and try again if needed.', variant: 'warning' });
-    }, 90000);
+    }, 30000);
     try {
-      const { success, subscriptionId } = await processPayment(user.id, user.email || '', selectedPlan, billingCycle, 'renter');
+      const { success, subscriptionId, error: paymentError } = await processPayment(user.id, user.email || '', selectedPlan, billingCycle, 'renter');
       if (!success) {
+        clearTimeout(safetyTimeout);
         setSubscribing(false);
         setSelectedPlan(null);
+        await alert({ title: 'Payment Failed', message: paymentError || 'Unable to process payment. Please try again.', variant: 'warning' });
         return;
       }
       if (selectedPlan === 'plus') await upgradeToPlus(billingCycle, subscriptionId);
