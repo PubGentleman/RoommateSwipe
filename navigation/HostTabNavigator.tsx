@@ -260,6 +260,8 @@ function HostCustomTabBar({ state, descriptors, navigation }: BottomTabBarProps)
                 navigation.navigate('Messages' as any, { screen: 'MessagesList' } as any);
               } else if (route.name === 'Profile') {
                 navigation.navigate('Profile' as any, { screen: 'ProfileMain' } as any);
+              } else if (route.name === 'Groups') {
+                navigation.navigate('Groups' as any, { screen: 'BrowseRenterGroups' } as any);
               } else if (!isFocused) {
                 navigation.navigate(route.name);
               }

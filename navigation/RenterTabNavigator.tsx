@@ -71,6 +71,8 @@ function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
                 navigation.navigate('Messages' as any, { screen: 'MessagesList' } as any);
               } else if (route.name === 'Profile') {
                 navigation.navigate('Profile' as any, { screen: 'ProfileMain' } as any);
+              } else if (route.name === 'Groups') {
+                navigation.navigate('Groups' as any, { screen: 'GroupsList' } as any);
               } else if (route.name === 'Explore' && isFocused) {
                 navigation.navigate('Explore' as any, { screen: 'ExploreMain' } as any);
               } else if (!isFocused) {
