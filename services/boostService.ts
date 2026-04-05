@@ -5,7 +5,7 @@ export async function getActiveBoost(userId: string) {
 
   const { data } = await supabase
     .from('boosts')
-    .select('*')
+    .select('id, user_id, type, is_active, expires_at, created_at, listing_id, includes_top_picks')
     .eq('user_id', userId)
     .eq('is_active', true)
     .gt('expires_at', new Date().toISOString())

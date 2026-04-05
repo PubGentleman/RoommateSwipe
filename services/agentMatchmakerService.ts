@@ -319,7 +319,7 @@ export async function getAgentInvitesForRenter(renterId: string): Promise<AgentG
 
   const { data, error } = await supabase
     .from('agent_group_invites')
-    .select('*')
+    .select('id, agent_id, renter_id, group_id, status, sent_at, responded_at, listing_id, message')
     .eq('renter_id', renterId)
     .order('sent_at', { ascending: false });
 

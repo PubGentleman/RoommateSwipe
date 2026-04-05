@@ -2,7 +2,47 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { notifyUser } from '../_shared/pushNotifications.ts'
 
 Deno.serve(async (req) => {
-  const payload = await req.json()
+  const webhookSecret = Deno.env.get('PERSONA_WEBHOOK_SECRET');
+
+  const body = await req.text();
+
+  if (webhookSecret) {
+    const signature = req.headers.get('Persona-Signature') || '';
+
+    try {
+      const encoder = new TextEncoder();
+      const key = await crypto.subtle.importKey(
+        'raw',
+        encoder.encode(webhookSecret),
+        { name: 'HMAC', hash: 'SHA-256' },
+        false,
+        ['verify']
+      );
+
+      const signatureBytes = Uint8Array.from(
+        atob(signature),
+        c => c.charCodeAt(0)
+      );
+      const isValid = await crypto.subtle.verify(
+        'HMAC',
+        key,
+        signatureBytes,
+        encoder.encode(body)
+      );
+
+      if (!isValid) {
+        console.error('Persona webhook signature verification failed');
+        return new Response('Invalid signature', { status: 401 });
+      }
+    } catch (e) {
+      console.error('Persona signature verification error:', e);
+      return new Response('Signature verification error', { status: 401 });
+    }
+  } else {
+    console.warn('PERSONA_WEBHOOK_SECRET not configured — skipping signature verification');
+  }
+
+  const payload = JSON.parse(body);
   const eventName = payload.data?.type
   const attributes = payload.data?.attributes || {}
   const referenceId = attributes['reference-id']

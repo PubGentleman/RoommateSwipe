@@ -82,3 +82,11 @@ The architecture includes a Babel module resolver, platform-specific UI, perform
 *   Walk Score API
 *   Overpass API
 *   NYC Open Data
+
+# Security Notes
+
+*   **Migration 103**: Comprehensive RLS hardening — enables RLS on affiliates, affiliate_referrals, boost_purchases, zip_code_data. Tightens preformed_groups/members/shortlist SELECT to members-only. Restricts notification INSERT to service_role. Adds DELETE policies for messages and notifications.
+*   **Edge Functions**: All user-facing Edge Functions (generate-group-suggestions, places-proxy, calculate-match-scores) now validate JWT tokens. Persona webhook verifies HMAC signatures. CRON functions use timing-safe comparison via shared `verifyCronAuth`.
+*   **Client**: Hardcoded Supabase anon key fallback removed from `lib/supabase.ts`. `select('*')` replaced with explicit column lists in AuthContext, backgroundCheckService, boostService, agentMatchmakerService.
+*   **SQL Injection**: Fixed in calculate-match-scores — excludeIds are now validated against UUID regex before query interpolation.
+*   **Next migration**: 104.

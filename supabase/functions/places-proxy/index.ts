@@ -1,6 +1,9 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const GOOGLE_KEY = Deno.env.get('GOOGLE_MAPS_API_KEY') || '';
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -11,6 +14,24 @@ const corsHeaders = {
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
+  }
+
+  const authHeader = req.headers.get('Authorization');
+  if (!authHeader) {
+    return new Response(
+      JSON.stringify({ status: 'ERROR', error_message: 'Missing authorization header' }),
+      { headers: corsHeaders, status: 401 }
+    );
+  }
+
+  const token = authHeader.replace('Bearer ', '');
+  const supabaseAuth = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const { data: { user }, error: authError } = await supabaseAuth.auth.getUser(token);
+  if (authError || !user) {
+    return new Response(
+      JSON.stringify({ status: 'ERROR', error_message: 'Unauthorized' }),
+      { headers: corsHeaders, status: 401 }
+    );
   }
 
   let action = 'autocomplete';

@@ -2,23 +2,15 @@ import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import {
   serializeFullContext, CORS_HEADERS, errorResponse, jsonResponse,
-  PI_AUTO_ASSEMBLE_PERSONA, stripName,
+  PI_AUTO_ASSEMBLE_PERSONA, stripName, verifyCronAuth,
 } from '../_shared/pi-utils.ts';
 
 const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY')!;
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const CRON_SECRET = Deno.env.get('CRON_SECRET') || '';
 
 const MIN_PAIRWISE_SCORE = 51;
 const ELIGIBLE_ACTIVE_DAYS = 30;
-
-function verifyCronAuth(req: Request): boolean {
-  const authHeader = req.headers.get('Authorization') || '';
-  if (authHeader === `Bearer ${SUPABASE_SERVICE_KEY}`) return true;
-  if (CRON_SECRET && authHeader === `Bearer ${CRON_SECRET}`) return true;
-  return false;
-}
 
 interface CandidateProfile {
   user_id: string;

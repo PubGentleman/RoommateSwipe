@@ -299,6 +299,28 @@ export async function sendPushNotifications(
   return sent;
 }
 
+export function verifyCronAuth(req: Request): boolean {
+  const authHeader = req.headers.get('Authorization') || '';
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+
+  if (authHeader === `Bearer ${serviceKey}`) return true;
+
+  const cronSecret = Deno.env.get('CRON_SECRET') || '';
+  if (!cronSecret || cronSecret.length < 32) return false;
+
+  const token = authHeader.replace('Bearer ', '');
+  if (token.length !== cronSecret.length) return false;
+
+  const encoder = new TextEncoder();
+  const a = encoder.encode(token);
+  const b = encoder.encode(cronSecret);
+  let result = 0;
+  for (let i = 0; i < a.length; i++) {
+    result |= a[i] ^ b[i];
+  }
+  return result === 0;
+}
+
 export function errorResponse(message: string, status: number) {
   return new Response(JSON.stringify({ error: message }), {
     status,

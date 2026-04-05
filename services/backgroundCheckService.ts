@@ -26,7 +26,7 @@ export const getMyBackgroundCheck = async (userId: string): Promise<BackgroundCh
 
   const { data } = await supabase
     .from('background_checks')
-    .select('*')
+    .select('id, user_id, status, provider, identity_verified, criminal_clear, created_at, completed_at')
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
     .limit(1)
@@ -88,7 +88,7 @@ export async function submitSelfieVerification(
 export const getUserBackgroundBadge = async (userId: string): Promise<BackgroundCheckBadge | null> => {
   const { data } = await supabase
     .from('public_background_badges')
-    .select('*')
+    .select('id, user_id, status, identity_verified, criminal_clear, created_at')
     .eq('user_id', userId)
     .single()
 

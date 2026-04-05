@@ -368,9 +368,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       const [userResult, profileResult, subscriptionResult] = await Promise.all([
-        supabase.from('users').select('*').eq('id', session.user.id).single(),
-        supabase.from('profiles').select('*').eq('user_id', session.user.id).single(),
-        supabase.from('subscriptions').select('*').eq('user_id', session.user.id).single(),
+        supabase.from('users').select('id, email, full_name, role, avatar_url, onboarding_step, onboarding_status, email_verified, gender, city, last_active_at, birthday, age, occupation, zodiac_sign, hostType, bio, photos, profilePicture, instagram_handle, instagram_verified, referral_code, referral_credits, pi_parsed_preferences, trust_score, is_paused, soft_deleted_at, accept_agent_offers').eq('id', session.user.id).single(),
+        supabase.from('profiles').select('id, user_id, age, occupation, sleep_schedule, cleanliness, smoking, pets, budget_max, budget_min, move_in_date, room_type, personality_answers, interests, bio, preferred_neighborhoods, work_schedule, guest_policy, noise_tolerance, household_gender_preference, apartment_search_type, roommate_relationship, shared_expenses, pet_type, dealbreakers, social_level, desired_bedrooms, listing_type_preference, preferred_trains, apartment_prefs_complete, pi_parsed_preferences').eq('user_id', session.user.id).single(),
+        supabase.from('subscriptions').select('id, user_id, plan, status, current_period_end, stripe_subscription_id, stripe_customer_id').eq('user_id', session.user.id).single(),
       ]);
 
       const userData = userResult.data;
@@ -2670,7 +2670,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const queryPromise = supabase
           .from('team_members')
-          .select('*')
+          .select('id, company_user_id, agent_user_id, role, status, permissions, created_at')
           .eq('company_user_id', user.id)
           .neq('status', 'removed')
           .order('created_at', { ascending: true });

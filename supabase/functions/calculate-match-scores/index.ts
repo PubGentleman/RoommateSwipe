@@ -6,6 +6,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 function calculateAgeFromBirthday(birthday: string | null | undefined): number | null {
   if (!birthday) return null;
   const parts = birthday.split('T')[0].split('-').map(Number);
@@ -87,15 +89,35 @@ serve(async (req: Request) => {
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
 
-    const { userId } = await req.json();
-    if (!userId) {
-      return new Response(JSON.stringify({ error: 'userId required' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+    const token = authHeader.replace('Bearer ', '');
+
+    let userId: string;
+
+    if (token === supabaseServiceKey) {
+      const body = await req.json();
+      if (!body.userId) {
+        return new Response(JSON.stringify({ error: 'userId required' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      userId = body.userId;
+    } else {
+      const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey);
+      const { data: { user }, error: authError } = await supabaseAuth.auth.getUser(token);
+
+      if (authError || !user) {
+        return new Response(JSON.stringify({ error: 'Invalid or expired token' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      userId = user.id;
     }
+
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const { data: currentUser } = await supabase
       .from('users')
@@ -142,7 +164,9 @@ serve(async (req: Request) => {
     );
     const excludeIds = [userId, ...recentPartnerIds];
 
-    const { data: candidates } = await supabase
+    const safeExcludeIds = excludeIds.filter(id => UUID_REGEX.test(id));
+
+    let candidateQuery = supabase
       .from('users')
       .select(`
         id, full_name, city, age, birthday, gender, zodiac_sign, occupation, pi_parsed_preferences,
@@ -156,9 +180,13 @@ serve(async (req: Request) => {
         )
       `)
       .eq('role', 'renter')
-      .eq('onboarding_step', 'complete')
-      .not('id', 'in', `(${excludeIds.join(',')})`)
-      .limit(50);
+      .eq('onboarding_step', 'complete');
+
+    if (safeExcludeIds.length > 0) {
+      candidateQuery = candidateQuery.not('id', 'in', `(${safeExcludeIds.join(',')})`);
+    }
+
+    const { data: candidates } = await candidateQuery.limit(50);
 
     if (!candidates || candidates.length === 0) {
       return new Response(JSON.stringify({ calculated: 0 }), {

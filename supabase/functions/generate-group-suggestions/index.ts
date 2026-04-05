@@ -2,29 +2,51 @@ import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
 const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Content-Type': 'application/json',
+};
 
 function errorResponse(msg: string, status: number) {
   return new Response(JSON.stringify({ error: msg }), {
     status,
-    headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+    headers: corsHeaders,
   });
 }
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', {
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-      },
-    });
+    return new Response('ok', { headers: corsHeaders });
   }
 
-  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
-  const { userId } = await req.json().catch(() => ({}));
+  const authHeader = req.headers.get('Authorization');
+  if (!authHeader) {
+    return errorResponse('Missing authorization header', 401);
+  }
 
-  if (!userId) return errorResponse('userId required', 400);
+  const token = authHeader.replace('Bearer ', '');
+
+  if (token === SUPABASE_SERVICE_KEY) {
+    const body = await req.json().catch(() => ({}));
+    if (!body.userId) return errorResponse('userId required', 400);
+    return handleRequest(body.userId);
+  }
+
+  const supabaseAuth = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const { data: { user }, error: authError } = await supabaseAuth.auth.getUser(token);
+  if (authError || !user) {
+    return errorResponse('Invalid token', 401);
+  }
+
+  return handleRequest(user.id);
+});
+
+async function handleRequest(userId: string) {
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
   const { data: profile } = await supabase
     .from('profiles')
@@ -35,7 +57,7 @@ serve(async (req) => {
   if (!profile?.budget_per_person_max && !profile?.move_in_date) {
     return new Response(JSON.stringify({ suggested: 0, reason: 'profile_incomplete' }), {
       status: 200,
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+      headers: corsHeaders,
     });
   }
 
@@ -51,7 +73,7 @@ serve(async (req) => {
   if (existingGroups && existingGroups.length > 0) {
     return new Response(JSON.stringify({ suggested: 0, reason: 'already_in_group' }), {
       status: 200,
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+      headers: corsHeaders,
     });
   }
 
@@ -66,7 +88,7 @@ serve(async (req) => {
   if (recentSuggestion && recentSuggestion.length > 0) {
     return new Response(JSON.stringify({ suggested: 0, reason: 'recent_suggestion_exists' }), {
       status: 200,
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+      headers: corsHeaders,
     });
   }
 
@@ -81,7 +103,7 @@ serve(async (req) => {
   if (!scores || scores.length < membersNeeded) {
     return new Response(JSON.stringify({ suggested: 0, reason: 'not_enough_matches' }), {
       status: 200,
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+      headers: corsHeaders,
     });
   }
 
@@ -97,7 +119,7 @@ serve(async (req) => {
   if (!matchUsers || matchUsers.length === 0) {
     return new Response(JSON.stringify({ suggested: 0 }), {
       status: 200,
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+      headers: corsHeaders,
     });
   }
 
@@ -137,6 +159,6 @@ serve(async (req) => {
 
   return new Response(
     JSON.stringify({ suggested: 1, suggestion_id: suggestion?.id }),
-    { headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } }
+    { headers: corsHeaders }
   );
-});
+}
