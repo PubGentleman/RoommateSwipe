@@ -218,6 +218,27 @@ export async function enableReplacement(groupId: string, slots: number): Promise
       open_to_requests: true,
     })
     .eq('id', groupId);
+
+  if (error && shouldLoadMockData()) {
+    try {
+      const keys = await AsyncStorage.getAllKeys();
+      const groupKey = keys.find(k => k.startsWith('@rhome/preformed_group_') && !k.includes('members'));
+      if (groupKey) {
+        const raw = await AsyncStorage.getItem(groupKey);
+        if (raw) {
+          const g = JSON.parse(raw);
+          if (g.id === groupId) {
+            g.needs_replacement = true;
+            g.replacement_slots = slots;
+            g.open_to_requests = true;
+            await AsyncStorage.setItem(groupKey, JSON.stringify(g));
+            return true;
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
   return !error;
 }
 
@@ -230,17 +251,54 @@ export async function disableReplacement(groupId: string): Promise<boolean> {
       open_to_requests: false,
     })
     .eq('id', groupId);
+
+  if (error && shouldLoadMockData()) {
+    try {
+      const keys = await AsyncStorage.getAllKeys();
+      const groupKey = keys.find(k => k.startsWith('@rhome/preformed_group_') && !k.includes('members'));
+      if (groupKey) {
+        const raw = await AsyncStorage.getItem(groupKey);
+        if (raw) {
+          const g = JSON.parse(raw);
+          if (g.id === groupId) {
+            g.needs_replacement = false;
+            g.replacement_slots = 0;
+            g.open_to_requests = false;
+            await AsyncStorage.setItem(groupKey, JSON.stringify(g));
+            return true;
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
   return !error;
 }
 
 export async function getGroupById(groupId: string): Promise<PreformedGroup | null> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('preformed_groups')
     .select('*')
     .eq('id', groupId)
     .single();
 
-  return data as PreformedGroup | null;
+  if (data) return data as PreformedGroup;
+
+  if ((error || !data) && shouldLoadMockData()) {
+    try {
+      const keys = await AsyncStorage.getAllKeys();
+      const groupKey = keys.find(k => k.startsWith('@rhome/preformed_group_') && !k.includes('members'));
+      if (groupKey) {
+        const raw = await AsyncStorage.getItem(groupKey);
+        if (raw) {
+          const g = JSON.parse(raw);
+          if (g.id === groupId) return g as PreformedGroup;
+        }
+      }
+    } catch (_) {}
+  }
+
+  return null;
 }
 
 export async function updateGroupPreferences(groupId: string, updates: {
@@ -339,6 +397,7 @@ export async function removeMember(groupId: string, memberId: string): Promise<b
     .eq('preformed_group_id', groupId)
     .eq('id', memberId);
 
+  let localRemoved = false;
   try {
     const localKey = `@rhome/preformed_members_${groupId}`;
     const local = await AsyncStorage.getItem(localKey);
@@ -347,10 +406,15 @@ export async function removeMember(groupId: string, memberId: string): Promise<b
       const filtered = members.filter(m => m.id !== memberId);
       if (filtered.length < members.length) {
         await AsyncStorage.setItem(localKey, JSON.stringify(filtered));
+        localRemoved = true;
       }
     }
   } catch (e) {
     console.warn('[removeMember] Local storage cleanup failed:', e);
+  }
+
+  if (error && localRemoved && shouldLoadMockData()) {
+    return true;
   }
 
   return !error;

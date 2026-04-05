@@ -296,24 +296,14 @@ export default function ApartmentGroupScreen() {
         </Text>
       </View>
 
-      {hasDropout ? (
+      {isLead ? (
         <Pressable
           style={styles.needRoommateBanner}
           onPress={() => {
-            if (!isLead) {
-              Alert.alert(
-                `${openSlots} ${openSlots === 1 ? 'Spot' : 'Spots'} Open`,
-                group.needs_replacement
-                  ? 'Your group lead has turned on roommate finding. New members will need approval to join.'
-                  : 'Ask your group lead to find a replacement if you need one.',
-              );
-              return;
-            }
-
             if (group.needs_replacement) {
               Alert.alert(
-                'Replacement Active',
-                'Your group is visible to roommate seekers. No join requests yet \u2014 we\'ll notify you when someone is interested.',
+                'Roommate Finding Active',
+                `Your group is visible to roommate seekers.${openSlots > 0 ? ` ${openSlots} open ${openSlots === 1 ? 'spot' : 'spots'}.` : ''} No join requests yet — we'll notify you when someone is interested.`,
                 [
                   { text: 'OK' },
                   {
@@ -326,8 +316,13 @@ export default function ApartmentGroupScreen() {
                   },
                 ],
               );
-            } else {
+            } else if (openSlots > 0) {
               handleNeedRoommate();
+            } else {
+              Alert.alert(
+                'No Open Spots',
+                'All spots are filled. Remove a member first to open a spot, then you can turn on roommate finding.',
+              );
             }
           }}
         >
@@ -337,13 +332,17 @@ export default function ApartmentGroupScreen() {
           <View style={{ flex: 1 }}>
             <Text style={styles.needRoommateTitle}>
               {group.needs_replacement
-                ? `Looking for ${openSlots} roommate${openSlots > 1 ? 's' : ''}`
-                : `Need a roommate? ${openSlots} ${openSlots === 1 ? 'spot' : 'spots'} open`}
+                ? `Looking for ${openSlots > 0 ? `${openSlots} ` : ''}roommate${openSlots !== 1 ? 's' : ''}`
+                : openSlots > 0
+                  ? `Need a roommate? ${openSlots} ${openSlots === 1 ? 'spot' : 'spots'} open`
+                  : 'Roommate Finding'}
             </Text>
             <Text style={styles.needRoommateSubtext}>
               {group.needs_replacement
                 ? 'Your group is visible to roommate seekers'
-                : 'Tap to find a replacement through Rhome'}
+                : openSlots > 0
+                  ? 'Tap to find a replacement through Rhome'
+                  : 'Remove a member to open a spot'}
             </Text>
           </View>
           {group.needs_replacement ? (
@@ -353,6 +352,35 @@ export default function ApartmentGroupScreen() {
           ) : (
             <Feather name="chevron-right" size={18} color="rgba(255,255,255,0.3)" />
           )}
+        </Pressable>
+      ) : hasDropout ? (
+        <Pressable
+          style={styles.needRoommateBanner}
+          onPress={() => {
+            Alert.alert(
+              `${openSlots} ${openSlots === 1 ? 'Spot' : 'Spots'} Open`,
+              group.needs_replacement
+                ? 'Your group lead has turned on roommate finding. New members will need approval to join.'
+                : 'Your group has open spots. Ask your group lead to find a replacement.',
+            );
+          }}
+        >
+          <View style={styles.needRoommateIcon}>
+            <Feather name="user-plus" size={18} color="#ff6b5b" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.needRoommateTitle}>
+              {openSlots} open {openSlots === 1 ? 'spot' : 'spots'}
+            </Text>
+            <Text style={styles.needRoommateSubtext}>
+              {group.needs_replacement ? 'Roommate finding is active' : 'Waiting for group lead to act'}
+            </Text>
+          </View>
+          {group.needs_replacement ? (
+            <View style={styles.liveBadge}>
+              <Text style={styles.liveBadgeText}>LIVE</Text>
+            </View>
+          ) : null}
         </Pressable>
       ) : null}
 
