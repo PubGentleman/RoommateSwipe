@@ -176,7 +176,7 @@ export const CreateGroupScreen = ({ navigation, route }: any) => {
     <View style={{ flex: 1, backgroundColor: '#0a0a0a' }}>
       <AppHeader
         title="New Group"
-        mode="tab"
+        mode="back"
         role="renter"
         hideSeparator
         rightActions={
