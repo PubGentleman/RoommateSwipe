@@ -132,7 +132,7 @@ export default function PlaceSeekerOnboardingScreen() {
       {!roomTypeKnown ? (
         <>
           <Text style={[styles.sectionLabel, { color: theme.text, marginTop: 28 }]}>Room Type</Text>
-          <Text style={[styles.sectionHint, { color: theme.textTertiary }]}>
+          <Text style={[styles.sectionHint, { color: theme.textSecondary }]}>
             Select all that apply
           </Text>
           <View style={{ gap: 10 }}>
@@ -155,7 +155,7 @@ export default function PlaceSeekerOnboardingScreen() {
                     <Text style={[styles.roomLabel, { color: isActive ? theme.primary : theme.text }]}>
                       {rt.label}
                     </Text>
-                    <Text style={[styles.roomDesc, { color: theme.textTertiary }]}>{rt.desc}</Text>
+                    <Text style={[styles.roomDesc, { color: theme.textSecondary }]}>{rt.desc}</Text>
                   </View>
                   {isActive ? (
                     <Feather name="check-circle" size={20} color={theme.primary} />
@@ -170,7 +170,7 @@ export default function PlaceSeekerOnboardingScreen() {
       {hasBoroughs ? (
         <>
           <Text style={[styles.sectionLabel, { color: theme.text, marginTop: 28 }]}>Neighborhoods</Text>
-          <Text style={[styles.sectionHint, { color: theme.textTertiary }]}>
+          <Text style={[styles.sectionHint, { color: theme.textSecondary }]}>
             Pick up to 5 — we'll prioritize listings in these areas
           </Text>
           {boroughEntries.map(([borough, hoods]) => {
@@ -220,7 +220,7 @@ export default function PlaceSeekerOnboardingScreen() {
               </View>
             );
           })}
-          <Text style={[styles.chipHint, { color: theme.textTertiary }]}>
+          <Text style={[styles.chipHint, { color: theme.textSecondary }]}>
             {selectedNeighborhoods.length}/5 selected
           </Text>
         </>
@@ -260,7 +260,7 @@ export default function PlaceSeekerOnboardingScreen() {
         </View>
 
         <Text style={[styles.sectionLabel, { color: theme.text, marginTop: 28 }]}>Must-haves</Text>
-        <Text style={[styles.sectionHint, { color: theme.textTertiary }]}>
+        <Text style={[styles.sectionHint, { color: theme.textSecondary }]}>
           What can't you live without?
         </Text>
         <View style={styles.chipsWrap}>
@@ -334,7 +334,7 @@ export default function PlaceSeekerOnboardingScreen() {
             <Text style={[styles.sectionLabel, { color: theme.text, marginTop: 28 }]}>
               Nice to have
             </Text>
-            <Text style={[styles.sectionHint, { color: theme.textTertiary }]}>
+            <Text style={[styles.sectionHint, { color: theme.textSecondary }]}>
               Optional — helps us find better matches
             </Text>
             <View style={styles.chipsWrap}>

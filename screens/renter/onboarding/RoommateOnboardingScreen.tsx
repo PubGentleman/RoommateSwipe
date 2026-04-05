@@ -142,7 +142,7 @@ export default function RoommateOnboardingScreen() {
                     <Text style={[styles.roomLabel, { color: isActive ? theme.primary : theme.text }]}>
                       {rt.label}
                     </Text>
-                    <Text style={[styles.roomDesc, { color: theme.textTertiary }]}>{rt.desc}</Text>
+                    <Text style={[styles.roomDesc, { color: theme.textSecondary }]}>{rt.desc}</Text>
                   </View>
                   {isActive ? (
                     <Feather name="check-circle" size={20} color={theme.primary} />
@@ -233,7 +233,7 @@ export default function RoommateOnboardingScreen() {
         })}
       </View>
 
-      <Text style={[styles.chipHint, { color: theme.textTertiary }]}>
+      <Text style={[styles.chipHint, { color: theme.textSecondary }]}>
         {dealbreakers.length === 0 ? 'None selected — all good!' : `${dealbreakers.length} dealbreaker${dealbreakers.length > 1 ? 's' : ''} set`}
       </Text>
     </View>
@@ -366,7 +366,7 @@ export default function RoommateOnboardingScreen() {
                 <Text style={[styles.roomLabel, { color: isActive ? theme.primary : theme.text }]}>
                   {opt.label}
                 </Text>
-                <Text style={[styles.roomDesc, { color: theme.textTertiary }]}>{opt.desc}</Text>
+                <Text style={[styles.roomDesc, { color: theme.textSecondary }]}>{opt.desc}</Text>
               </View>
               {isActive ? (
                 <Feather name="check-circle" size={20} color={theme.primary} />
@@ -403,7 +403,7 @@ export default function RoommateOnboardingScreen() {
         onChangeText={setIdealRoommate}
         maxLength={500}
       />
-      <Text style={[styles.charCount, { color: theme.textTertiary }]}>
+      <Text style={[styles.charCount, { color: theme.textSecondary }]}>
         {idealRoommate.length}/500
       </Text>
     </View>
