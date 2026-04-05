@@ -1,9 +1,11 @@
-import React from 'react';
-import { View, Pressable, StyleSheet, Platform, Text } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Pressable, StyleSheet, Platform, Text, Modal } from 'react-native';
 import { createBottomTabNavigator, BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { Feather } from '../components/VectorIcons';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useNavigation } from '@react-navigation/native';
 import { ExploreStackNavigator } from './ExploreStackNavigator';
 import { RoommatesStackNavigator } from './RoommatesStackNavigator';
 import { GroupsStackNavigator } from './GroupsStackNavigator';
@@ -142,6 +144,142 @@ const tabStyles = StyleSheet.create({
   },
 });
 
+const NUDGE_KEY_PREFIX = '@rhome/type_onboarding_nudge_count_';
+const MAX_NUDGES = 5;
+
+function TypeOnboardingNudge() {
+  const { user } = useAuth();
+  const navigation = useNavigation();
+  const [visible, setVisible] = useState(false);
+  const searchType = user?.profileData?.apartment_search_type;
+  const userId = user?.id;
+  const nudgeKey = userId ? `${NUDGE_KEY_PREFIX}${userId}` : null;
+
+  useEffect(() => {
+    if (!user || !nudgeKey || user.typeOnboardingComplete || !searchType) return;
+
+    let timer: ReturnType<typeof setTimeout>;
+
+    const check = async () => {
+      try {
+        const countStr = await AsyncStorage.getItem(nudgeKey);
+        const count = countStr ? parseInt(countStr, 10) : 0;
+        if (count >= MAX_NUDGES) return;
+        timer = setTimeout(() => setVisible(true), 30000);
+      } catch {}
+    };
+
+    check();
+    return () => { if (timer) clearTimeout(timer); };
+  }, [user?.typeOnboardingComplete, searchType, nudgeKey]);
+
+  const incrementNudgeCount = useCallback(async () => {
+    if (!nudgeKey) return;
+    try {
+      const countStr = await AsyncStorage.getItem(nudgeKey);
+      const count = countStr ? parseInt(countStr, 10) : 0;
+      await AsyncStorage.setItem(nudgeKey, String(count + 1));
+    } catch {}
+  }, [nudgeKey]);
+
+  const dismiss = useCallback(async () => {
+    setVisible(false);
+    await incrementNudgeCount();
+  }, [incrementNudgeCount]);
+
+  const handleSetup = useCallback(async () => {
+    setVisible(false);
+    await incrementNudgeCount();
+    (navigation as any).navigate('ProfileCompletion');
+  }, [navigation, incrementNudgeCount]);
+
+  if (!visible) return null;
+
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={dismiss}>
+      <View style={nudgeStyles.overlay}>
+        <View style={nudgeStyles.card}>
+          <View style={nudgeStyles.iconWrap}>
+            <Feather name="zap" size={28} color="#ff6b5b" />
+          </View>
+          <Text style={nudgeStyles.title}>Quick setup — 2 minutes</Text>
+          <Text style={nudgeStyles.desc}>
+            Tell us a few things so we can find better matches for you
+          </Text>
+          <Pressable style={nudgeStyles.setupBtn} onPress={handleSetup}>
+            <Text style={nudgeStyles.setupBtnText}>Set up now</Text>
+          </Pressable>
+          <Pressable style={nudgeStyles.laterBtn} onPress={dismiss}>
+            <Text style={nudgeStyles.laterBtnText}>Later</Text>
+          </Pressable>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+const nudgeStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  card: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 20,
+    padding: 28,
+    marginHorizontal: 32,
+    width: '85%',
+    maxWidth: 340,
+    alignItems: 'center',
+  },
+  iconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(255,107,91,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#fff',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  desc: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.6)',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 24,
+  },
+  setupBtn: {
+    backgroundColor: '#ff6b5b',
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 28,
+    width: '100%',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  setupBtnText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  laterBtn: {
+    paddingVertical: 10,
+  },
+  laterBtnText: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.5)',
+  },
+});
+
 export const RenterTabNavigator = () => {
   const { user } = useAuth();
   const searchType = user?.profileData?.apartment_search_type;
@@ -182,6 +320,7 @@ export const RenterTabNavigator = () => {
       <Tab.Screen name="Messages" component={MessagesStackNavigator} />
       <Tab.Screen name="Profile" component={ProfileStackNavigator} />
     </Tab.Navigator>
+    <TypeOnboardingNudge />
     </>
   );
 };

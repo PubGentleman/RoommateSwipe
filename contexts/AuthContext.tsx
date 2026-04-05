@@ -412,6 +412,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       mappedUser.lastActiveAt = new Date();
       mappedUser.emailVerified = !!session.user.email_confirmed_at;
 
+      if (mappedUser.role === 'renter' && mappedUser.onboardingStep === 'profile') {
+        mappedUser.onboardingStep = 'complete';
+        supabase.from('users').update({ onboarding_step: 'complete' }).eq('id', session.user.id).catch(() => {});
+      }
+
       if (userData.is_deleted) {
         const deletedAt = userData.deleted_at ? new Date(userData.deleted_at) : null;
         const RECOVERY_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;

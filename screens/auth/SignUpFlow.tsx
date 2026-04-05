@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -134,6 +134,14 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
   const [agentNotice, setAgentNotice] = useState(false);
   const [selectedCard, setSelectedCard] = useState<string | null>(null);
   const [personalEmailBlocked, setPersonalEmailBlocked] = useState(false);
+  const [autoCompleting, setAutoCompleting] = useState(false);
+
+  useEffect(() => {
+    if (currentStepId === 'complete' && state.accountType === 'renter' && !isLoading && !autoCompleting) {
+      setAutoCompleting(true);
+      handleComplete();
+    }
+  }, [currentStepId]);
 
   const slideAnim = useRef(new Animated.Value(0)).current;
   const dragAnim = useRef(new Animated.Value(0)).current;
@@ -328,6 +336,20 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
       const companyName = state.accountType === 'company' && state.companyName.trim() ? state.companyName.trim() : undefined;
       const fullName = `${state.firstName.trim()} ${state.lastName.trim()}`;
       await register(state.email.trim().toLowerCase(), state.password, fullName, role as any, hostType, companyName, state.firstName.trim(), state.lastName.trim());
+      try {
+        const { supabase: sb } = await import('../../lib/supabase');
+        const { data: { user: authUser } } = await sb.auth.getUser();
+        if (authUser && state.city) {
+          await sb.from('users').update({
+            city: state.city,
+            state: state.locationState,
+            neighborhood: state.locationNeighborhood,
+            borough: state.locationBorough,
+            lat: state.locationLat,
+            lng: state.locationLng,
+          }).eq('id', authUser.id);
+        }
+      } catch (_) {}
       if (state.profilePhoto) {
         try {
           const { supabase, isSupabaseConfigured } = await import('../../lib/supabase');

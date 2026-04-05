@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView, Modal, ActivityIndicator, Linking } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -155,6 +155,12 @@ export const PlanSelectionScreen = () => {
   const isHost = user?.role === 'host' || !!user?.hostType || !!user?.hostTypeLockedAt;
   const hostType = (user?.hostType as HostType) ?? 'individual';
   const plans = useMemo(() => isHost ? buildHostPlans(hostType) : RENTER_PLANS, [isHost, hostType]);
+
+  useEffect(() => {
+    if (user?.role === 'host' && user?.hostType === 'individual') {
+      completeOnboardingStep('complete');
+    }
+  }, [user?.role, user?.hostType]);
 
   const handleSelectPlan = (planId: string) => {
     setSelectedPlanId(planId);

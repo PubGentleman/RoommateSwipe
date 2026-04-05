@@ -4,15 +4,12 @@ import { useAuth, getInitialRoute } from '../contexts/AuthContext';
 import { LoginScreen } from '../screens/auth/LoginScreen';
 import { NewPasswordScreen } from '../screens/auth/NewPasswordScreen';
 import { VerificationPendingScreen } from '../screens/auth/VerificationPendingScreen';
-import { OnboardingScreen } from '../screens/shared/OnboardingScreen';
 import { ProfileQuestionnaireScreen } from '../screens/shared/ProfileQuestionnaireScreen';
 import { PlanSelectionScreen } from '../screens/shared/PlanSelectionScreen';
 import { HostTypeSelectScreen } from '../screens/host/onboarding/HostTypeSelectScreen';
 import { HostCompanySetupScreen } from '../screens/host/onboarding/HostCompanySetupScreen';
 import { HostAgentSetupScreen } from '../screens/host/onboarding/HostAgentSetupScreen';
 import WhatAreYouLookingForScreen from '../screens/renter/WhatAreYouLookingForScreen';
-import PlaceSeekerOnboardingScreen from '../screens/renter/onboarding/PlaceSeekerOnboardingScreen';
-import RoommateOnboardingScreen from '../screens/renter/onboarding/RoommateOnboardingScreen';
 import { RenterTabNavigator } from './RenterTabNavigator';
 import { HostTabNavigator } from './HostTabNavigator';
 import { ProfileReminderOverlay } from '../components/ProfileReminderOverlay';
@@ -63,7 +60,10 @@ export const RootNavigator = () => {
 
   useEffect(() => {
     StorageService.isOnboardingCompleted().then((completed) => {
-      setShowOnboarding(!completed);
+      if (!completed) {
+        StorageService.setOnboardingCompleted(true);
+      }
+      setShowOnboarding(false);
       setOnboardingChecked(true);
     });
   }, []);
@@ -114,7 +114,12 @@ export const RootNavigator = () => {
   }
 
   if (showOnboarding) {
-    return <OnboardingScreen onComplete={handleOnboardingComplete} />;
+    handleOnboardingComplete();
+    return (
+      <View style={[styles.loading, { backgroundColor: theme.backgroundRoot }]}>
+        <ActivityIndicator size="large" color={theme.primary} />
+      </View>
+    );
   }
 
   if (passwordRecoveryMode) {
@@ -178,7 +183,7 @@ export const RootNavigator = () => {
     );
   }
 
-  if (step === 'profile') {
+  if (step === 'profile' && user.role === 'host') {
     return (
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="OnboardingProfile" component={ProfileQuestionnaireScreen} />
@@ -204,17 +209,7 @@ export const RootNavigator = () => {
     );
   }
 
-  const searchType = user.profileData?.apartment_search_type;
-  const needsTypeOnboarding = user.role === 'renter'
-    && searchType
-    && !user.typeOnboardingComplete;
-
-  if (needsTypeOnboarding) {
-    if (searchType === 'with_roommates') {
-      return <RoommateOnboardingScreen />;
-    }
-    return <PlaceSeekerOnboardingScreen />;
-  }
+  
 
   const route = getInitialRoute(user);
   const MainComponent = route === 'HostTabs' ? HostMain : RenterMain;

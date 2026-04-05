@@ -219,6 +219,22 @@ export const ExploreScreen = () => {
     visible: boolean;
     category: 'transit' | 'restaurants' | 'grocery' | 'laundry' | 'parks' | null;
   }>({ visible: false, category: null });
+  const [profileNudgeDismissed, setProfileNudgeDismissed] = useState(false);
+
+  const profileCompletion = useMemo(() => {
+    if (!user) return 0;
+    let filled = 0;
+    const total = 8;
+    if (user.photos?.length > 0) filled++;
+    if (user.profileData?.bio) filled++;
+    if (user.birthday) filled++;
+    if (user.profileData?.occupation) filled++;
+    if (user.profileData?.preferences?.sleepSchedule) filled++;
+    if (user.profileData?.preferences?.cleanliness) filled++;
+    if (user.profileData?.interests?.length > 0) filled++;
+    if (user.profileData?.budget || user.profileData?.budgetMax) filled++;
+    return Math.round((filled / total) * 100);
+  }, [user]);
 
   const COLLAPSIBLE_HEIGHT = 120;
   const exploreScrollY = useSharedValue(0);
@@ -2273,9 +2289,63 @@ export const ExploreScreen = () => {
             const showTopHosts = topHostListings.length > 0 && viewMode !== 'saved';
             const showTopPicks = topPicksListings.length > 0 && viewMode !== 'saved';
             const showBoosted = boostedListings.length > 0 && viewMode !== 'saved';
-            if (!showTopHosts && !showTopPicks && !showBoosted) return null;
+            const showProfileNudge = user && profileCompletion < 60 && !profileNudgeDismissed && viewMode !== 'saved';
+            if (!showTopHosts && !showTopPicks && !showBoosted && !showProfileNudge) return null;
             return (
               <View>
+                {showProfileNudge ? (
+                  <Pressable
+                    onPress={() => (navigation as any).navigate('ProfileCompletion')}
+                    style={{
+                      backgroundColor: '#1a1a1a',
+                      borderRadius: 16,
+                      padding: 16,
+                      marginHorizontal: 16,
+                      marginBottom: 12,
+                      borderWidth: 1,
+                      borderColor: 'rgba(255,107,91,0.2)',
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 12,
+                    }}
+                  >
+                    <View style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: 22,
+                      backgroundColor: 'rgba(255,107,91,0.12)',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}>
+                      <Feather name="user-plus" size={20} color="#ff6b5b" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>
+                        Complete your profile
+                      </Text>
+                      <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, marginTop: 2 }}>
+                        Get better matches and more responses
+                      </Text>
+                    </View>
+                    <View style={{
+                      backgroundColor: '#ff6b5b',
+                      borderRadius: 8,
+                      paddingHorizontal: 12,
+                      paddingVertical: 6,
+                    }}>
+                      <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>{profileCompletion}%</Text>
+                    </View>
+                    <Pressable
+                      onPress={(e) => {
+                        e.stopPropagation?.();
+                        setProfileNudgeDismissed(true);
+                      }}
+                      hitSlop={8}
+                    >
+                      <Feather name="x" size={16} color="rgba(255,255,255,0.3)" />
+                    </Pressable>
+                  </Pressable>
+                ) : null}
                 {showTopPicks ? (
                   <View style={styles.topPicksSection}>
                     <View style={styles.featuredHeader}>

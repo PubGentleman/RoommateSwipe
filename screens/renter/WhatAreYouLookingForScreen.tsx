@@ -1,13 +1,11 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   StyleSheet,
   Pressable,
-  Animated,
-  Easing,
-  Dimensions,
   Text,
   ActivityIndicator,
+  ScrollView,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Feather } from '../../components/VectorIcons';
@@ -16,90 +14,87 @@ import { useAuth } from '../../contexts/AuthContext';
 import { updateProfile } from '../../services/profileService';
 import { RhomeLogo } from '../../components/RhomeLogo';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+type SearchType = 'solo' | 'with_partner' | 'with_roommates' | 'have_group';
+type ListingPref = 'room' | 'entire_apartment' | 'any';
 
-type RenterIntent = 'find_roommates' | 'find_place';
-type RoommateSubIntent = 'room' | 'entire_apartment';
-type PlaceSubIntent = 'solo' | 'with_partner' | 'have_group';
-
-const INTENT_OPTIONS: { id: RenterIntent; icon: string; label: string; description: string; color: string }[] = [
-  { id: 'find_roommates', icon: 'users', label: 'Find Roommates', description: 'Match with compatible people to share a place', color: '#ff6b5b' },
-  { id: 'find_place', icon: 'home', label: 'Find a Place', description: 'Browse listings for you, a partner, or your group', color: '#4a9eff' },
-];
-
-const ROOMMATE_SUB_OPTIONS: { id: RoommateSubIntent; icon: string; label: string; description: string; color: string }[] = [
-  { id: 'room', icon: 'user', label: 'A Room', description: 'Find a room in a shared apartment', color: '#2ecc71' },
-  { id: 'entire_apartment', icon: 'home', label: 'Entire Apartment', description: 'Find roommates to get a whole place together', color: '#e83a7a' },
-];
-
-const PLACE_SUB_OPTIONS: { id: PlaceSubIntent; icon: string; label: string; description: string; color: string }[] = [
-  { id: 'solo', icon: 'user', label: 'Just Me', description: 'Looking for my own place', color: '#4a9eff' },
-  { id: 'with_partner', icon: 'heart', label: 'Me & Partner', description: 'Moving in with my significant other', color: '#e83a7a' },
-  { id: 'have_group', icon: 'users', label: 'With My Group', description: 'Already have roommates lined up', color: '#2ecc71' },
+const COMBINED_OPTIONS: {
+  id: string;
+  searchType: SearchType;
+  listingPref: ListingPref;
+  icon: string;
+  label: string;
+  description: string;
+  color: string;
+  action?: 'create_group';
+}[] = [
+  {
+    id: 'room',
+    searchType: 'with_roommates',
+    listingPref: 'room',
+    icon: 'search',
+    label: 'Find a Room',
+    description: 'Join a shared apartment with compatible roommates',
+    color: '#ff6b5b',
+  },
+  {
+    id: 'roommates_apartment',
+    searchType: 'with_roommates',
+    listingPref: 'entire_apartment',
+    icon: 'users',
+    label: 'Get an Apartment Together',
+    description: 'Find roommates to rent a whole place with',
+    color: '#a855f7',
+  },
+  {
+    id: 'solo',
+    searchType: 'solo',
+    listingPref: 'any',
+    icon: 'user',
+    label: 'Just Me',
+    description: 'Browse apartments for myself',
+    color: '#4a9eff',
+  },
+  {
+    id: 'partner',
+    searchType: 'with_partner',
+    listingPref: 'any',
+    icon: 'heart',
+    label: 'Me & Partner',
+    description: 'Moving in with my significant other',
+    color: '#e83a7a',
+  },
+  {
+    id: 'group',
+    searchType: 'have_group',
+    listingPref: 'any',
+    icon: 'users',
+    label: 'With My Group',
+    description: 'I already have roommates lined up',
+    color: '#22c55e',
+    action: 'create_group',
+  },
 ];
 
 interface Props {
   onComplete: (action?: 'create_group') => void;
   isSettings?: boolean;
-  initialIntent?: RenterIntent;
+  initialIntent?: string;
   initialSubIntent?: string;
   initialListingPref?: string;
 }
 
-export default function WhatAreYouLookingForScreen({ onComplete, isSettings, initialIntent, initialSubIntent, initialListingPref }: Props) {
+export default function WhatAreYouLookingForScreen({ onComplete, isSettings, initialSubIntent, initialListingPref }: Props) {
   const insets = useSafeAreaInsets();
   const { user, updateUser } = useAuth();
-  const [step, setStep] = useState<'intent' | 'roommate_sub' | 'place_sub' | 'group_prompt'>(
-    isSettings ? 'intent' : (initialIntent ? (initialIntent === 'find_roommates' ? 'roommate_sub' : 'place_sub') : 'intent')
-  );
-  const [intent, setIntent] = useState<RenterIntent | null>(initialIntent || null);
+  const [saving, setSaving] = useState(false);
   const [selectedCard, setSelectedCard] = useState<string | null>(null);
-  const slideAnim = useRef(new Animated.Value(0)).current;
   const [confirmAction, setConfirmAction] = useState<{
     title: string;
     message: string;
     onConfirm: () => void;
   } | null>(null);
 
-  const animateForward = useCallback((cb: () => void) => {
-    Animated.timing(slideAnim, {
-      toValue: -SCREEN_WIDTH,
-      duration: 280,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start(() => {
-      cb();
-      slideAnim.setValue(SCREEN_WIDTH);
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 280,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }).start();
-    });
-  }, [slideAnim]);
-
-  const animateBack = useCallback((cb: () => void) => {
-    Animated.timing(slideAnim, {
-      toValue: SCREEN_WIDTH,
-      duration: 280,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start(() => {
-      cb();
-      slideAnim.setValue(-SCREEN_WIDTH);
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 280,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }).start();
-    });
-  }, [slideAnim]);
-
-  const [saving, setSaving] = useState(false);
-
-  const doSave = async (listingPref: 'room' | 'entire_apartment' | 'any', searchType: 'solo' | 'with_partner' | 'with_roommates' | 'have_group', skipComplete?: boolean) => {
+  const doSave = async (listingPref: ListingPref, searchType: SearchType) => {
     if (!user) return;
     setSaving(true);
 
@@ -127,7 +122,6 @@ export default function WhatAreYouLookingForScreen({ onComplete, isSettings, ini
       });
 
       setSaving(false);
-      if (!skipComplete) onComplete();
     } catch (err) {
       console.error('Failed to save intent:', err);
       setSaving(false);
@@ -139,176 +133,138 @@ export default function WhatAreYouLookingForScreen({ onComplete, isSettings, ini
     }
   };
 
-  const saveAndContinue = async (listingPref: 'room' | 'entire_apartment' | 'any', searchType: 'solo' | 'with_partner' | 'with_roommates' | 'have_group') => {
-    if (!user || saving) return;
-    const currentSearch = user.profileData?.apartment_search_type;
-    if (!isSettings || !currentSearch) {
-      doSave(listingPref, searchType);
-      return;
-    }
+  const handleSelect = async (option: typeof COMBINED_OPTIONS[0]) => {
+    if (saving) return;
+    setSelectedCard(option.id);
 
-    if (currentSearch === searchType) {
-      doSave(listingPref, searchType);
-      return;
-    }
+    const currentSearch = user?.profileData?.apartment_search_type;
 
-    const wasMatching = currentSearch === 'with_roommates';
-    const willMatch = searchType === 'with_roommates';
-    const wasGroup = currentSearch === 'have_group';
+    if (isSettings && currentSearch && currentSearch !== option.searchType) {
+      const wasMatching = currentSearch === 'with_roommates';
+      const willMatch = option.searchType === 'with_roommates';
+      const wasGroup = currentSearch === 'have_group';
 
-    if (wasMatching && !willMatch) {
-      setConfirmAction({
-        title: 'Leave Roommate Matching?',
-        message: 'This will remove you from roommate matching and Pi auto-groups. Continue?',
-        onConfirm: () => { setConfirmAction(null); doSave(listingPref, searchType); },
-      });
-    } else if (wasGroup) {
-      setConfirmAction({
-        title: 'Leave Your Group?',
-        message: 'Changing your search intent will remove you from your current group. Continue?',
-        onConfirm: () => { setConfirmAction(null); doSave(listingPref, searchType); },
-      });
-    } else if (!wasMatching && willMatch) {
-      setConfirmAction({
-        title: 'Join Roommate Matching',
-        message: "You'll be added to the roommate matching pool. Pi will start looking for your ideal roommates!",
-        onConfirm: () => { setConfirmAction(null); doSave(listingPref, searchType); },
-      });
-    } else {
-      doSave(listingPref, searchType);
-    }
-  };
-
-  const handleIntentSelect = (id: RenterIntent) => {
-    setSelectedCard(id);
-    setIntent(id);
-    setTimeout(() => {
-      setSelectedCard(null);
-      if (id === 'find_roommates') {
-        saveAndContinue('room', 'with_roommates');
-      } else {
-        animateForward(() => setStep('place_sub'));
-      }
-    }, 150);
-  };
-
-  const handleRoommateSubSelect = (id: RoommateSubIntent) => {
-    setSelectedCard(id);
-    setTimeout(() => {
-      setSelectedCard(null);
-      const listingPref = id;
-      saveAndContinue(listingPref, 'with_roommates');
-    }, 150);
-  };
-
-  const handlePlaceSubSelect = (id: PlaceSubIntent) => {
-    setSelectedCard(id);
-    setTimeout(() => {
-      setSelectedCard(null);
-      const listingPref = id === 'have_group' ? 'any' as const : 'entire_apartment' as const;
-      if (id === 'have_group' && !isSettings) {
-        doSave(listingPref, id, true).then(() => {
-          animateForward(() => setStep('group_prompt'));
+      if (wasMatching && !willMatch) {
+        setConfirmAction({
+          title: 'Leave Roommate Matching?',
+          message: 'This will remove you from roommate matching and Pi auto-groups. Continue?',
+          onConfirm: async () => {
+            setConfirmAction(null);
+            await doSave(option.listingPref, option.searchType);
+            if (option.action === 'create_group') {
+              onComplete('create_group');
+            } else {
+              onComplete();
+            }
+          },
         });
-      } else {
-        saveAndContinue(listingPref, id);
+        setSelectedCard(null);
+        return;
+      } else if (wasGroup) {
+        setConfirmAction({
+          title: 'Leave Your Group?',
+          message: 'Changing your search intent will remove you from your current group. Continue?',
+          onConfirm: async () => {
+            setConfirmAction(null);
+            await doSave(option.listingPref, option.searchType);
+            if (option.action === 'create_group') {
+              onComplete('create_group');
+            } else {
+              onComplete();
+            }
+          },
+        });
+        setSelectedCard(null);
+        return;
+      } else if (!wasMatching && willMatch) {
+        setConfirmAction({
+          title: 'Join Roommate Matching',
+          message: "You'll be added to the roommate matching pool. Pi will start looking for your ideal roommates!",
+          onConfirm: async () => {
+            setConfirmAction(null);
+            await doSave(option.listingPref, option.searchType);
+            if (option.action === 'create_group') {
+              onComplete('create_group');
+            } else {
+              onComplete();
+            }
+          },
+        });
+        setSelectedCard(null);
+        return;
       }
-    }, 150);
-  };
-
-  const handleBack = () => {
-    if (step === 'intent') return;
-    if (step === 'group_prompt') {
-      animateBack(() => setStep('place_sub'));
-      return;
     }
-    animateBack(() => setStep('intent'));
+
+    await doSave(option.listingPref, option.searchType);
+    if (option.action === 'create_group') {
+      onComplete('create_group');
+    } else {
+      onComplete();
+    }
   };
 
-  const renderCards = <T extends string>(
-    options: { id: T; icon: string; label: string; description: string; color: string }[],
-    onSelect: (id: T) => void,
-  ) => (
-    <View style={styles.typeGrid}>
-      {options.map((opt) => {
-        const isSelected = selectedCard === opt.id;
-        const isCurrent = isSettings && (initialSubIntent === opt.id || initialListingPref === opt.id);
-        return (
-          <Pressable
-            key={opt.id}
-            style={[
-              styles.typeCard,
-              isCurrent ? { borderColor: opt.color, borderWidth: 2, backgroundColor: `${opt.color}10` } : null,
-              isSelected ? { borderColor: opt.color, backgroundColor: `${opt.color}15` } : null,
-            ]}
-            onPress={() => onSelect(opt.id)}
-          >
-            <View style={[styles.typeIconWrap, { backgroundColor: `${opt.color}20` }]}>
-              <Feather name={opt.icon} size={22} color={opt.color} />
-            </View>
-            <Text style={styles.typeLabel}>{opt.label}</Text>
-            <Text style={styles.typeDesc}>{opt.description}</Text>
-            {isCurrent ? <Text style={[styles.typeDesc, { color: opt.color, fontWeight: '600', marginTop: 2 }]}>Current</Text> : null}
-          </Pressable>
-        );
-      })}
-    </View>
-  );
+  const currentSearchType = user?.profileData?.apartment_search_type;
+  const currentListingPref = user?.profileData?.listing_type_preference;
 
-  const STEP_CONFIG: Record<string, { headline: string; subheadline: string }> = {
-    intent: { headline: 'What are you looking for?', subheadline: 'This personalizes your Rhome experience' },
-    roommate_sub: { headline: 'What kind of place?', subheadline: 'Help us find the right match' },
-    place_sub: { headline: "Who's moving in?", subheadline: 'This helps us show the right listings' },
-    group_prompt: { headline: 'Set up your group', subheadline: 'Create a group so you can search together' },
+  const getCurrentOptionId = () => {
+    if (!currentSearchType) return null;
+    return COMBINED_OPTIONS.find(o =>
+      o.searchType === currentSearchType &&
+      (o.listingPref === currentListingPref || !currentListingPref)
+    )?.id ?? null;
   };
 
-  const config = STEP_CONFIG[step];
+  const currentOptionId = getCurrentOptionId();
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 20 }]}>
-      <Animated.View style={[styles.content, { transform: [{ translateX: slideAnim }] }]}>
-        <View style={styles.stepHeader}>
-          {step !== 'intent' || isSettings ? (
-            <Pressable onPress={isSettings && step === 'intent' ? onComplete : handleBack} style={styles.backBtn} hitSlop={12}>
-              <Feather name="arrow-left" size={20} color="rgba(255,255,255,0.7)" />
-            </Pressable>
-          ) : (
-            <RhomeLogo variant="horizontal" size="sm" />
-          )}
-        </View>
-        <View style={styles.stepContent}>
-          <Text style={styles.headline}>{config.headline}</Text>
-          <Text style={styles.subheadline}>{config.subheadline}</Text>
-          {step === 'intent' ? renderCards(INTENT_OPTIONS, handleIntentSelect) : null}
-          {step === 'roommate_sub' ? renderCards(ROOMMATE_SUB_OPTIONS, handleRoommateSubSelect) : null}
-          {step === 'place_sub' ? renderCards(PLACE_SUB_OPTIONS, handlePlaceSubSelect) : null}
-          {step === 'group_prompt' ? (
-            <View style={styles.groupPromptWrap}>
-              <View style={[styles.typeIconWrap, { backgroundColor: 'rgba(46,204,113,0.15)', alignSelf: 'center', marginBottom: 16 }]}>
-                <Feather name="users" size={28} color="#2ecc71" />
-              </View>
+      <View style={styles.header}>
+        {isSettings ? (
+          <Pressable onPress={() => onComplete()} style={styles.backBtn} hitSlop={12}>
+            <Feather name="arrow-left" size={20} color="rgba(255,255,255,0.7)" />
+          </Pressable>
+        ) : (
+          <RhomeLogo variant="horizontal" size="sm" />
+        )}
+      </View>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={styles.headline}>What are you looking for?</Text>
+        <Text style={styles.subheadline}>This personalizes your Rhome experience</Text>
+        <View style={styles.optionsGrid}>
+          {COMBINED_OPTIONS.map((option) => {
+            const isSelected = selectedCard === option.id;
+            const isCurrent = isSettings && currentOptionId === option.id;
+            return (
               <Pressable
-                style={styles.groupPromptBtn}
-                onPress={() => onComplete('create_group')}
+                key={option.id}
+                style={[
+                  styles.optionCard,
+                  isCurrent ? { borderColor: option.color, borderWidth: 2, backgroundColor: `${option.color}10` } : null,
+                  isSelected ? { borderColor: option.color, backgroundColor: `${option.color}15` } : null,
+                ]}
+                onPress={() => handleSelect(option)}
+                disabled={saving}
               >
-                <Feather name="plus-circle" size={18} color="#FFFFFF" />
-                <Text style={styles.groupPromptBtnText}>Create Group Now</Text>
+                <View style={[styles.iconWrap, { backgroundColor: `${option.color}20` }]}>
+                  <Feather name={option.icon as any} size={22} color={option.color} />
+                </View>
+                <Text style={styles.optionLabel}>{option.label}</Text>
+                <Text style={styles.optionDesc}>{option.description}</Text>
+                {isCurrent ? <Text style={[styles.optionDesc, { color: option.color, fontWeight: '600', marginTop: 2 }]}>Current</Text> : null}
               </Pressable>
-              <Pressable
-                style={styles.groupPromptSkip}
-                onPress={() => onComplete()}
-              >
-                <Text style={styles.groupPromptSkipText}>Skip for now</Text>
-              </Pressable>
-            </View>
-          ) : null}
-          {saving ? (
-            <View style={styles.savingOverlay}>
-              <ActivityIndicator color="#ff6b5b" size="small" />
-            </View>
-          ) : null}
+            );
+          })}
         </View>
-      </Animated.View>
+        {saving ? (
+          <View style={styles.savingWrap}>
+            <ActivityIndicator color="#ff6b5b" size="small" />
+          </View>
+        ) : null}
+      </ScrollView>
       {confirmAction ? (
         <View style={styles.confirmOverlay}>
           <View style={styles.confirmBox}>
@@ -317,7 +273,7 @@ export default function WhatAreYouLookingForScreen({ onComplete, isSettings, ini
             <View style={styles.confirmButtons}>
               <Pressable
                 style={styles.confirmCancelBtn}
-                onPress={() => setConfirmAction(null)}
+                onPress={() => { setConfirmAction(null); setSelectedCard(null); }}
               >
                 <Text style={styles.confirmCancelText}>Cancel</Text>
               </Pressable>
@@ -340,14 +296,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#111',
   },
-  content: {
-    flex: 1,
-    paddingHorizontal: 24,
-  },
-  stepHeader: {
+  header: {
     height: 44,
     justifyContent: 'center',
-    marginBottom: 12,
+    paddingHorizontal: 24,
+    marginBottom: 8,
   },
   backBtn: {
     width: 36,
@@ -357,10 +310,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  stepContent: {
+  scroll: {
     flex: 1,
-    justifyContent: 'center',
-    paddingBottom: 60,
+  },
+  scrollContent: {
+    paddingHorizontal: 24,
+    paddingBottom: 40,
   },
   headline: {
     fontSize: 26,
@@ -376,81 +331,41 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     lineHeight: 20,
   },
-  typeGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+  optionsGrid: {
     gap: 12,
-    marginTop: 16,
-    justifyContent: 'center',
   },
-  typeCard: {
-    width: '47%',
+  optionCard: {
     backgroundColor: 'rgba(255,255,255,0.05)',
     borderWidth: 1.5,
     borderColor: 'rgba(255,255,255,0.08)',
     borderRadius: 18,
-    paddingVertical: 20,
-    paddingHorizontal: 16,
+    paddingVertical: 18,
+    paddingHorizontal: 20,
+    flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 14,
   },
-  typeIconWrap: {
+  iconWrap: {
     width: 48,
     height: 48,
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 4,
   },
-  typeLabel: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  typeDesc: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.45)',
-    textAlign: 'center',
-    lineHeight: 16,
-  },
-  groupPromptWrap: {
-    alignItems: 'center',
-    marginTop: 24,
-    gap: 16,
-  },
-  groupPromptBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: '#2ecc71',
-    borderRadius: 14,
-    paddingVertical: 16,
-    paddingHorizontal: 28,
-    width: '100%',
-    justifyContent: 'center',
-  },
-  groupPromptBtnText: {
+  optionLabel: {
     fontSize: 16,
     fontWeight: '700',
     color: '#FFFFFF',
   },
-  groupPromptSkip: {
-    paddingVertical: 12,
+  optionDesc: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.45)',
+    lineHeight: 16,
+    flex: 1,
   },
-  groupPromptSkipText: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.5)',
-  },
-  savingOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+  savingWrap: {
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    borderRadius: 18,
+    marginTop: 20,
   },
   confirmOverlay: {
     ...StyleSheet.absoluteFillObject,
