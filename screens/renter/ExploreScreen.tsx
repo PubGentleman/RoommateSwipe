@@ -57,6 +57,8 @@ import { ReportBlockModal } from '../../components/ReportBlockModal';
 import { InquiryModal } from '../../components/InquiryModal';
 import { VisitRequestModal } from '../../components/VisitRequestModal';
 import { submitDetailedReport, blockUser as blockUserRemote } from '../../services/moderationService';
+import ForYouCard from '../../components/ForYouCard';
+import { getForYouListings, trackListingInteraction, getForYouLimit, RecommendedListing } from '../../services/recommendationService';
 
 import { useNotificationContext } from '../../contexts/NotificationContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
@@ -152,9 +154,11 @@ export const ExploreScreen = () => {
   const [showNeighborhoodSheet, setShowNeighborhoodSheet] = useState(false);
   const [photoIndex, setPhotoIndex] = useState(0);
   const [showMatchBreakdown, setShowMatchBreakdown] = useState(false);
-  const [viewMode, setViewMode] = useState<'all' | 'saved'>('all');
+  const [viewMode, setViewMode] = useState<'all' | 'saved' | 'forYou'>('all');
   const exploreTour = useTourSetup('explore', TOUR_CONTENT.explore);
   const [recommendations, setRecommendations] = useState<RecommendationSection[]>([]);
+  const [forYouListings, setForYouListings] = useState<RecommendedListing[]>([]);
+  const [forYouLoading, setForYouLoading] = useState(false);
   const [gateModal, setGateModal] = useState<{ visible: boolean; feature: string; requiredTier: ProfileTier } | null>(null);
   const gateStatus = useMemo(() => getProfileGateStatus(user), [user]);
   const [displayMode, setDisplayMode] = useState<'list' | 'map'>('list');
@@ -1260,6 +1264,54 @@ export const ExploreScreen = () => {
   const renterPlan = normalizeRenterPlan(user?.subscription?.plan);
   const renterLimits = getRenterPlanLimits(renterPlan);
 
+  const loadForYou = useCallback(async () => {
+    if (!user?.id) return;
+    setForYouLoading(true);
+    try {
+      const results = await getForYouListings(user.id, user, 50);
+      setForYouListings(results);
+    } catch (err) {
+      console.error('Failed to load recommendations:', err);
+    } finally {
+      setForYouLoading(false);
+    }
+  }, [user?.id, renterPlan]);
+
+  useEffect(() => {
+    if (viewMode === 'forYou' && user?.id && forYouListings.length === 0) {
+      loadForYou();
+    }
+  }, [viewMode]);
+
+  const handleForYouListingPress = useCallback((listing: Property) => {
+    const viewCheck = canViewListing();
+    if (!viewCheck.canView) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      setPaywallFeature('Unlimited Listing Views');
+      setPaywallPlan('plus');
+      setShowPaywall(true);
+      return;
+    }
+    useListingView();
+
+    if (user?.id) {
+      trackListingInteraction(user.id, listing.id, 'view', {
+        source: 'for_you',
+        listingSnapshot: {
+          price: listing.price,
+          bedrooms: listing.bedrooms,
+          neighborhood: listing.neighborhood,
+          amenities: listing.amenities,
+          listing_type: listing.listingType,
+        },
+      });
+    }
+
+    setSelectedProperty(listing);
+    setPhotoIndex(0);
+    setShowPropertyDetail(true);
+  }, [user?.id]);
+
   const handleFilterPress = () => {
     setShowFilterModal(true);
   };
@@ -1352,9 +1404,12 @@ export const ExploreScreen = () => {
     const newSaved = new Set(saved);
     if (wasSaved) {
       newSaved.delete(id);
+      trackListingInteraction(user.id, id, 'unsave', {
+        source: viewMode === 'forYou' ? 'for_you' : 'explore',
+      });
     } else {
       newSaved.add(id);
-      const prop = properties.find(p => p.id === id);
+      const prop = properties.find(p => p.id === id) || forYouListings.find(f => f.listing.id === id)?.listing;
       if (prop) {
         trackListingSave({
           id: prop.id,
@@ -1363,6 +1418,16 @@ export const ExploreScreen = () => {
           zip_code: prop.zipCode,
           bedrooms: prop.bedrooms,
           rent: prop.price,
+        });
+        trackListingInteraction(user.id, id, 'save', {
+          source: viewMode === 'forYou' ? 'for_you' : 'explore',
+          listingSnapshot: {
+            price: prop.price,
+            bedrooms: prop.bedrooms,
+            neighborhood: prop.neighborhood,
+            amenities: (prop as any).amenities,
+            listing_type: prop.listingType,
+          },
         });
       }
     }
@@ -1923,6 +1988,22 @@ export const ExploreScreen = () => {
               </View>
             )}
           </Pressable>
+          <Pressable
+            style={viewMode === 'forYou' ? styles.tabActive : styles.tabInactive}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setViewMode('forYou'); }}
+          >
+            {viewMode === 'forYou' ? (
+              <LinearGradient colors={['#6C5CE7', '#5a4bd6']} style={styles.tabGradient}>
+                <Feather name="zap" size={13} color="#fff" />
+                <Text style={styles.tabActiveText}>For You</Text>
+              </LinearGradient>
+            ) : (
+              <>
+                <Feather name="zap" size={13} color="rgba(255,255,255,0.4)" />
+                <Text style={styles.tabInactiveText}>For You</Text>
+              </>
+            )}
+          </Pressable>
         </View>
 
         <ScrollView
@@ -1987,7 +2068,79 @@ export const ExploreScreen = () => {
           </Pressable>
         </ScrollView>
       ) : null}
-      {displayMode === 'map' ? (
+      {viewMode === 'forYou' ? (
+        forYouLoading ? (
+          <View style={styles.forYouLoadingContainer}>
+            <ActivityIndicator size="large" color="#6C5CE7" />
+            <Text style={styles.forYouLoadingText}>Finding your best matches...</Text>
+          </View>
+        ) : forYouListings.length > 0 ? (
+          <FlatList
+            data={forYouListings}
+            keyExtractor={(item) => item.listing.id}
+            contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 100, paddingTop: Spacing.lg }]}
+            showsVerticalScrollIndicator={false}
+            renderItem={({ item, index }) => {
+              const limit = getForYouLimit(renterPlan);
+              if (index >= limit) {
+                return (
+                  <View key={`locked-${index}`} style={styles.forYouLockedCard}>
+                    <View style={styles.forYouLockedOverlay}>
+                      <Feather name="lock" size={24} color="#6C5CE7" />
+                      <Text style={styles.forYouLockedTitle}>Upgrade to see more</Text>
+                      <Text style={styles.forYouLockedSubtitle}>Get personalized recommendations with Plus</Text>
+                      <Pressable
+                        style={styles.forYouUpgradeButton}
+                        onPress={() => { setPaywallFeature('Unlimited For You Recommendations'); setPaywallPlan('plus'); setShowPaywall(true); }}
+                      >
+                        <Text style={styles.forYouUpgradeText}>View Plans</Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                );
+              }
+              return (
+                <ForYouCard
+                  item={item}
+                  onPress={() => handleForYouListingPress(item.listing)}
+                  onSave={() => toggleSave(item.listing.id)}
+                  isSaved={saved.has(item.listing.id)}
+                />
+              );
+            }}
+            ListHeaderComponent={() => (
+              <View style={styles.forYouHeader}>
+                <LinearGradient colors={['rgba(108,92,231,0.15)', 'transparent']} style={styles.forYouHeaderGradient}>
+                  <Feather name="zap" size={20} color="#6C5CE7" />
+                  <Text style={styles.forYouHeaderTitle}>Picked for you</Text>
+                  <Text style={styles.forYouHeaderSubtitle}>Based on your browsing patterns and preferences</Text>
+                </LinearGradient>
+              </View>
+            )}
+            ListEmptyComponent={
+              <View style={styles.emptyStateInline}>
+                <Feather name="zap" size={64} color={theme.textSecondary} />
+                <ThemedText style={[Typography.h2, { marginTop: Spacing.xl, textAlign: 'center' }]}>
+                  No Recommendations Yet
+                </ThemedText>
+                <ThemedText style={[Typography.body, { color: theme.textSecondary, marginTop: Spacing.sm, textAlign: 'center' }]}>
+                  Browse and save listings to get personalized recommendations
+                </ThemedText>
+              </View>
+            }
+          />
+        ) : (
+          <View style={styles.emptyStateInline}>
+            <Feather name="zap" size={64} color={theme.textSecondary} />
+            <ThemedText style={[Typography.h2, { marginTop: Spacing.xl, textAlign: 'center' }]}>
+              No Recommendations Yet
+            </ThemedText>
+            <ThemedText style={[Typography.body, { color: theme.textSecondary, marginTop: Spacing.sm, textAlign: 'center' }]}>
+              Browse and save listings to get personalized recommendations
+            </ThemedText>
+          </View>
+        )
+      ) : displayMode === 'map' ? (
         <InteractiveMapView
           properties={filteredProperties}
           savedPropertyIds={saved}
@@ -4509,6 +4662,75 @@ const styles = StyleSheet.create({
   emptyStateInline: {
     paddingVertical: Spacing.xxl * 2,
     alignItems: 'center',
+  },
+  forYouLoadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: Spacing.xxl * 3,
+  },
+  forYouLoadingText: {
+    color: '#A0A0A0',
+    fontSize: 14,
+    marginTop: Spacing.lg,
+  },
+  forYouHeader: {
+    marginBottom: Spacing.lg,
+  },
+  forYouHeaderGradient: {
+    padding: Spacing.lg,
+    borderRadius: 14,
+    alignItems: 'center',
+    gap: 6,
+  },
+  forYouHeaderTitle: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  forYouHeaderSubtitle: {
+    color: '#A0A0A0',
+    fontSize: 13,
+    textAlign: 'center',
+  },
+  forYouLockedCard: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 14,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#222',
+    marginBottom: 16,
+    height: 200,
+  },
+  forYouLockedOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(13,13,13,0.85)',
+    gap: 8,
+    padding: Spacing.lg,
+  },
+  forYouLockedTitle: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  forYouLockedSubtitle: {
+    color: '#A0A0A0',
+    fontSize: 13,
+    textAlign: 'center',
+  },
+  forYouUpgradeButton: {
+    backgroundColor: '#6C5CE7',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 10,
+    marginTop: 4,
+  },
+  forYouUpgradeText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
   },
   featuredSection: {
     marginBottom: Spacing.lg,
