@@ -527,17 +527,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           };
 
           if (session?.user?.id) {
-            supabase
-              .from('users')
-              .update(intentOverrides)
-              .eq('id', session.user.id)
-              .then(({ error }) => {
-                if (error) {
-                  console.warn('[Auth] Failed to sync intent overrides to Supabase:', error);
-                } else {
-                  console.log('[Auth] Synced intent overrides to Supabase:', Object.keys(intentOverrides));
-                }
-              });
+            Promise.allSettled([
+              supabase.from('users').update(intentOverrides).eq('id', session.user.id),
+              supabase.from('profiles').update(intentOverrides).eq('user_id', session.user.id),
+            ]).then((results) => {
+              const usersOk = results[0].status === 'fulfilled' && !results[0].value.error;
+              const profilesOk = results[1].status === 'fulfilled' && !results[1].value.error;
+              if (!usersOk && !profilesOk) {
+                console.warn('[Auth] Failed to sync intent overrides to both tables');
+              } else {
+                console.log('[Auth] Synced intent overrides:', { usersOk, profilesOk, keys: Object.keys(intentOverrides) });
+              }
+            });
           }
         }
       }
@@ -2047,7 +2048,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const isPlaceSeeker = (): boolean => {
     if (!user) return false;
     const searchType = user.profileData?.apartment_search_type;
-    return searchType === 'solo' || searchType === 'with_partner' || searchType === 'have_group';
+    return searchType === 'solo' || searchType === 'with_partner' || searchType === 'have_group' || searchType === 'entire_apartment';
   };
 
   const getAdCredits = (): { rewinds: number; superLikes: number; boosts: number; messages: number } => {

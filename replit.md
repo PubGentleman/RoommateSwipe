@@ -94,4 +94,5 @@ The architecture includes a Babel module resolver, platform-specific UI, perform
 *   **Client**: Hardcoded Supabase anon key fallback removed from `lib/supabase.ts`. `select('*')` replaced with explicit column lists in AuthContext, backgroundCheckService, boostService, agentMatchmakerService.
 *   **SQL Injection**: Fixed in calculate-match-scores — excludeIds are now validated against UUID regex before query interpolation.
 *   **Migration 105**: Adds `'entire_apartment'` to the `apartment_search_type` CHECK constraint on `users` table.
-*   **Next migration**: 106.
+*   **Migration 106**: Fixes `apartment_search_type` column — adds it to `users` table (was only on `profiles`), adds `listing_type_preference` to `users`, updates CHECK constraints on both tables to allow `'entire_apartment'`.
+*   **Next migration**: 107.

@@ -210,69 +210,87 @@ export async function leavePreformedGroup(userId: string, groupId: string): Prom
 }
 
 export async function enableReplacement(groupId: string, slots: number): Promise<boolean> {
-  const { error } = await supabase
-    .from('preformed_groups')
-    .update({
-      needs_replacement: true,
-      replacement_slots: slots,
-      open_to_requests: true,
-    })
-    .eq('id', groupId);
-
-  if (error && shouldLoadMockData()) {
-    try {
-      const keys = await AsyncStorage.getAllKeys();
-      const groupKey = keys.find(k => k.startsWith('@rhome/preformed_group_') && !k.includes('members'));
-      if (groupKey) {
-        const raw = await AsyncStorage.getItem(groupKey);
-        if (raw) {
-          const g = JSON.parse(raw);
-          if (g.id === groupId) {
-            g.needs_replacement = true;
-            g.replacement_slots = slots;
-            g.open_to_requests = true;
-            await AsyncStorage.setItem(groupKey, JSON.stringify(g));
-            return true;
-          }
-        }
-      }
-    } catch (_) {}
+  let supabaseOk = false;
+  try {
+    const { error } = await supabase
+      .from('preformed_groups')
+      .update({
+        needs_replacement: true,
+        replacement_slots: slots,
+        open_to_requests: true,
+      })
+      .eq('id', groupId);
+    supabaseOk = !error;
+    if (error) console.warn('[enableReplacement] Supabase update failed:', error.message);
+  } catch (e) {
+    console.warn('[enableReplacement] Supabase threw:', e);
   }
 
-  return !error;
+  let localOk = false;
+  try {
+    const keys = await AsyncStorage.getAllKeys();
+    const groupKeys = keys.filter(k => k.startsWith('@rhome/preformed_group_') && !k.includes('members'));
+    for (const key of groupKeys) {
+      const val = await AsyncStorage.getItem(key);
+      if (val) {
+        const g = JSON.parse(val);
+        if (g.id === groupId) {
+          g.needs_replacement = true;
+          g.replacement_slots = slots;
+          g.open_to_requests = true;
+          await AsyncStorage.setItem(key, JSON.stringify(g));
+          localOk = true;
+          break;
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('[enableReplacement] Local storage update failed:', e);
+  }
+
+  return supabaseOk || localOk;
 }
 
 export async function disableReplacement(groupId: string): Promise<boolean> {
-  const { error } = await supabase
-    .from('preformed_groups')
-    .update({
-      needs_replacement: false,
-      replacement_slots: 0,
-      open_to_requests: false,
-    })
-    .eq('id', groupId);
-
-  if (error && shouldLoadMockData()) {
-    try {
-      const keys = await AsyncStorage.getAllKeys();
-      const groupKey = keys.find(k => k.startsWith('@rhome/preformed_group_') && !k.includes('members'));
-      if (groupKey) {
-        const raw = await AsyncStorage.getItem(groupKey);
-        if (raw) {
-          const g = JSON.parse(raw);
-          if (g.id === groupId) {
-            g.needs_replacement = false;
-            g.replacement_slots = 0;
-            g.open_to_requests = false;
-            await AsyncStorage.setItem(groupKey, JSON.stringify(g));
-            return true;
-          }
-        }
-      }
-    } catch (_) {}
+  let supabaseOk = false;
+  try {
+    const { error } = await supabase
+      .from('preformed_groups')
+      .update({
+        needs_replacement: false,
+        replacement_slots: 0,
+        open_to_requests: false,
+      })
+      .eq('id', groupId);
+    supabaseOk = !error;
+    if (error) console.warn('[disableReplacement] Supabase update failed:', error.message);
+  } catch (e) {
+    console.warn('[disableReplacement] Supabase threw:', e);
   }
 
-  return !error;
+  let localOk = false;
+  try {
+    const keys = await AsyncStorage.getAllKeys();
+    const groupKeys = keys.filter(k => k.startsWith('@rhome/preformed_group_') && !k.includes('members'));
+    for (const key of groupKeys) {
+      const val = await AsyncStorage.getItem(key);
+      if (val) {
+        const g = JSON.parse(val);
+        if (g.id === groupId) {
+          g.needs_replacement = false;
+          g.replacement_slots = 0;
+          g.open_to_requests = false;
+          await AsyncStorage.setItem(key, JSON.stringify(g));
+          localOk = true;
+          break;
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('[disableReplacement] Local storage update failed:', e);
+  }
+
+  return supabaseOk || localOk;
 }
 
 export async function getGroupById(groupId: string): Promise<PreformedGroup | null> {
@@ -410,13 +428,21 @@ export async function updateShortlistNotes(itemId: string, notes: string): Promi
 }
 
 export async function removeMember(groupId: string, memberId: string): Promise<boolean> {
-  const { error } = await supabase
-    .from('preformed_group_members')
-    .delete()
-    .eq('preformed_group_id', groupId)
-    .eq('id', memberId);
+  let supabaseSuccess = false;
 
-  let localRemoved = false;
+  try {
+    const { error } = await supabase
+      .from('preformed_group_members')
+      .delete()
+      .eq('preformed_group_id', groupId)
+      .eq('id', memberId);
+    supabaseSuccess = !error;
+    if (error) console.warn('[removeMember] Supabase delete failed:', error.message);
+  } catch (e) {
+    console.warn('[removeMember] Supabase delete threw:', e);
+  }
+
+  let localSuccess = false;
   try {
     const localKey = `@rhome/preformed_members_${groupId}`;
     const local = await AsyncStorage.getItem(localKey);
@@ -425,18 +451,14 @@ export async function removeMember(groupId: string, memberId: string): Promise<b
       const filtered = members.filter(m => m.id !== memberId);
       if (filtered.length < members.length) {
         await AsyncStorage.setItem(localKey, JSON.stringify(filtered));
-        localRemoved = true;
+        localSuccess = true;
       }
     }
   } catch (e) {
     console.warn('[removeMember] Local storage cleanup failed:', e);
   }
 
-  if (error && localRemoved && shouldLoadMockData()) {
-    return true;
-  }
-
-  return !error;
+  return supabaseSuccess || localSuccess;
 }
 
 export async function getUserPreformedGroup(userId: string): Promise<PreformedGroup | null> {

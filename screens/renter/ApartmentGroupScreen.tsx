@@ -130,30 +130,46 @@ export default function ApartmentGroupScreen() {
           onPress: async () => {
             try {
               const success = await removeMember(group.id, memberId);
-              if (!success) {
-                Alert.alert('Error', 'Failed to remove member. Please try again.');
-                return;
-              }
 
               const freshGroup = await getUserPreformedGroup(user!.id);
               if (freshGroup) {
                 const freshMembers = await getGroupMembers(freshGroup.id);
-                const freshJoined = freshMembers.filter(m => m.status === 'joined').length;
-                const freshOpenSlots = (freshGroup.group_size || 0) - freshJoined;
-                setGroup(freshGroup);
-                setMembers(freshMembers);
+
+                const memberStillExists = freshMembers.some(m => m.id === memberId);
+                if (memberStillExists) {
+                  const forcedMembers = freshMembers.filter(m => m.id !== memberId);
+                  setGroup(freshGroup);
+                  setMembers(forcedMembers);
+                } else {
+                  setGroup(freshGroup);
+                  setMembers(freshMembers);
+                }
+
+                const activeMembers = (memberStillExists
+                  ? freshMembers.filter(m => m.id !== memberId)
+                  : freshMembers
+                ).filter(m => m.status === 'joined');
+                const freshOpenSlots = (freshGroup.group_size || 0) - activeMembers.length;
 
                 if (freshOpenSlots > 0) {
                   Alert.alert(
-                    'Need a Roommate?',
-                    `Your group now has ${freshOpenSlots} open ${freshOpenSlots === 1 ? 'spot' : 'spots'}. Would you like to find a replacement through Rhome's roommate matching?`,
+                    'Member Removed',
+                    `Your group now has ${freshOpenSlots} open ${freshOpenSlots === 1 ? 'spot' : 'spots'}. What would you like to do?`,
                     [
-                      { text: 'Not Now', style: 'cancel' },
+                      { text: 'Nothing for Now', style: 'cancel' },
                       {
-                        text: 'Find a Roommate',
+                        text: 'Invite a Friend',
+                        onPress: () => shareInvite(),
+                      },
+                      {
+                        text: 'Find on Rhome',
                         onPress: async () => {
                           await enableReplacement(freshGroup.id, freshOpenSlots);
                           loadData();
+                          Alert.alert(
+                            'You\'re Live!',
+                            'Your group is now visible to roommate seekers. You\'ll get notifications when someone requests to join.',
+                          );
                         },
                       },
                     ],
@@ -163,8 +179,8 @@ export default function ApartmentGroupScreen() {
                 setMembers(prev => prev.filter(m => m.id !== memberId));
               }
             } catch (err) {
-              console.error('[ApartmentGroup] Remove member error:', err);
-              Alert.alert('Error', 'Something went wrong. Please try again.');
+              console.error('[handleRemoveMember] Error:', err);
+              Alert.alert('Error', 'Failed to remove member. Please try again.');
             }
           },
         },

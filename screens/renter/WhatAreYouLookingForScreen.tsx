@@ -77,22 +77,24 @@ export default function WhatAreYouLookingForScreen({ onComplete, isSettings, ini
     };
 
     try {
-      const { error } = await supabase
-        .from('users')
-        .update(updates)
-        .eq('id', user.id);
-      if (error) throw error;
-    } catch (err) {
-      console.warn('[Intent] Users table update failed, retrying once:', err);
-      try {
-        const { error } = await supabase
-          .from('users')
-          .update(updates)
-          .eq('id', user.id);
-        if (error) throw error;
-      } catch (retryErr) {
-        console.warn('[Intent] Users table update retry also failed:', retryErr);
+      const [usersResult, profilesResult] = await Promise.allSettled([
+        supabase.from('users').update(updates).eq('id', user.id),
+        supabase.from('profiles').update(updates).eq('user_id', user.id),
+      ]);
+
+      const usersError = usersResult.status === 'fulfilled' ? usersResult.value.error : usersResult.reason;
+      const profilesError = profilesResult.status === 'fulfilled' ? profilesResult.value.error : profilesResult.reason;
+
+      if (usersError && profilesError) {
+        console.warn('[Intent] Both table updates failed:', { usersError, profilesError });
+        const { error: retryError } = await supabase.from('profiles').update(updates).eq('user_id', user.id);
+        if (retryError) console.warn('[Intent] Profile retry also failed:', retryError);
+      } else {
+        if (usersError) console.warn('[Intent] Users table update failed (profiles succeeded):', usersError);
+        if (profilesError) console.warn('[Intent] Profiles table update failed (users succeeded):', profilesError);
       }
+    } catch (err) {
+      console.warn('[Intent] Save to database failed:', err);
     }
 
     try {
