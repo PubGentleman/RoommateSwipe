@@ -21,7 +21,7 @@ import {
 import { UNLOCK_PACKAGES, canUseProactiveOutreach, type HostPlan } from '../../constants/planLimits';
 import { PurchaseConfirmModal } from '../../components/modals/PurchaseConfirmModal';
 import { OUTREACH_CREDIT_CONFIGS } from '../../constants/purchaseConfig';
-import { LockedFeatureWall } from '../../components/host/LockedFeatureWall';
+import FeatureGate from '../../components/FeatureGate';
 
 const BG = '#111';
 const CARD_BG = '#1a1a1a';
@@ -273,13 +273,20 @@ export const BrowseRenterGroupsScreen = () => {
             <Text style={styles.subtitle}>Groups actively looking for a place together</Text>
           </View>
         </View>
-        <LockedFeatureWall
-          icon="users"
-          title="Renter Group Outreach"
-          description="Upgrade to Host Starter or higher to browse renter groups and message them directly with your listing."
-          requiredPlan="Host Starter"
+        <FeatureGate
+          isUnlocked={false}
+          requiredPlan="starter"
+          requiredPlanLabel="Starter"
+          featureName="Renter Group Outreach"
+          featureDescription="Browse renter groups and message them directly with your listing."
+          lockStyle="replace"
           onUpgrade={() => navigation.navigate('Dashboard', { screen: 'HostSubscription' })}
-        />
+          showPlanCompare
+          role="host"
+          currentPlan={hostSub?.plan || 'free'}
+        >
+          <View />
+        </FeatureGate>
       </View>
     );
   }

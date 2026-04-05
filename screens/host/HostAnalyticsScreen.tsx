@@ -15,9 +15,7 @@ import { Spacing, BorderRadius } from '../../constants/theme';
 import { getMyListings, mapListingToProperty, getListingViewStats, type ListingViewStats } from '../../services/listingService';
 import { getReceivedInterestCards } from '../../services/discoverService';
 import { canAccessAnalytics } from '../../utils/planGates';
-import { LockedFeatureWall } from '../../components/host/LockedFeatureWall';
-import SmartUpgradePrompt from '../../components/SmartUpgradePrompt';
-import { getUpgradePromptData } from '../../services/upgradePromptService';
+import FeatureGate from '../../components/FeatureGate';
 import { getPlanLimits, type HostPlan } from '../../constants/planLimits';
 import { getOutreachLogForHost } from '../../services/hostOutreachService';
 
@@ -293,12 +291,20 @@ export const HostAnalyticsScreen = () => {
           </Pressable>
           <ThemedText type="h2" style={{ marginLeft: 8 }}>Analytics</ThemedText>
         </View>
-        <SmartUpgradePrompt
-          data={getUpgradePromptData('analytics_locked', hostPlan)}
-          variant="card"
+        <FeatureGate
+          isUnlocked={false}
+          requiredPlan="pro"
+          requiredPlanLabel="Pro"
+          featureName="Listing Analytics"
+          featureDescription="Track views, inquiries, and engagement for all your listings."
+          lockStyle="replace"
           onUpgrade={() => navigation.navigate('HostSubscription')}
-          onDismiss={() => navigation.goBack()}
-        />
+          showPlanCompare
+          role="host"
+          currentPlan={hostPlan}
+        >
+          <View />
+        </FeatureGate>
       </ScreenScrollView>
     );
   }
