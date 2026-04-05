@@ -13,7 +13,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { updateProfile } from '../../services/profileService';
 import { RhomeLogo } from '../../components/RhomeLogo';
 
-type SearchType = 'solo' | 'with_partner' | 'with_roommates' | 'have_group';
+type SearchType = 'solo' | 'with_partner' | 'with_roommates' | 'have_group' | 'entire_apartment';
 type ListingPref = 'room' | 'entire_apartment' | 'any';
 
 const PATHS = [
@@ -32,7 +32,7 @@ const PATHS = [
     icon: 'home' as const,
     color: '#4a9eff',
     description: 'Get a whole apartment for yourself or your group',
-    searchType: 'solo' as SearchType,
+    searchType: 'entire_apartment' as SearchType,
     listingPref: 'entire_apartment' as ListingPref,
   },
 ];

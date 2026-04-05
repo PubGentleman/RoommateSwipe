@@ -64,6 +64,10 @@ export const ProfileCompletionScreen = () => {
   const isCompany = user?.hostType === 'company';
   const isHostProfessional = isAgent || isCompany;
 
+  const searchType = user?.profileData?.apartment_search_type;
+  const isPlaceSeeker = !!searchType && searchType !== 'with_roommates';
+  const skipRoommateFields = isHostProfessional || isPlaceSeeker;
+
   const [photo, setPhoto] = useState<string | null>(user?.profilePicture || (user?.photos?.length ? user.photos[0] : null));
   const [bio, setBio] = useState(user?.profileData?.bio || '');
   const [occupation, setOccupation] = useState(user?.profileData?.occupation || (isAgent ? 'Real Estate Agent' : ''));
@@ -108,14 +112,16 @@ export const ProfileCompletionScreen = () => {
 
   const photoComplete = !!photo;
   const bioComplete = bio.trim().length >= 20;
-  const occupationComplete = isHostProfessional || !!occupation;
-  const lifestyleComplete = isHostProfessional || lifestyleTags.length >= 2;
+  const occupationComplete = skipRoommateFields || !!occupation;
+  const lifestyleComplete = skipRoommateFields || lifestyleTags.length >= 2;
   const budgetComplete = isHostProfessional || budgetTouched;
-  const interestsComplete = isHostProfessional || interestTags.length >= 3;
+  const interestsComplete = skipRoommateFields || interestTags.length >= 3;
 
   const sectionsDone = isHostProfessional
     ? [photoComplete, bioComplete]
-    : [photoComplete, bioComplete, occupationComplete, lifestyleComplete, budgetComplete, interestsComplete];
+    : isPlaceSeeker
+      ? [photoComplete, bioComplete, budgetComplete]
+      : [photoComplete, bioComplete, occupationComplete, lifestyleComplete, budgetComplete, interestsComplete];
   const progressPct = Math.round((sectionsDone.filter(Boolean).length / sectionsDone.length) * 100);
 
   const handlePickPhoto = async () => {
@@ -248,14 +254,14 @@ export const ProfileCompletionScreen = () => {
           </Text>
         </View>
 
-        {!isHostProfessional ? (
+        {!skipRoommateFields ? (
           <>
             <SectionHeader icon="briefcase" title="Occupation" complete={!!occupation} />
             <OccupationBarSelector selectedOccupation={occupation} onChange={setOccupation} />
           </>
         ) : null}
 
-        {!isHostProfessional ? (
+        {!skipRoommateFields ? (
           <>
             <SectionHeader icon="sun" title="Lifestyle preferences" complete={lifestyleComplete} />
             <Text style={styles.tagHint}>Select at least 2</Text>
@@ -274,7 +280,11 @@ export const ProfileCompletionScreen = () => {
                 );
               })}
             </View>
+          </>
+        ) : null}
 
+        {!isHostProfessional ? (
+          <>
             <SectionHeader icon="dollar-sign" title="Budget range" complete={budgetComplete} />
             <PricePickerPair
               minValue={budgetMin}
@@ -283,7 +293,11 @@ export const ProfileCompletionScreen = () => {
               onMaxChange={(val) => { setBudgetMax(val); setBudgetTouched(true); }}
               height={140}
             />
+          </>
+        ) : null}
 
+        {!skipRoommateFields ? (
+          <>
             <SectionHeader icon="tag" title="Interest tags" complete={interestsComplete} />
             <Text style={styles.tagHint}>Select at least 3</Text>
             {Object.entries(INTEREST_TAGS).map(([key, category]) => (

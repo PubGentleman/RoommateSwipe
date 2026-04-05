@@ -204,9 +204,13 @@ function TypeOnboardingNudge() {
           <View style={nudgeStyles.iconWrap}>
             <Feather name="zap" size={28} color="#ff6b5b" />
           </View>
-          <Text style={nudgeStyles.title}>Quick setup — 2 minutes</Text>
+          <Text style={nudgeStyles.title}>
+            Quick setup — {searchType === 'with_roommates' ? '2 minutes' : '1 minute'}
+          </Text>
           <Text style={nudgeStyles.desc}>
-            Tell us a few things so we can find better matches for you
+            {searchType === 'with_roommates'
+              ? 'Tell us a few things so we can find better matches for you'
+              : 'Add a photo and bio to get started'}
           </Text>
           <Pressable style={nudgeStyles.setupBtn} onPress={handleSetup}>
             <Text style={nudgeStyles.setupBtnText}>Set up now</Text>
@@ -289,8 +293,9 @@ export const RenterTabNavigator = () => {
   const showRoommates = needsRoommates(searchType);
   const showMyGroup = isPreformedGroup(searchType);
   const showSaved = isFastLane(searchType);
+  const showGroups = showRoommates || showSaved;
 
-  const tabKey = showRoommates ? 'full' : showMyGroup ? 'group' : 'lite';
+  const tabKey = showRoommates ? 'full' : showMyGroup ? 'group' : showGroups ? 'groups-lite' : 'lite';
 
   return (
     <>
@@ -310,7 +315,7 @@ export const RenterTabNavigator = () => {
       {showRoommates ? (
         <Tab.Screen name="Roommates" component={RoommatesStackNavigator} />
       ) : null}
-      {showRoommates ? (
+      {showGroups ? (
         <Tab.Screen name="Groups" component={GroupsStackNavigator} />
       ) : null}
       {showMyGroup ? (

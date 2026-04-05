@@ -360,7 +360,7 @@ export const ProfileQuestionnaireScreen = () => {
   const searchType = user?.profileData?.apartment_search_type;
   const isPlaceSeekerUser = !!searchType && searchType !== 'with_roommates';
   const isLiteOnboarding = isOnboarding && user?.role === 'renter' && (
-    searchType === 'solo' || searchType === 'with_partner'
+    searchType === 'solo' || searchType === 'with_partner' || searchType === 'entire_apartment'
   );
   const missingStepsParam = (route.params as any)?.missingSteps as string[] | undefined;
   const allStepsForType = isPlaceSeekerUser ? PLACE_SEEKER_STEPS : STEP_ORDER;
