@@ -23,6 +23,7 @@ import {
   enableReplacement,
   disableReplacement,
   removeMember,
+  updateGroupPreferences,
 } from '../../services/preformedGroupService';
 import {
   getGroupTours,
@@ -176,27 +177,53 @@ export default function ApartmentGroupScreen() {
     const joinedCount = members.filter(m => m.status === 'joined').length;
     const openSlots = (group.group_size || 0) - joinedCount;
 
-    Alert.alert(
-      'Find a Roommate',
-      openSlots > 0
-        ? `You have ${openSlots} open ${openSlots === 1 ? 'spot' : 'spots'}. Turning this on will make your group visible to people looking for roommates on Rhome. You'll be able to review requests before accepting anyone.`
-        : 'All spots are filled. To find a replacement, first increase your group size or remove a member.',
-      openSlots > 0
-        ? [
-            { text: 'Cancel', style: 'cancel' },
-            {
-              text: 'Find Roommates',
-              onPress: async () => {
-                await enableReplacement(group.id, openSlots);
-                loadData();
-                Alert.alert(
-                  'You\'re Live!',
-                  'Your group is now visible to roommate seekers. You\'ll get notifications when someone requests to join. You can review their profile and compatibility before accepting.',
-                );
-              },
+    if (openSlots > 0) {
+      Alert.alert(
+        'Find a Roommate',
+        `You have ${openSlots} open ${openSlots === 1 ? 'spot' : 'spots'}. Turning this on will make your group visible to people looking for roommates on Rhome. You'll be able to review requests before accepting anyone.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Find Roommates',
+            onPress: async () => {
+              await enableReplacement(group.id, openSlots);
+              loadData();
+              Alert.alert(
+                'You\'re Live!',
+                'Your group is now visible to roommate seekers. You\'ll get notifications when someone requests to join. You can review their profile and compatibility before accepting.',
+              );
             },
-          ]
-        : [{ text: 'OK' }],
+          },
+        ],
+      );
+    } else {
+      Alert.alert(
+        'Add More Roommates',
+        `Your group currently has ${joinedCount} members with all spots filled. How many additional roommates would you like to find?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: '+1 Roommate',
+            onPress: () => expandGroupAndEnable(1),
+          },
+          {
+            text: '+2 Roommates',
+            onPress: () => expandGroupAndEnable(2),
+          },
+        ],
+      );
+    }
+  };
+
+  const expandGroupAndEnable = async (extraSlots: number) => {
+    if (!group) return;
+    const newSize = (group.group_size || 0) + extraSlots;
+    await updateGroupPreferences(group.id, { group_size: newSize });
+    await enableReplacement(group.id, extraSlots);
+    loadData();
+    Alert.alert(
+      'You\'re Live!',
+      `Group size updated to ${newSize}. Your group is now visible to roommate seekers looking for a spot.`,
     );
   };
 
@@ -316,13 +343,8 @@ export default function ApartmentGroupScreen() {
                   },
                 ],
               );
-            } else if (openSlots > 0) {
-              handleNeedRoommate();
             } else {
-              Alert.alert(
-                'No Open Spots',
-                'All spots are filled. Remove a member first to open a spot, then you can turn on roommate finding.',
-              );
+              handleNeedRoommate();
             }
           }}
         >
@@ -335,14 +357,14 @@ export default function ApartmentGroupScreen() {
                 ? `Looking for ${openSlots > 0 ? `${openSlots} ` : ''}roommate${openSlots !== 1 ? 's' : ''}`
                 : openSlots > 0
                   ? `Need a roommate? ${openSlots} ${openSlots === 1 ? 'spot' : 'spots'} open`
-                  : 'Roommate Finding'}
+                  : 'Find More Roommates'}
             </Text>
             <Text style={styles.needRoommateSubtext}>
               {group.needs_replacement
                 ? 'Your group is visible to roommate seekers'
                 : openSlots > 0
                   ? 'Tap to find a replacement through Rhome'
-                  : 'Remove a member to open a spot'}
+                  : 'Tap to expand your group and find roommates'}
             </Text>
           </View>
           {group.needs_replacement ? (

@@ -309,11 +309,30 @@ export async function updateGroupPreferences(groupId: string, updates: {
   desired_bedroom_count?: number;
   move_in_date?: string;
   preferred_neighborhoods?: string[];
+  group_size?: number;
 }): Promise<boolean> {
   const { error } = await supabase
     .from('preformed_groups')
     .update(updates)
     .eq('id', groupId);
+
+  if (error && shouldLoadMockData()) {
+    try {
+      const keys = await AsyncStorage.getAllKeys();
+      const groupKey = keys.find(k => k.startsWith('@rhome/preformed_group_') && !k.includes('members'));
+      if (groupKey) {
+        const raw = await AsyncStorage.getItem(groupKey);
+        if (raw) {
+          const g = JSON.parse(raw);
+          if (g.id === groupId) {
+            Object.assign(g, updates);
+            await AsyncStorage.setItem(groupKey, JSON.stringify(g));
+            return true;
+          }
+        }
+      }
+    } catch (_) {}
+  }
 
   return !error;
 }
