@@ -2103,9 +2103,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#2a2a2a',
     borderRadius: 14,
-    paddingVertical: 14,
+    paddingTop: 14,
+    paddingBottom: 18,
     paddingHorizontal: 6,
     alignItems: 'center',
+    overflow: 'visible',
   },
   statDivider: {
     width: 1,
