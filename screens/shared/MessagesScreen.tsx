@@ -22,6 +22,8 @@ import { AppHeader, HeaderIconButton } from '../../components/AppHeader';
 import CoachMarkOverlay from '../../components/CoachMark';
 import { useTourSetup } from '../../hooks/useTourSetup';
 import { TOUR_CONTENT } from '../../constants/tourSteps';
+import { isUserOnline, subscribeToPresence } from '../../services/presenceService';
+import { OnlineDot } from '../../components/OnlineDot';
 
 function safeDate(value: any): Date {
   if (value instanceof Date && !isNaN(value.getTime())) return value;
@@ -93,6 +95,14 @@ export const MessagesScreen = () => {
   const [inquiryGroups, setInquiryGroups] = useState<Group[]>([]);
   const [chatFilter, setChatFilter] = useState<ChatFilterKey>('all');
   const messagesTour = useTourSetup('messages', TOUR_CONTENT.messages);
+
+  const [, forcePresenceUpdate] = useState(0);
+  useEffect(() => {
+    const unsub = subscribeToPresence(() => {
+      forcePresenceUpdate(v => v + 1);
+    });
+    return unsub;
+  }, []);
 
   const MSG_COLLAPSE_H = 50;
   const msgScrollY = useSharedValue(0);
@@ -651,8 +661,8 @@ export const MessagesScreen = () => {
               </Text>
             </LinearGradient>
           )}
-          {canSeeOnlineStatus() && item.participant.online && !isUnmatched ? (
-            <View style={styles.onlineDot} />
+          {canSeeOnlineStatus() && !isUnmatched ? (
+            <OnlineDot userId={item.participant.id} size="sm" />
           ) : null}
         </View>
 
@@ -696,6 +706,9 @@ export const MessagesScreen = () => {
               </View>
             ) : null}
           </View>
+          {canSeeOnlineStatus() && isUserOnline(item.participant.id) && !isUnmatched ? (
+            <Text style={{ fontSize: 11, color: '#22C55E', marginTop: 2 }}>Online</Text>
+          ) : null}
 
           {isUnmatched ? (
             <View style={styles.convTagRow}>

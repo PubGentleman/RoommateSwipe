@@ -16,7 +16,9 @@ import { PaywallSheet } from '../../components/PaywallSheet';
 import { RhomeAISheet, ScreenContext } from '../../components/RhomeAISheet';
 import { AIFloatingButton } from '../../components/AIFloatingButton';
 import { useNotificationContext } from '../../contexts/NotificationContext';
-import { getMessages as getSupabaseMessages, sendMessage as sendSupabaseMessage, markMessagesAsRead as markSupabaseMessagesAsRead, subscribeToMessages, joinChatPresence, addReaction, removeReaction, getReactions, sendReplyMessage, deleteMessage as deleteMessageService, editMessage as editMessageService, sendVoiceMessage } from '../../services/messageService';
+import { getMessages as getSupabaseMessages, sendMessage as sendSupabaseMessage, markMessagesAsRead as markSupabaseMessagesAsRead, subscribeToMessages, addReaction, removeReaction, getReactions, sendReplyMessage, deleteMessage as deleteMessageService, editMessage as editMessageService, sendVoiceMessage } from '../../services/messageService';
+import { joinConversationTyping, leaveConversationTyping, sendTypingIndicator, isUserOnline, subscribeToPresence, getTypingUsers, getLastSeen, formatLastSeen } from '../../services/presenceService';
+import { OnlineDot } from '../../components/OnlineDot';
 import { recordMessageActivity } from '../../utils/aiMemory';
 import { acceptInquiry, declineInquiry, linkListingToGroup, leaveGroup, removeMember, getGroupMessages, sendGroupMessage, subscribeToGroupMessages } from '../../services/groupService';
 import { supabase } from '../../lib/supabase';
@@ -184,7 +186,6 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   const [highlightedId, setHighlightedId] = useState<string | null>(highlightMessageId || null);
   const [showAttachmentPicker, setShowAttachmentPicker] = useState(false);
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
-  const typingPresenceRef = useRef<{ setTyping: (v: boolean) => Promise<void>; unsubscribe: () => void } | null>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showGroupOption, setShowGroupOption] = useState(true);
   const [isOnline, setIsOnline] = useState(false);
@@ -570,14 +571,16 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
     if (!user?.id || isInquiryChat) return;
     const matchIdForPresence = conversationId || routeMatchId;
     if (!matchIdForPresence) return;
-    typingPresenceRef.current = joinChatPresence(
-      matchIdForPresence,
-      user.id,
-      (isTyping) => { setOtherUserTyping(isTyping); }
-    );
+    joinConversationTyping(matchIdForPresence, user.id);
+
+    const unsub = subscribeToPresence(() => {
+      const typers = getTypingUsers(matchIdForPresence);
+      setOtherUserTyping(typers.length > 0);
+    });
+
     return () => {
-      typingPresenceRef.current?.unsubscribe();
-      typingPresenceRef.current = null;
+      leaveConversationTyping(matchIdForPresence);
+      unsub();
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     };
   }, [conversationId, routeMatchId, user?.id, isInquiryChat]);
@@ -776,15 +779,12 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
 
   const handleTextChange = (text: string) => {
     setInputText(text);
-    if (text.length > 0 && typingPresenceRef.current) {
-      typingPresenceRef.current.setTyping(true);
-      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-      typingTimeoutRef.current = setTimeout(() => {
-        typingPresenceRef.current?.setTyping(false);
-      }, 2000);
-    } else if (text.length === 0 && typingPresenceRef.current) {
-      typingPresenceRef.current.setTyping(false);
-      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    const matchIdForPresence = conversationId || routeMatchId;
+    if (!matchIdForPresence) return;
+    if (text.length > 0) {
+      sendTypingIndicator(matchIdForPresence, true);
+    } else {
+      sendTypingIndicator(matchIdForPresence, false);
     }
   };
 
@@ -1070,22 +1070,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
     if (otherUser || conversation?.participant?.id) {
       const participantId = otherUser?.id || conversation?.participant?.id;
       if (participantId) {
-        try {
-          const { data: participantData } = await supabase
-            .from('users')
-            .select('last_active_at')
-            .eq('id', participantId)
-            .maybeSingle();
-          if (participantData?.last_active_at) {
-            const lastActive = new Date(participantData.last_active_at);
-            const thirtyMinsAgo = new Date(Date.now() - 30 * 60 * 1000);
-            setIsOnline(lastActive > thirtyMinsAgo);
-          } else {
-            setIsOnline(false);
-          }
-        } catch (_e) {
-          setIsOnline(false);
-        }
+        setIsOnline(isUserOnline(participantId));
       }
     }
 
@@ -1357,8 +1342,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
     setMessages(prev => [...prev, newMessage]);
     setInputText('');
     setReplyToMessage(null);
-    typingPresenceRef.current?.setTyping(false);
-    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    const matchIdForPresence = conversationId || routeMatchId;
+    if (matchIdForPresence) sendTypingIndicator(matchIdForPresence, false);
     setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
 
     analyzeIntentAfterMessage().catch(() => {});
@@ -2050,8 +2035,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
               <>
                 <View style={styles.avatarWrapper}>
                   <Image source={{ uri: otherUser.photos?.[0] }} style={styles.headerAvatar} />
-                  {canSeeOnlineStatus() && isOnline ? (
-                    <View style={[styles.headerOnlineIndicator, { backgroundColor: theme.success }]} />
+                  {canSeeOnlineStatus() ? (
+                    <OnlineDot userId={otherUser.id} size="md" />
                   ) : null}
                 </View>
                 <View style={{ flex: 1, marginLeft: Spacing.md }}>
@@ -2067,9 +2052,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
                       <Text style={{ fontSize: 10, fontWeight: '700', color: '#3b82f6' }}>Verified Agent</Text>
                     </View>
                   ) : canSeeOnlineStatus() ? (
-                    <ThemedText style={[Typography.caption, { color: isOnline ? theme.success : theme.textSecondary }]}>
-                      {isOnline ? 'Online' : 'Offline'}
-                    </ThemedText>
+                    <OnlineDot userId={otherUser.id} showLastSeen />
                   ) : null}
                 </View>
               </>

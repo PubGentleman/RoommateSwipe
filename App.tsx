@@ -25,6 +25,7 @@ import { checkDailyTrigger } from "./utils/insightRefresh";
 import { useResponseTracking } from "./hooks/useResponseTracking";
 import { supabase } from "./lib/supabase";
 import { addNotificationResponseListener } from "./services/pushNotificationService";
+import { joinGlobalPresence, leaveGlobalPresence, startPresenceHeartbeat, stopPresenceHeartbeat } from "./services/presenceService";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -67,18 +68,47 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    let currentUserId: string | null = null;
+
+    const initPresence = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          currentUserId = user.id;
+          joinGlobalPresence(user.id);
+          startPresenceHeartbeat(user.id);
+        }
+      } catch {}
+    };
+
+    initPresence();
+
     const sub = AppState.addEventListener('change', async (nextState) => {
       if (appState.current.match(/inactive|background/) && nextState === 'active') {
         try {
           const { data: { user } } = await supabase.auth.getUser();
           if (user) {
+            currentUserId = user.id;
             await supabase.from('users').update({ last_active_at: new Date().toISOString() }).eq('id', user.id);
+            joinGlobalPresence(user.id);
+            startPresenceHeartbeat(user.id);
           }
         } catch {}
+      } else if (nextState === 'background' || nextState === 'inactive') {
+        if (currentUserId) {
+          stopPresenceHeartbeat(currentUserId);
+          leaveGlobalPresence();
+        }
       }
       appState.current = nextState;
     });
-    return () => sub.remove();
+    return () => {
+      sub.remove();
+      if (currentUserId) {
+        stopPresenceHeartbeat(currentUserId);
+        leaveGlobalPresence();
+      }
+    };
   }, []);
 
   useEffect(() => {

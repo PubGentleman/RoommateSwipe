@@ -36,6 +36,7 @@ The application uses React Native, Expo, and TypeScript, with React Navigation f
 *   **Group Functionality:** Supports group apartment voting and comparison, a redesigned group experience with inviting and shared listings, and a couple & room-matching system.
 *   **Personalization:** Provides a Smart Recommendations Feed and an AI "For You" Feed that leverages user interactions for personalized listing suggestions.
 *   **AI-Powered Enhancements:** Integrates AI Assistant, AI-generated match explanations, listing suggestions, AI tools for agents/companies, AI-suggested meetups, AI Neighborhood Intelligence, and "Pi AI Matchmaker" for insights and preference parsing.
+*   **Enhanced Chat:** Message reactions (plan-gated), reply threading, voice messages, link previews, long-press actions, timestamp grouping, bubble redesign, real-time typing indicators with animated dots, and online/last-seen presence tracking via Supabase Realtime Presence. Presence service (`services/presenceService.ts`) manages global online tracking, per-conversation typing channels, and heartbeat-based last-seen updates. Components: `OnlineDot`, `TypingIndicator`.
 *   **Security & Safety:** Includes robust verification features (Instagram, multi-photo, identity, agent license), background checks, a comprehensive block/report system, chat leakage detection, contact info protection, and a Trust Score system. Enhanced reporting and moderation tools allow for granular report reasons, photo evidence, and automated moderation actions.
 *   **Monetization & Management:** Features a Boost System for hosts to improve listing visibility, tiered subscription plans for different user roles, and screens for plan comparison and billing history.
 *   **Account Management:** Includes soft-delete functionality and the ability for renters to pause their search profiles.
@@ -47,7 +48,7 @@ The application uses React Native, Expo, and TypeScript, with React Navigation f
 Supabase provides the complete backend infrastructure:
 *   **Auth:** Email/password authentication with Row Level Security (RLS).
 *   **Database:** PostgreSQL with RLS, computed columns, and preference tables.
-*   **Realtime:** Subscriptions for messaging and notifications.
+*   **Realtime:** Subscriptions for messaging, notifications, typing indicators, and online presence tracking via Supabase Realtime Presence.
 *   **Push Notifications:** Expo Notifications handled by a service and Edge Functions.
 *   **Storage:** For media assets.
 *   **Edge Functions:** Used for webhooks, verification, payments, AI operations, and match calculations.
