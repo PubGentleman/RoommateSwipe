@@ -36,11 +36,10 @@ export default function OnboardingHeader({
               <Feather name="chevron-left" size={24} color="#FFFFFF" />
             </Pressable>
           ) : null}
-        </View>
-
-        <View style={styles.centerSection}>
           <RhomeLogo variant="icon-only" size="sm" />
         </View>
+
+        <View style={styles.centerSection} />
 
         <View style={styles.rightSection}>
           {rightAction || null}
@@ -80,8 +79,9 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   leftSection: {
-    width: 48,
-    alignItems: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
   centerSection: {
     flex: 1,
