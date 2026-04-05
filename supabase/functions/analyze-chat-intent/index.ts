@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { notifyUser } from '../_shared/pushNotifications.ts';
 
 const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY')!;
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
@@ -283,32 +284,18 @@ Signals to look for: scheduling a meetup, discussing move-in dates, asking about
       });
     }
 
-    const { data: tokens } = await supabase
-      .from('push_tokens')
-      .select('token, user_id')
-      .in('user_id', [userId1, userId2]);
-
-    if (tokens?.length) {
-      const notifications = tokens.map((t: any) => {
-        const otherProfile = t.user_id === userId1 ? profile2 : profile1;
-        return {
-          to: t.token,
-          title: 'You two seem like a great match!',
-          body: `Want to meet ${otherProfile?.first_name || 'your match'} for coffee? We found a spot halfway between you.`,
-          data: {
-            type: 'meetup_suggestion',
-            conversationId,
-            suggestionId: suggestion.id,
-            screen: 'Chat',
-          },
-        };
+    for (const uid of [userId1, userId2]) {
+      const otherProfile = uid === userId1 ? profile2 : profile1;
+      await notifyUser(supabase, uid, {
+        type: 'meetup_suggestion',
+        title: 'You two seem like a great match!',
+        body: `Want to meet ${otherProfile?.first_name || 'your match'} for coffee? We found a spot halfway between you.`,
+        data: {
+          conversationId,
+          suggestionId: suggestion.id,
+          screen: 'Chat',
+        },
       });
-
-      await fetch('https://exp.host/--/api/v2/push/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(notifications),
-      }).catch((e: any) => console.error('Push notification error:', e));
     }
 
     return new Response(JSON.stringify({ success: true, suggestion, leakageDetected: contactCheck.detected }), {

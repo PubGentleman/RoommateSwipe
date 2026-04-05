@@ -4,6 +4,7 @@ import { StorageService } from '../utils/storage';
 import { useAuth } from './AuthContext';
 import { Notification } from '../types/models';
 import { NotificationToast, ToastNotification } from '../components/NotificationToast';
+import { supabase } from '../lib/supabase';
 
 interface NotificationContextType {
   unreadCount: number;
@@ -20,8 +21,6 @@ const NotificationContext = createContext<NotificationContextType>({
 });
 
 export const useNotificationContext = () => useContext(NotificationContext);
-
-const POLL_INTERVAL = 5000;
 
 export const NotificationProvider = ({ children }: { children: React.ReactNode }) => {
   const { user } = useAuth();
@@ -141,10 +140,21 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
     const graceTimer = setTimeout(() => {
       loginGraceRef.current = false;
       checkForNewNotifications();
-      intervalRef.current = setInterval(checkForNewNotifications, POLL_INTERVAL);
     }, 3000);
 
-    const subscription = AppState.addEventListener('change', (nextState: AppStateStatus) => {
+    const channel = supabase
+      .channel(`notification-count-${user.id}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'notifications',
+        filter: `user_id=eq.${user.id}`,
+      }, () => {
+        checkForNewNotifications();
+      })
+      .subscribe();
+
+    const appStateSubscription = AppState.addEventListener('change', (nextState: AppStateStatus) => {
       if (nextState === 'active') {
         checkForNewNotifications();
       }
@@ -153,7 +163,8 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
     return () => {
       clearTimeout(graceTimer);
       if (intervalRef.current) clearInterval(intervalRef.current);
-      subscription.remove();
+      supabase.removeChannel(channel);
+      appStateSubscription.remove();
     };
   }, [user?.id, user?.onboardingStep]);
 

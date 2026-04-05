@@ -256,6 +256,16 @@ export async function sendLike(
     body: { userId },
   }).catch(() => {});
 
+  supabase.functions.invoke('send-push-notification', {
+    body: {
+      userId: recipientId,
+      type: 'interest_received',
+      title: 'Someone likes you!',
+      body: 'Open Rhome to see who sent you interest',
+      data: {},
+    },
+  }).catch(() => {});
+
   if (matchBreakdown && matchScore !== undefined) {
     recordSwipeWithScores(userId, recipientId, 'like', matchScore, matchBreakdown).catch(() => {});
     triggerWeightRecalculation(userId);
@@ -365,6 +375,16 @@ export async function acceptInterestCard(userId: string, cardId: string, senderI
     .single();
 
   if (matchError) throw matchError;
+
+  supabase.functions.invoke('send-push-notification', {
+    body: {
+      userId: senderId,
+      type: 'interest_accepted',
+      title: "It's a match!",
+      body: 'Someone accepted your interest. Start chatting!',
+      data: { matchId: match?.id },
+    },
+  }).catch(() => {});
 
   return { match };
 }

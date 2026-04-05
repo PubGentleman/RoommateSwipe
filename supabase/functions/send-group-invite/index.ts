@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { notifyUser } from '../_shared/pushNotifications.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -119,6 +120,23 @@ serve(async (req) => {
         .from('group_invites')
         .update({ delivery_status: 'sent' })
         .eq('invite_code', inviteCode);
+    }
+
+    if (email) {
+      const { data: inviteeUser } = await supabase
+        .from('users')
+        .select('id')
+        .eq('email', email)
+        .single();
+
+      if (inviteeUser?.id) {
+        await notifyUser(supabase, inviteeUser.id, {
+          type: 'group_invite',
+          title: 'Group Invite',
+          body: `${inviterName} invited you to join "${groupName}"`,
+          data: { groupId, inviterId: caller.id, inviterName },
+        });
+      }
     }
 
     return new Response(JSON.stringify({ success: true }), {

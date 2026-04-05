@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { notifyUser } from '../_shared/pushNotifications.ts'
 
 Deno.serve(async (req) => {
   const payload = await req.json()
@@ -32,26 +33,14 @@ Deno.serve(async (req) => {
       .eq('provider_inquiry_id', inquiryId)
       .eq('user_id', referenceId)
 
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('push_token')
-      .eq('id', referenceId)
-      .single()
-
-    if (profile?.push_token) {
-      await fetch('https://exp.host/--/api/v2/push/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          to: profile.push_token,
-          title: status === 'approved' ? 'Background Check Approved' : 'Background Check Update',
-          body: status === 'approved'
-            ? 'Your verified badge is now showing on your profile.'
-            : 'Your background check was not approved. Tap for details.',
-          data: { type: 'background_check', status },
-        }),
-      }).catch((e: any) => console.error('Push error:', e))
-    }
+    await notifyUser(supabase, referenceId, {
+      type: 'background_check',
+      title: status === 'approved' ? 'Verification Complete' : 'Verification Update',
+      body: status === 'approved'
+        ? 'Your identity verification has been approved!'
+        : 'There was an issue with your verification. Please check your profile.',
+      data: { status, inquiryId },
+    });
   }
 
   return new Response('ok', { status: 200 })
