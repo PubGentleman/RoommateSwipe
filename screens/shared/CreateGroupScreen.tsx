@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import {
-  View, StyleSheet, Pressable, TextInput, ActivityIndicator, Switch,
+  View, StyleSheet, Pressable, TextInput, ActivityIndicator, Switch, ScrollView, Platform,
 } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { Feather } from '../../components/VectorIcons';
 import { ThemedText } from '../../components/ThemedText';
 import { useTheme } from '../../hooks/useTheme';
@@ -12,7 +13,6 @@ import { createGroup as createGroupSupabase, getGroupLimit, getMemberLimit, send
 import { StorageService } from '../../utils/storage';
 import { requireVerification } from '../../utils/verificationGating';
 import { supabase } from '../../lib/supabase';
-import { ScreenKeyboardAwareScrollView } from '../../components/ScreenKeyboardAwareScrollView';
 import { Image } from 'expo-image';
 import { GroupPropertySearchModal } from '../../components/GroupPropertySearchModal';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -170,11 +170,10 @@ export const CreateGroupScreen = ({ navigation, route }: any) => {
     }
   };
 
+  const ScrollComponent = Platform.OS === 'web' ? ScrollView : KeyboardAwareScrollView;
+
   return (
-    <ScreenKeyboardAwareScrollView
-      style={{ backgroundColor: '#0a0a0a' }}
-      contentContainerStyle={styles.container}
-    >
+    <View style={{ flex: 1, backgroundColor: '#0a0a0a' }}>
       <AppHeader
         title="New Group"
         mode="tab"
@@ -193,6 +192,11 @@ export const CreateGroupScreen = ({ navigation, route }: any) => {
           )
         }
       />
+      <ScrollComponent
+        style={{ flex: 1 }}
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
+      >
 
       <View style={styles.heroSection}>
         <View style={styles.heroIconWrap}>
@@ -492,7 +496,8 @@ export const CreateGroupScreen = ({ navigation, route }: any) => {
         }}
         onClose={() => setShowPropertySearch(false)}
       />
-    </ScreenKeyboardAwareScrollView>
+      </ScrollComponent>
+    </View>
   );
 };
 
