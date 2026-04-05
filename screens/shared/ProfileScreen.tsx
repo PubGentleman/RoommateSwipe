@@ -2412,8 +2412,9 @@ const styles = StyleSheet.create({
   },
   boostBtnWrap: {
     width: '100%',
-    marginTop: 4,
+    marginTop: 16,
     marginBottom: 8,
+    paddingHorizontal: 16,
   },
   boostBtn: {
     height: 40,
