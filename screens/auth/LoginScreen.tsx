@@ -105,7 +105,7 @@ export const LoginScreen = () => {
         <View style={styles.field}>
           <Text style={styles.fieldLabel}>Email</Text>
           <View style={[styles.inputWrap, emailFocused && styles.inputWrapFocused]}>
-            <View style={{ paddingLeft: 12 }}>
+            <View style={styles.inputIconWrap}>
               <Feather name="mail" size={16} color={emailFocused ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.35)'} />
             </View>
             <TextInput
@@ -128,7 +128,7 @@ export const LoginScreen = () => {
         <View style={styles.field}>
           <Text style={styles.fieldLabel}>Password</Text>
           <View style={[styles.inputWrap, passwordFocused && styles.inputWrapFocused]}>
-            <View style={{ paddingLeft: 12 }}>
+            <View style={styles.inputIconWrap}>
               <Feather name="lock" size={16} color={passwordFocused ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.35)'} />
             </View>
             <TextInput
@@ -266,6 +266,11 @@ const styles = StyleSheet.create({
   },
   inputWrapFocused: {
     borderColor: '#F06464',
+  },
+  inputIconWrap: {
+    paddingLeft: 12,
+    zIndex: 2,
+    backgroundColor: '#242538',
   },
   input: {
     flex: 1,
