@@ -30,6 +30,8 @@ export interface RenterPlanLimits {
   hasPiDeckReranking: boolean;
   maxPendingAutoGroups: number;
   autoMatchPriority: AutoMatchPriority;
+  savedSearchLimit: number;
+  savedSearchFrequencies: string[];
 }
 
 export const RENTER_PLAN_LIMITS: Record<RenterPlan, RenterPlanLimits> = {
@@ -61,6 +63,8 @@ export const RENTER_PLAN_LIMITS: Record<RenterPlan, RenterPlanLimits> = {
     hasPiDeckReranking: false,
     maxPendingAutoGroups: 1,
     autoMatchPriority: 'standard',
+    savedSearchLimit: 1,
+    savedSearchFrequencies: ['daily'],
   },
   plus: {
     plan: 'plus',
@@ -90,6 +94,8 @@ export const RENTER_PLAN_LIMITS: Record<RenterPlan, RenterPlanLimits> = {
     hasPiDeckReranking: true,
     maxPendingAutoGroups: 2,
     autoMatchPriority: 'priority',
+    savedSearchLimit: 5,
+    savedSearchFrequencies: ['daily', 'weekly'],
   },
   elite: {
     plan: 'elite',
@@ -119,6 +125,8 @@ export const RENTER_PLAN_LIMITS: Record<RenterPlan, RenterPlanLimits> = {
     hasPiDeckReranking: true,
     maxPendingAutoGroups: 3,
     autoMatchPriority: 'highest',
+    savedSearchLimit: 20,
+    savedSearchFrequencies: ['instant', 'daily', 'weekly'],
   },
 };
 

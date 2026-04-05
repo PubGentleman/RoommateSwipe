@@ -309,6 +309,11 @@ export const NotificationsScreen = () => {
       case 'pi_group_dissolved_member':
         (navigation as any).navigate('Groups');
         break;
+      case 'saved_search_match':
+        (navigation as any).navigate('Explore', {
+          screen: 'SavedSearches',
+        });
+        break;
       default:
         break;
     }

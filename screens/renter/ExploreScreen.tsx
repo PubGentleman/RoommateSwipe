@@ -25,6 +25,9 @@ import { getDiscoverableGroupsForListing } from '../../services/groupService';
 import { getUserPreformedGroup, addToShortlist } from '../../services/preformedGroupService';
 import { Property, PropertyFilter, AdvancedPropertyFilter, User, RoommateProfile, InterestCard, Conversation, Group } from '../../types/models';
 import AdvancedFilterSheet from '../../components/AdvancedFilterSheet';
+import SaveSearchSheet from '../../components/SaveSearchSheet';
+import { getSavedSearches, markMatchesSeen, SavedSearchFilters } from '../../services/savedSearchService';
+import { getSavedSearchLimit } from '../../services/savedSearchService';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
@@ -137,6 +140,8 @@ export const ExploreScreen = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showFilterModal, setShowFilterModal] = useState(false);
+  const [showSaveSearchSheet, setShowSaveSearchSheet] = useState(false);
+  const [savedSearchCount, setSavedSearchCount] = useState(0);
   const [expandedCategories, setExpandedCategories] = useState<Set<AmenityCategory>>(new Set(['unit_features']));
   const [filters, setFilters] = useState<AdvancedPropertyFilter>({});
   const [tempFilters, setTempFilters] = useState<AdvancedPropertyFilter>({});
@@ -558,6 +563,28 @@ export const ExploreScreen = () => {
       navigation.setParams({ viewListingId: undefined } as any);
     }
   }, [route.params?.viewListingId, properties]);
+
+  useEffect(() => {
+    const applySavedFilters = (route.params as any)?.applySavedFilters;
+    const savedSearchId = (route.params as any)?.savedSearchId;
+    if (applySavedFilters) {
+      const newFilters: AdvancedPropertyFilter = { ...applySavedFilters };
+      setFilters(newFilters);
+      if (newFilters.listingTypes) setListingTypeFilter(newFilters.listingTypes);
+      navigation.setParams({ applySavedFilters: undefined, savedSearchId: undefined } as any);
+      if (savedSearchId) {
+        markMatchesSeen(savedSearchId, []).catch(() => {});
+      }
+    }
+  }, [(route.params as any)?.applySavedFilters]);
+
+  useEffect(() => {
+    if (user?.id) {
+      getSavedSearches(user.id)
+        .then(s => setSavedSearchCount(s.length))
+        .catch(() => {});
+    }
+  }, [user?.id]);
 
   useEffect(() => {
     if (selectedProperty?.id) {
@@ -1809,6 +1836,10 @@ export const ExploreScreen = () => {
         rightActions={
           <>
             <AIFloatingButton onPress={() => setShowAISheet(true)} position="inline" />
+            <HeaderIconButton
+              icon="bookmark"
+              onPress={() => (navigation as any).navigate('SavedSearches')}
+            />
             <View ref={exploreTour.setRef('mapToggle')} collapsable={false}>
               <HeaderIconButton
                 icon={displayMode === 'list' ? 'map' : 'list'}
@@ -1947,6 +1978,10 @@ export const ExploreScreen = () => {
               </Pressable>
             </View>
           ))}
+          <Pressable style={styles.saveSearchChip} onPress={() => setShowSaveSearchSheet(true)}>
+            <Feather name="bookmark" size={12} color="#6C5CE7" />
+            <Text style={styles.saveSearchChipText}>Save Search</Text>
+          </Pressable>
           <Pressable style={styles.clearAllChip} onPress={handleClearFilters}>
             <Text style={styles.clearAllText}>Clear all</Text>
           </Pressable>
@@ -2136,6 +2171,18 @@ export const ExploreScreen = () => {
         onClose={() => setShowFilterModal(false)}
         resultCount={filteredProperties.length}
       />
+
+      {user ? (
+        <SaveSearchSheet
+          visible={showSaveSearchSheet}
+          onClose={() => setShowSaveSearchSheet(false)}
+          filters={{ ...filters, city: activeCity || undefined, neighborhood: selectedNeighborhood || undefined, subArea: activeSubArea || undefined, listingTypes: listingTypeFilter.length > 0 ? listingTypeFilter : filters.listingTypes } as SavedSearchFilters}
+          userId={user.id}
+          currentPlan={renterPlan}
+          currentSavedCount={savedSearchCount}
+          onSaved={() => setSavedSearchCount(prev => prev + 1)}
+        />
+      ) : null}
 
       <PaywallSheet
         visible={showPaywall}
@@ -4118,6 +4165,22 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(108,92,231,0.3)',
   },
   activeChipText: {
+    color: '#6C5CE7',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  saveSearchChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#6C5CE7',
+    borderStyle: 'dashed',
+  },
+  saveSearchChipText: {
     color: '#6C5CE7',
     fontSize: 12,
     fontWeight: '600',

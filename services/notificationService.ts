@@ -198,6 +198,22 @@ export async function createPiAutoMatchNotification(
   });
 }
 
+export async function createSavedSearchMatchNotification(
+  userId: string,
+  searchName: string,
+  matchCount: number,
+  savedSearchId: string
+): Promise<void> {
+  await supabase.from('notifications').insert({
+    user_id: userId,
+    type: 'saved_search_match',
+    title: 'New matches found!',
+    body: `${matchCount} new listing${matchCount !== 1 ? 's' : ''} match your "${searchName}" search.`,
+    read: false,
+    data: { savedSearchId, matchCount, searchName },
+  });
+}
+
 export function subscribeToNotifications(userId: string, onNotification: (notification: any) => void) {
   const channel = supabase
     .channel(`notifications-${userId}`)
