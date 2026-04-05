@@ -582,6 +582,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             } catch (_) {}
           }
 
+          fallbackUser.emailVerified = true;
           setUser(fallbackUser);
         }
       } catch {
@@ -666,7 +667,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         };
       }
       if (currentUser.emailVerified === undefined) {
-        currentUser.emailVerified = false;
+        currentUser.emailVerified = true;
       }
       const resetUser = await resetDailyMessagesIfNeeded(currentUser);
       StorageService.seedUserSpecificMockData(resetUser.id, resetUser.name, resetUser.role, resetUser.hostType).catch(() => {});
