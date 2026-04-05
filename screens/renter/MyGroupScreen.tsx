@@ -175,23 +175,42 @@ export default function MyGroupScreen() {
 
   const handleRemoveMember = (memberId: string) => {
     if (!group) return;
-    Alert.alert('Remove Member', 'Remove this person from the group?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Remove',
-        style: 'destructive',
-        onPress: async () => {
-          await removeMember(group.id, memberId);
-          const freshGroup = await getUserPreformedGroup(user!.id);
-          if (freshGroup) {
-            const freshMembers = await getGroupMembers(freshGroup.id);
-            setGroup(freshGroup);
-            setMembers(freshMembers);
-            promptForReplacement(freshGroup, freshMembers);
-          }
+    const member = members.find(m => m.id === memberId);
+    const memberName = member?.name || 'this member';
+
+    Alert.alert(
+      'Remove Member',
+      `Are you sure you want to remove ${memberName} from the group? This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const success = await removeMember(group.id, memberId);
+              if (!success) {
+                Alert.alert('Error', 'Failed to remove member. Please try again.');
+                return;
+              }
+
+              const freshGroup = await getUserPreformedGroup(user!.id);
+              if (freshGroup) {
+                const freshMembers = await getGroupMembers(freshGroup.id);
+                setGroup(freshGroup);
+                setMembers(freshMembers);
+                promptForReplacement(freshGroup, freshMembers);
+              } else {
+                setMembers(prev => prev.filter(m => m.id !== memberId));
+              }
+            } catch (err) {
+              console.error('[handleRemoveMember] Error:', err);
+              Alert.alert('Error', 'Something went wrong. Please try again.');
+            }
+          },
         },
-      },
-    ]);
+      ]
+    );
   };
 
   const handleSaveName = async () => {

@@ -339,6 +339,20 @@ export async function removeMember(groupId: string, memberId: string): Promise<b
     .eq('preformed_group_id', groupId)
     .eq('id', memberId);
 
+  try {
+    const localKey = `@rhome/preformed_members_${groupId}`;
+    const local = await AsyncStorage.getItem(localKey);
+    if (local) {
+      const members = JSON.parse(local) as PreformedGroupMember[];
+      const filtered = members.filter(m => m.id !== memberId);
+      if (filtered.length < members.length) {
+        await AsyncStorage.setItem(localKey, JSON.stringify(filtered));
+      }
+    }
+  } catch (e) {
+    console.warn('[removeMember] Local storage cleanup failed:', e);
+  }
+
   return !error;
 }
 
