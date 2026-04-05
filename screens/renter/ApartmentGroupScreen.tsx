@@ -21,6 +21,7 @@ import {
   getUserPreformedGroup,
   getGroupMembers,
   enableReplacement,
+  disableReplacement,
   removeMember,
 } from '../../services/preformedGroupService';
 import {
@@ -114,41 +115,60 @@ export default function ApartmentGroupScreen() {
 
   const handleRemoveMember = async (memberId: string) => {
     if (!group) return;
-    Alert.alert('Remove Member', 'Are you sure you want to remove this person?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Remove',
-        style: 'destructive',
-        onPress: async () => {
-          await removeMember(group.id, memberId);
-          const freshGroup = await getUserPreformedGroup(user!.id);
-          if (freshGroup) {
-            const freshMembers = await getGroupMembers(freshGroup.id);
-            const freshJoined = freshMembers.filter(m => m.status === 'joined').length;
-            const freshOpenSlots = (freshGroup.group_size || 0) - freshJoined;
-            setGroup(freshGroup);
-            setMembers(freshMembers);
+    const member = members.find(m => m.id === memberId);
+    const memberName = member?.name || 'this member';
 
-            if (freshOpenSlots > 0) {
-              Alert.alert(
-                'Need a Roommate?',
-                `Your group now has ${freshOpenSlots} open ${freshOpenSlots === 1 ? 'spot' : 'spots'}. Would you like to find a replacement through Rhome's roommate matching?`,
-                [
-                  { text: 'Not Now', style: 'cancel' },
-                  {
-                    text: 'Find a Roommate',
-                    onPress: async () => {
-                      await enableReplacement(freshGroup.id, freshOpenSlots);
-                      loadData();
-                    },
-                  },
-                ],
-              );
+    Alert.alert(
+      'Remove Member',
+      `Are you sure you want to remove ${memberName} from the group? This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const success = await removeMember(group.id, memberId);
+              if (!success) {
+                Alert.alert('Error', 'Failed to remove member. Please try again.');
+                return;
+              }
+
+              const freshGroup = await getUserPreformedGroup(user!.id);
+              if (freshGroup) {
+                const freshMembers = await getGroupMembers(freshGroup.id);
+                const freshJoined = freshMembers.filter(m => m.status === 'joined').length;
+                const freshOpenSlots = (freshGroup.group_size || 0) - freshJoined;
+                setGroup(freshGroup);
+                setMembers(freshMembers);
+
+                if (freshOpenSlots > 0) {
+                  Alert.alert(
+                    'Need a Roommate?',
+                    `Your group now has ${freshOpenSlots} open ${freshOpenSlots === 1 ? 'spot' : 'spots'}. Would you like to find a replacement through Rhome's roommate matching?`,
+                    [
+                      { text: 'Not Now', style: 'cancel' },
+                      {
+                        text: 'Find a Roommate',
+                        onPress: async () => {
+                          await enableReplacement(freshGroup.id, freshOpenSlots);
+                          loadData();
+                        },
+                      },
+                    ],
+                  );
+                }
+              } else {
+                setMembers(prev => prev.filter(m => m.id !== memberId));
+              }
+            } catch (err) {
+              console.error('[ApartmentGroup] Remove member error:', err);
+              Alert.alert('Error', 'Something went wrong. Please try again.');
             }
-          }
+          },
         },
-      },
-    ]);
+      ],
+    );
   };
 
   const handleNeedRoommate = () => {
@@ -276,15 +296,54 @@ export default function ApartmentGroupScreen() {
         </Text>
       </View>
 
-      {hasDropout && isLead ? (
-        <Pressable style={styles.needRoommateBanner} onPress={handleNeedRoommate}>
-          <Feather name="user-plus" size={16} color="#ff6b5b" />
+      {hasDropout ? (
+        <Pressable
+          style={styles.needRoommateBanner}
+          onPress={() => {
+            if (!isLead) {
+              Alert.alert(
+                `${openSlots} ${openSlots === 1 ? 'Spot' : 'Spots'} Open`,
+                group.needs_replacement
+                  ? 'Your group lead has turned on roommate finding. New members will need approval to join.'
+                  : 'Ask your group lead to find a replacement if you need one.',
+              );
+              return;
+            }
+
+            if (group.needs_replacement) {
+              Alert.alert(
+                'Replacement Active',
+                'Your group is visible to roommate seekers. No join requests yet \u2014 we\'ll notify you when someone is interested.',
+                [
+                  { text: 'OK' },
+                  {
+                    text: 'Turn Off',
+                    style: 'destructive',
+                    onPress: async () => {
+                      await disableReplacement(group.id);
+                      loadData();
+                    },
+                  },
+                ],
+              );
+            } else {
+              handleNeedRoommate();
+            }
+          }}
+        >
+          <View style={styles.needRoommateIcon}>
+            <Feather name="user-plus" size={18} color="#ff6b5b" />
+          </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.needRoommateTitle}>Need a Roommate?</Text>
+            <Text style={styles.needRoommateTitle}>
+              {group.needs_replacement
+                ? `Looking for ${openSlots} roommate${openSlots > 1 ? 's' : ''}`
+                : `Need a roommate? ${openSlots} ${openSlots === 1 ? 'spot' : 'spots'} open`}
+            </Text>
             <Text style={styles.needRoommateSubtext}>
               {group.needs_replacement
                 ? 'Your group is visible to roommate seekers'
-                : `${openSlots} ${openSlots === 1 ? 'spot' : 'spots'} open — find someone on Rhome`}
+                : 'Tap to find a replacement through Rhome'}
             </Text>
           </View>
           {group.needs_replacement ? (
@@ -575,6 +634,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,107,91,0.2)',
     borderRadius: 12,
+  },
+  needRoommateIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,107,91,0.15)',
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
   },
   needRoommateTitle: {
     color: '#ff6b5b',

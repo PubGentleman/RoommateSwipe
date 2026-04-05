@@ -63,6 +63,11 @@ export const RootNavigator = () => {
       return;
     }
     if (user.profileData?.apartment_search_type) {
+      setIntentCompletedForUserId(user.id);
+      setIntentCheckDone(true);
+      return;
+    }
+    if (intentCompletedForUserId === user.id) {
       setIntentCheckDone(true);
       return;
     }
