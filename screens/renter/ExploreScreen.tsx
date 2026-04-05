@@ -40,6 +40,7 @@ import { getNeighborhoodsByCity, getAllCities, NEIGHBORHOODS } from '../../utils
 import { fetchAreaInfo, formatNearestAmenity, AreaInfo, NearbyAmenity } from '../../services/neighborhoodService';
 import { getZodiacSymbol } from '../../utils/zodiacUtils';
 import { getBoostRotationIndex } from '../../utils/boostRotation';
+import { getTransitLinesForListing, parseTransitStop } from '../../utils/transitLineParser';
 import { initImpressionTracking, stopImpressionTracking, trackImpression, flushImpressions } from '../../services/boostImpressionService';
 import { getAgentsWithCriticalStatus } from '../../services/responseTrackingService';
 import { shouldShowMatchScore, getHostBadgeLabel, getHostBadgeColor, getHostBadgeIcon } from '../../utils/hostTypeUtils';
@@ -1751,6 +1752,38 @@ export const ExploreScreen = () => {
               <Text style={styles.areaInfoPillText}>Area info</Text>
             </Pressable>
           </View>
+          {(() => {
+            const allLines = getTransitLinesForListing(item.transitInfo, item.neighborhood);
+            if (allLines.length === 0) return null;
+            const displayLines = allLines.slice(0, 8);
+            const extraCount = allLines.length - displayLines.length;
+            const closestStop = item.transitInfo?.stops?.[0];
+            return (
+              <View style={styles.transitRow}>
+                <Feather name="navigation" size={11} color="rgba(255,255,255,0.35)" />
+                {displayLines.map((line) => (
+                  <View
+                    key={line.line}
+                    style={[styles.transitLineBadge, { backgroundColor: line.color }]}
+                  >
+                    <Text style={[styles.transitLineText, { color: line.textColor }]}>
+                      {line.line}
+                    </Text>
+                  </View>
+                ))}
+                {extraCount > 0 ? (
+                  <Text style={styles.transitExtraText}>+{extraCount}</Text>
+                ) : null}
+                {closestStop ? (
+                  <Text style={styles.transitDistanceText}>
+                    {(closestStop.distanceMiles ?? (closestStop as any).distanceMi ?? 0) < 0.1
+                      ? '< 0.1 mi'
+                      : `${closestStop.distanceMiles ?? (closestStop as any).distanceMi ?? 0} mi`}
+                  </Text>
+                ) : null}
+              </View>
+            );
+          })()}
           <Pressable
             onPress={(e) => {
               e.stopPropagation?.();
@@ -2967,6 +3000,67 @@ export const ExploreScreen = () => {
                           );
                         })()}
 
+                      </View>
+                    ) : null}
+
+                    {selectedProperty?.transitInfo?.stops && selectedProperty.transitInfo.stops.length > 0 ? (
+                      <View style={styles.pdTransitSection}>
+                        <View style={styles.pdTransitHeader}>
+                          <Feather name="navigation" size={14} color="#ff6b5b" />
+                          <Text style={styles.pdTransitTitle}>Nearby Transit</Text>
+                        </View>
+                        {selectedProperty.transitInfo.stops.slice(0, 4).map((stop, idx) => {
+                          const parsed = parseTransitStop(stop);
+                          return (
+                            <View key={idx} style={styles.pdTransitStopRow}>
+                              <View style={styles.pdTransitStopIcon}>
+                                <Feather
+                                  name={
+                                    parsed.type === 'subway' ? 'disc' :
+                                    parsed.type === 'bus' ? 'truck' :
+                                    parsed.type === 'train' ? 'zap' :
+                                    'navigation'
+                                  }
+                                  size={12}
+                                  color="rgba(255,255,255,0.5)"
+                                />
+                              </View>
+                              <View style={styles.pdTransitStopInfo}>
+                                <Text style={styles.pdTransitStopName}>{parsed.name}</Text>
+                                <View style={styles.pdTransitLinesRow}>
+                                  {parsed.lines.map((line) => (
+                                    <View
+                                      key={line.line}
+                                      style={[styles.pdTransitLineBadge, { backgroundColor: line.color }]}
+                                    >
+                                      <Text style={[styles.pdTransitLineText, { color: line.textColor }]}>
+                                        {line.line}
+                                      </Text>
+                                    </View>
+                                  ))}
+                                  {parsed.lines.length === 0 ? (
+                                    <View style={[styles.pdTransitLineBadge, { backgroundColor: '#444', width: parsed.type === 'subway' ? 20 : 'auto', paddingHorizontal: parsed.type === 'subway' ? 0 : 6 }]}>
+                                      <Text style={[styles.pdTransitLineText, { color: '#fff' }]}>
+                                        {parsed.type === 'subway' ? 'S' : parsed.type === 'bus' ? 'BUS' : parsed.type.toUpperCase()}
+                                      </Text>
+                                    </View>
+                                  ) : null}
+                                </View>
+                              </View>
+                              <Text style={styles.pdTransitDistance}>
+                                {parsed.distanceMiles < 0.1 ? '< 0.1' : parsed.distanceMiles} mi
+                              </Text>
+                            </View>
+                          );
+                        })}
+                        {selectedProperty.transitInfo.manualOverride ? (
+                          <View style={styles.pdTransitManual}>
+                            <Feather name="info" size={11} color="rgba(255,255,255,0.4)" />
+                            <Text style={styles.pdTransitManualText}>
+                              {selectedProperty.transitInfo.manualOverride}
+                            </Text>
+                          </View>
+                        ) : null}
                       </View>
                     ) : null}
 
@@ -4589,6 +4683,36 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.35)',
     fontSize: 12,
   },
+  transitRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingBottom: 6,
+    gap: 4,
+    flexWrap: 'wrap',
+  },
+  transitLineBadge: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  transitLineText: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+  },
+  transitExtraText: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.4)',
+    marginLeft: 2,
+  },
+  transitDistanceText: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.35)',
+    marginLeft: 6,
+  },
   hostRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -5472,6 +5596,83 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     textTransform: 'uppercase',
     marginBottom: 10,
+  },
+  pdTransitSection: {
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderTopWidth: 1,
+    borderTopColor: '#222',
+  },
+  pdTransitHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  pdTransitTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  pdTransitStopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    gap: 10,
+  },
+  pdTransitStopIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#222',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pdTransitStopInfo: {
+    flex: 1,
+    gap: 4,
+  },
+  pdTransitStopName: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#ddd',
+  },
+  pdTransitLinesRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+  },
+  pdTransitLineBadge: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pdTransitLineText: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+  },
+  pdTransitDistance: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.4)',
+    fontWeight: '600',
+  },
+  pdTransitManual: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#1a1a1a',
+  },
+  pdTransitManualText: {
+    flex: 1,
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.5)',
+    lineHeight: 18,
   },
   pdDescriptionText: {
     fontSize: 14,
