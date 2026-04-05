@@ -1,6 +1,6 @@
 # Overview
 
-Rhome is a React Native mobile application designed to streamline housing and roommate searches by connecting renters and hosts. It features a role-based, swipe-based matching system, AI-powered matching, property listings, group functionalities, and secure communication. The project aims to become the leading platform for seamless housing and roommate discovery.
+Rhome is a React Native mobile application designed to connect renters and hosts, streamlining housing and roommate searches. It features a role-based, swipe-based matching system, AI-powered matching, property listings, group functionalities, and secure communication. The project aims to become the leading platform for seamless housing and roommate discovery. Key capabilities include enhanced smart match scoring with adaptive weights, visual compatibility breakdowns, AI roommate insights, advanced search filters, interactive map views, and a gamified progress-based feature unlock system.
 
 # User Preferences
 
@@ -24,54 +24,34 @@ Preferred communication style: Simple, everyday language.
 
 ## Frontend
 
-The application is built with React Native, Expo, and TypeScript. React Navigation handles role-based access for Renters, Hosts, and Agents/Landlords. It supports light/dark modes, animations using React Native Reanimated, and state management via React Context API and AsyncStorage.
+The application uses React Native, Expo, and TypeScript, with React Navigation for role-based access (Renters, Hosts, Agents/Landlords). It supports light/dark modes, animations with React Native Reanimated, and state management via React Context API and AsyncStorage.
 
 **Key Features:**
--   **Matching & Profiles:** Includes compatibility algorithms, interest tags, personality quizzes, and location matching. **Enhanced Smart Match Scoring:** Adaptive weight system (`match_weight_profiles` table, migration 089) lets users customize 8 priority sliders (location, budget, sleep, cleanliness, smoking, pets, lifestyle, social) on 0-10 scale. `matchWeightService.ts` handles CRUD, computes effective multipliers (user weights blended 70/30 with learned weights after 20+ swipes). `calculateWeightedCompatibility()` in `matchingAlgorithm.ts` applies multipliers to raw factor scores. `swipe_analytics` table tracks per-factor score breakdown on each swipe; `recalculateLearnedWeights()` analyzes like-vs-pass patterns every 10 swipes. `MatchPrioritiesScreen.tsx` provides slider UI accessible from ProfileScreen. **Visual Compatibility Breakdown:** `CompatibilityBreakdownSheet.tsx` bottom sheet shows detailed per-category compatibility (16 factors with progress bars, scores, and detail text). `compatibilityBreakdownService.ts` wraps `calculateWeightedCompatibility` with category metadata, strengths/friction analysis, and Pi AI insight integration. Plan-gated: free=top 3 categories only; plus/elite=all categories + strengths/friction + Pi AI analysis. Accessible via match score pill in property detail view on ExploreScreen.
--   **Role-Specific Features:**
-    -   **Renter:** Swipe-based matching, 1-on-1 messaging, group management, advanced property search filters, saved properties, AI Match Assistant, property reviews, and chat scheduling. Features an "Renter Intent System" for onboarding. **Advanced Filters** (`AdvancedFilterSheet.tsx`): Full-screen filter modal with collapsible sections for price range, bedrooms, transit lines (plan-gated), move-in date, property type (room/lease), host preferences (plan-gated), amenities with categories, roommate situation (plan-gated), and sort options. Active filter chip bar with individual removal. `AdvancedPropertyFilter` interface extends `PropertyFilter` in `types/models.ts`. **Interactive Map View** (`InteractiveMapView.tsx`): Full-featured Leaflet.js map with price pin markers, marker clustering (via leaflet.markercluster), animated preview cards on marker tap, draw-to-search polygon filtering, locate-me button, and message token security. Replaces basic PropertyMapView in ExploreScreen map mode.
-    -   **Host:** Dashboard for listing management (create, edit, delete, boost), inquiry handling, analytics, property review management, and group matches monetization. Includes a multi-step listing wizard. Supports Individual, Company, and Agent host types with features like Rhome Select Badge, Company Teams, and Group Bookings. Company hosts can invite and manage agents. Listing Performance Stats screen with time-series bar charts, stat cards, response time gauges, and boost impact analysis (plan-gated). Inquiry Trends & Conversion Funnel screen with visual funnel (views/saves/inquiries/accepted/booked), status breakdown, stacked daily inquiry charts, response time trends, super interest rate, and top listings leaderboard. Revenue & Spending Overview screen with total spend/booking revenue summary, spending breakdown bars, monthly stacked bar trend, ROI metrics (cost per inquiry/booking), and recent transaction activity feed (plan-gated). Comparative Insights screen with market position scoring, price bar comparison, engagement/response/inquiry rate metrics vs area averages, area snapshot, and improvement tips (plan-gated by analyticsLevel).
--   **Welcome Tour (Coach Marks):** Spotlight-style onboarding overlays shown on first visit to key screens. TourProvider context with AsyncStorage persistence, reusable CoachMark overlay component, and useTourSetup hook. Tours: Explore (3 stops), Roommates (3 stops), Messages (2 stops), Host Dashboard (3 stops).
--   **Progress-Based Feature Unlock:** Gamified tier system (Bronze/Silver/Gold/Platinum) gating features behind profile completion milestones. `profileGate.ts` computes tier from 9 profile items. `FeatureGateModal` shows what to complete. `LevelUpToast` animates tier-up celebrations. Gates: swipe (Silver), save (Silver), message (Gold), super like (Gold). Tier badge on ProfileScreen.
--   **Group Apartment Voting & Comparison:** Shortlisting with voting, progress bars, and side-by-side listing comparisons.
--   **Smart Recommendations Feed:** Personalized sections on the Explore screen including "Best Match Today," "New This Week," and "Price Drops."
--   **AI "For You" Feed:** Personalized listing recommendations via `recommendationService.ts`. Tracks user interactions (`listing_interactions` table, migration 090) with weighted behavioral analysis (view_long, save, inquiry, share, apply). Generates scored recommendations blending base match algorithm (60%) with behavioral bonuses (40%) for price sweet spots, preferred neighborhoods, amenity matches, freshness, and host quality. Results cached in `user_recommendations` table (24h TTL). Plan-gated: free=5, plus=20, elite=50 recommendations. `ForYouCard.tsx` component shows match score badge and up to 3 recommendation reasons. ExploreScreen "For You" tab alongside All Listings and Saved tabs.
--   **AI-Powered Enhancements:** AI Assistant for housing help, AI-generated match explanations, listing suggestions, AI tools for agents/companies, AI-suggested meetups, and AI Neighborhood Intelligence.
--   **Pi AI Matchmaker:** An AI persona providing insights, deck rankings, and preference parsing, integrated with a subscription model.
--   **Pi Demand Intelligence:** Aggregates anonymous renter activity for market insights.
--   **Contact Info Protection:** Platform-level contact information blurring in chat for free users.
--   **Agent/Company Messaging Paywall:** Blurred message previews for free-tier agents/companies.
--   **Verification & Safety:** Features Instagram verification, multi-photo enforcement, chat leakage detection, background checks, identity verification (with selfie match step), a References System, Agent License Verification, email domain blocking, email verification, password recovery, a comprehensive block/report system, and a Trust Score system (0-100) combining phone/ID/selfie/social/background/reviews/account age signals with TrustBadge component and verification nudges on profiles/chat/host dashboard.
--   **Enhanced Reviews & Ratings:** Three review types (property, host, renter), renter review tags, review prompt system (auto-prompts after 7-day bookings), aggregate rating display on listing cards and detail screens, review moderation with report/auto-flag system, renter reply support, and ReviewPromptBanner on host dashboard.
--   **Enhanced Reporting & Moderation:** Granular report reasons with severity levels (critical/high/medium/low), photo evidence upload (up to 3), auto-moderation (auto-hide listings after 5+ reports or 3+ scam reports, auto-restrict users after 10+ reports), admin ModerationQueueScreen with filters and actions, MyReportsScreen for reporter status tracking, and enhanced ReportBlockModal with evidence support.
--   **Profile Pause:** Renters can pause their search profiles.
--   **Activity Decay Ranking:** Inactive user profiles are deprioritized in discovery.
--   **Boost System:** A three-tier system for hosts to improve listing visibility with various benefits and analytics. Includes Boost Management Dashboard (`BoostManagementScreen`) with credit balance display, active boost countdown timers, performance summary stats (avg lift, views, inquiries, best type, total spent), auto-boost scheduling (daily/every 3 days/weekly with preferred time), and boost history with ROI per boost. Backed by `boost_history` and `auto_boost_schedules` Supabase tables with RLS. `boostManagementService.ts` handles history CRUD, summary aggregation, and auto-boost schedule management. Boost activations are recorded via `recordBoostActivation()` in `ListingBoostScreen`.
--   **Plan Comparison & Billing History:** `PlanComparisonScreen` provides side-by-side feature comparison tables for Renter and Host plans with billing cycle toggle (Monthly/3-Month/Annual), current plan highlighting, and upgrade CTA. `BillingHistoryScreen` shows current plan summary, payment history from `host_transactions` table, yearly total, and receipt links. `PlanChangePreviewModal` component shows prorated upgrade/downgrade cost breakdown. Entry points: ProfileScreen (Account section), ManageSubscriptionScreen (quick links), HostSubscriptionScreen (compare link).
--   **Saved Searches with New Match Alerts:** Renters can save their current filter configuration as a named search. `SaveSearchSheet` modal captures search name, notification frequency, and filter summary. `SavedSearchesScreen` manages saved searches with check-now, toggle alerts, delete, and run-search actions. Plan-gated: free=1 search (daily alerts), plus=5 (daily/weekly), elite=20 (instant/daily/weekly). `savedSearchService.ts` handles CRUD, match checking against `saved_search_seen_listings`, and name auto-generation. Notification type `saved_search_match` navigates to SavedSearches screen. DB tables: `saved_searches` and `saved_search_seen_listings` (migration 088). `renterPlanLimits.ts` includes `savedSearchLimit` and `savedSearchFrequencies` fields. ExploreScreen has bookmark header icon (navigate to SavedSearches), "Save Search" chip in active filter bar, and handles incoming `applySavedFilters` route params.
--   **Account Management:** Soft-delete functionality.
--   **Subscription Management:** Tiered subscription plans for different user roles with a hybrid payment architecture.
--   **UI/UX:** Consistent dark theme, collapsible/sticky headers, platform-specific interactions, and a comprehensive location system with Area Info Cards.
--   **Renter/Host Mode Switch:** Allows individual hosts to toggle between modes.
--   **Affiliate Program:** Users can apply to become affiliates with referral codes and a dashboard.
--   **Request to Join Group:** Renters can browse and send requests to open groups.
--   **Couple & Room-Matching System:** Groups support couples sharing bedrooms and dynamic inquiry functionality based on group-listing compatibility.
--   **Host Gender Preference on Listings:** Individual hosts can set preferred tenant gender for room-type listings, influencing bidirectional feed filtering.
--   **Household Gender Preference:** Collected during renter onboarding for enhanced matching.
--   **Amenity System:** Centralized definitions for categorized display and preference filtering.
--   **Host Badge System:** Earned achievement badges (Rhome Select, Top Agent, Top Company) based on criteria.
--   **Apartment Seeker Group System:** Redesigned group experience with inviting, shared liked listings, and tour scheduling.
+
+*   **Matching & Profiles:** Includes compatibility algorithms, interest tags, personality quizzes, and location matching. Features an enhanced smart match scoring system with user-customizable priority sliders and learned weights, visual compatibility breakdowns, and AI-powered roommate insights.
+*   **Role-Specific Features:**
+    *   **Renter:** Swipe-based matching, 1-on-1 messaging, group management, advanced property search filters, saved properties, AI Match Assistant, property reviews, chat scheduling, and an "Renter Intent System." Includes an interactive map view with Leaflet.js for property discovery and draw-to-search functionality. Renters can also save search configurations with new match alerts.
+    *   **Host:** Dashboard for listing management (create, edit, delete, boost), inquiry handling, analytics, property review management, and group matches monetization. Supports Individual, Company, and Agent host types with features like Rhome Select Badge, Company Teams, and Group Bookings. Offers various performance analytics screens (Listing Performance, Inquiry Trends, Revenue & Spending, Comparative Insights).
+*   **User Onboarding & Engagement:** Features a Welcome Tour (coach marks) for first-time users and a progress-based feature unlock system (Bronze/Silver/Gold/Platinum tiers) to gamify profile completion.
+*   **Group Functionality:** Supports group apartment voting and comparison, a redesigned group experience with inviting and shared listings, and a couple & room-matching system.
+*   **Personalization:** Provides a Smart Recommendations Feed and an AI "For You" Feed that leverages user interactions for personalized listing suggestions.
+*   **AI-Powered Enhancements:** Integrates AI Assistant, AI-generated match explanations, listing suggestions, AI tools for agents/companies, AI-suggested meetups, AI Neighborhood Intelligence, and "Pi AI Matchmaker" for insights and preference parsing.
+*   **Security & Safety:** Includes robust verification features (Instagram, multi-photo, identity, agent license), background checks, a comprehensive block/report system, chat leakage detection, contact info protection, and a Trust Score system. Enhanced reporting and moderation tools allow for granular report reasons, photo evidence, and automated moderation actions.
+*   **Monetization & Management:** Features a Boost System for hosts to improve listing visibility, tiered subscription plans for different user roles, and screens for plan comparison and billing history.
+*   **Account Management:** Includes soft-delete functionality and the ability for renters to pause their search profiles.
+*   **UI/UX:** Employs a consistent dark theme, collapsible/sticky headers, platform-specific interactions, and a comprehensive location system with Area Info Cards. Supports Renter/Host mode switching and an Affiliate Program.
+*   **Preferences & Amenities:** Allows hosts to set gender preferences for listings and renters to specify household gender preferences for enhanced matching. Features a centralized amenity system and a Host Badge System for achievements.
 
 ## Backend
 
 Supabase provides the complete backend infrastructure:
--   **Auth:** Email/password authentication with Row Level Security (RLS).
--   **Database:** PostgreSQL with RLS, computed columns, and preference tables.
--   **Realtime:** Subscriptions for messaging and notifications.
--   **Push Notifications:** Expo Notifications handled by a service and Edge Functions.
--   **Storage:** For media assets.
--   **Edge Functions:** Used for webhooks, verification, payments, AI operations, and match calculations.
--   **Neighborhood Knowledge Base:** A PostgreSQL table with pre-seeded data for NYC/NJ neighborhoods, queried by Pi AI.
+*   **Auth:** Email/password authentication with Row Level Security (RLS).
+*   **Database:** PostgreSQL with RLS, computed columns, and preference tables.
+*   **Realtime:** Subscriptions for messaging and notifications.
+*   **Push Notifications:** Expo Notifications handled by a service and Edge Functions.
+*   **Storage:** For media assets.
+*   **Edge Functions:** Used for webhooks, verification, payments, AI operations, and match calculations.
+*   **Neighborhood Knowledge Base:** A PostgreSQL table with pre-seeded data for NYC/NJ neighborhoods, queried by Pi AI.
 
 ## Technical Decisions
 
@@ -79,21 +59,21 @@ The architecture includes a Babel module resolver, platform-specific UI, perform
 
 # External Dependencies
 
--   Expo
--   React Native
--   React Navigation
--   @react-native-community/datetimepicker
--   React Native Reanimated
--   @stripe/stripe-react-native
--   react-native-purchases (RevenueCat)
--   @react-native-async-storage/async-storage
--   react-native-maps
--   react-native-google-places-autocomplete
--   react-native-webview
--   expo-notifications
--   expo-device
--   Supabase (Auth, Database, Realtime, Storage, Edge Functions)
--   Claude (for AI operations)
--   Walk Score API
--   Overpass API
--   NYC Open Data
+*   Expo
+*   React Native
+*   React Navigation
+*   @react-native-community/datetimepicker
+*   React Native Reanimated
+*   @stripe/stripe-react-native
+*   react-native-purchases (RevenueCat)
+*   @react-native-async-storage/async-storage
+*   react-native-maps
+*   react-native-google-places-autocomplete
+*   react-native-webview
+*   expo-notifications
+*   expo-device
+*   Supabase (Auth, Database, Realtime, Storage, Edge Functions)
+*   Claude (for AI operations)
+*   Walk Score API
+*   Overpass API
+*   NYC Open Data

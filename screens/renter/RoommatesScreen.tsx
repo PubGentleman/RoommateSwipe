@@ -61,6 +61,8 @@ import { getBestMatchToday } from '../../utils/bestMatchToday';
 import { AIGroupSuggestionCard } from '../../components/AIGroupSuggestionCard';
 import { InstagramBadge } from '../../components/InstagramBadge';
 import { WhyThisMatchModal } from '../../components/WhyThisMatchModal';
+import InsightChip from '../../components/InsightChip';
+import { generateAlgorithmicInsights, selectCardInsight, getEnhancedInsight, QuickInsight } from '../../services/quickInsightService';
 import { getCachedOrGenerateInsight, getCachedDeckRanking } from '../../services/piMatchingService';
 import { DailyQuestionCard } from '../../components/DailyQuestionCard';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -2028,6 +2030,15 @@ export const RoommatesScreen = () => {
                   <ThemedText style={styles.askAIPillText}>Ask AI</ThemedText>
                 </Pressable>
               </View>
+              {(() => {
+                const cardInsights = user ? generateAlgorithmicInsights(user, currentProfile) : [];
+                const topInsight = selectCardInsight(cardInsights);
+                return topInsight ? (
+                  <View style={{ paddingHorizontal: 16, marginTop: -2 }}>
+                    <InsightChip insight={topInsight} compact />
+                  </View>
+                ) : null;
+              })()}
               {(() => {
                 const rawMyTags = user?.profileData?.interests;
                 const myTags: string[] = Array.isArray(rawMyTags) ? rawMyTags : [];

@@ -53,6 +53,9 @@ import { PropertyReviewsScreen } from '../shared/PropertyReviewsScreen';
 import { WriteReviewSheet } from '../../components/WriteReviewSheet';
 import { HostReviewsScreen } from '../shared/HostReviewsScreen';
 import CompatibilityBreakdownSheet from '../../components/CompatibilityBreakdownSheet';
+import InsightChip from '../../components/InsightChip';
+import InsightStack from '../../components/InsightStack';
+import { generateAlgorithmicInsights, selectCardInsight } from '../../services/quickInsightService';
 import { getReviewSummary, submitReview, checkReviewEligibility, ReviewSummary } from '../../services/reviewService';
 import { ReportBlockModal } from '../../components/ReportBlockModal';
 import { InquiryModal } from '../../components/InquiryModal';
@@ -2779,6 +2782,17 @@ export const ExploreScreen = () => {
                             <PlanBadgeInline plan="Elite" locked />
                           )}
                         </Pressable>
+                      ) : null}
+
+                      {detailShowMatch && detailHostProfile && user ? (
+                        <View style={{ paddingHorizontal: 4 }}>
+                          <InsightStack
+                            insights={generateAlgorithmicInsights(user, detailHostProfile)}
+                            maxVisible={renterLimits.hasMatchBreakdown ? 3 : 1}
+                            onSeeAll={renterLimits.hasMatchBreakdown ? () => setShowMatchBreakdown(true) : undefined}
+                            isPremium={renterLimits.hasMatchBreakdown}
+                          />
+                        </View>
                       ) : null}
 
                       {detailHostUser?.verifiedBusiness || detailHostUser?.purchases?.hostVerificationBadge || ((detailHostUser as any)?.hostSubscription?.plan && (detailHostUser as any).hostSubscription.plan !== 'free' && (detailHostUser as any).hostSubscription.plan !== 'none') || (detailHostUser?.hostPlan && detailHostUser.hostPlan !== 'free' && detailHostUser.hostPlan !== 'none') ? (
