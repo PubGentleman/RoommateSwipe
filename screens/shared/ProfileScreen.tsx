@@ -30,6 +30,8 @@ import { normalizeRenterPlan, getRenterPlanLimits } from '../../constants/renter
 import { getHostPlanDisplayInfo, resolveEffectiveHostPlan, isFreeTier } from '../../utils/planResolver';
 import { getProfileGateStatus, TIER_INFO, ProfileTier } from '../../utils/profileGate';
 import LevelUpToast from '../../components/LevelUpToast';
+import { ShareProfileSheet } from '../../components/ShareProfileSheet';
+import { getReceivedTestimonials, refreshProfileStats, getTraitEmoji, type PublicProfile, type Testimonial } from '../../services/socialProfileService';
 
 type ProfileScreenNavigationProp = NativeStackNavigationProp<ProfileStackParamList, 'ProfileMain'>;
 
@@ -50,6 +52,9 @@ export const ProfileScreen = () => {
   const [hasAffiliate, setHasAffiliate] = useState(false);
   const [searchPaused, setSearchPaused] = useState(false);
   const [searchPausedAt, setSearchPausedAt] = useState<string | null>(null);
+  const [showShareSheet, setShowShareSheet] = useState(false);
+  const [testimonials, setTestimonials] = useState<any[]>([]);
+  const [profileStats, setProfileStats] = useState<any>({});
 
   const PROFILE_COLLAPSE_H = 280;
   const profileScrollY = useSharedValue(0);
@@ -174,6 +179,20 @@ export const ProfileScreen = () => {
           const aff = await getAffiliateForUser(userId);
           if (!isMounted) return;
           setHasAffiliate(!!aff);
+
+          try {
+            const tData = await getReceivedTestimonials(userId);
+            if (!isMounted) return;
+            setTestimonials(tData.filter((t: any) => t.status === 'approved'));
+          } catch {}
+
+          try {
+            await refreshProfileStats(userId);
+            const { supabase: sb } = await import('../../lib/supabase');
+            const { data: statsData } = await sb.from('users').select('profile_stats, profile_slug, profile_tagline, public_profile_enabled').eq('id', userId).single();
+            if (!isMounted) return;
+            if (statsData) setProfileStats(statsData);
+          } catch {}
         } catch (e) {
           console.warn('Failed to load profile data:', e);
         }
@@ -674,6 +693,49 @@ export const ProfileScreen = () => {
                 <Text style={styles.rpAddBioText}>Add a bio to help roommates get to know you</Text>
               </Pressable>
             )}
+
+            {profileStats?.profile_tagline ? (
+              <Text style={styles.spTagline}>"{profileStats.profile_tagline}"</Text>
+            ) : null}
+
+            <View style={styles.spStatsRow}>
+              <View style={styles.spStatItem}>
+                <Text style={styles.spStatValue}>{profileStats?.profile_stats?.matchCount || 0}</Text>
+                <Text style={styles.spStatLabel}>Matches</Text>
+              </View>
+              <View style={styles.spStatDivider} />
+              <View style={styles.spStatItem}>
+                <Text style={styles.spStatValue}>{profileStats?.profile_stats?.groupCount || 0}</Text>
+                <Text style={styles.spStatLabel}>Groups</Text>
+              </View>
+              <View style={styles.spStatDivider} />
+              <View style={styles.spStatItem}>
+                <Text style={styles.spStatValue}>{testimonials.length}</Text>
+                <Text style={styles.spStatLabel}>Reviews</Text>
+              </View>
+            </View>
+
+            {testimonials.length > 0 ? (
+              <Pressable style={styles.spTestimonialsSection} onPress={() => navigation.navigate('Testimonials' as any)}>
+                <Text style={styles.spSectionTitle}>Testimonials ({testimonials.length})</Text>
+                {testimonials.slice(0, 2).map((t: any) => (
+                  <View key={t.id} style={styles.spTestimonialPreview}>
+                    <View style={styles.spTestimonialStars}>
+                      {[1, 2, 3, 4, 5].map(i => (
+                        <Feather key={i} name="star" size={10} color={i <= (t.rating || 0) ? '#ff6b5b' : '#333'} />
+                      ))}
+                    </View>
+                    <Text style={styles.spTestimonialContent} numberOfLines={2}>"{t.content}"</Text>
+                  </View>
+                ))}
+                <Text style={styles.spSeeAll}>See all</Text>
+              </Pressable>
+            ) : null}
+
+            <Pressable style={styles.spShareBtn} onPress={() => setShowShareSheet(true)}>
+              <Feather name="share-2" size={16} color="#ff6b5b" />
+              <Text style={styles.spShareBtnText}>Share Profile</Text>
+            </Pressable>
 
             {getLifestyleCards(user).length > 0 ? (
               <View style={styles.rpLifestyleGrid}>
@@ -1350,6 +1412,29 @@ export const ProfileScreen = () => {
       </Modal>
 
 
+      <ShareProfileSheet
+        visible={showShareSheet}
+        onClose={() => setShowShareSheet(false)}
+        profile={{
+          slug: profileStats?.profile_slug || user?.id || '',
+          name: user?.name || user?.full_name || '',
+          age: user?.profileData?.age,
+          tagline: profileStats?.profile_tagline,
+          photo: user?.avatar_url || '',
+          bio: user?.profileData?.bio,
+          occupation: user?.profileData?.occupation,
+          neighborhood: user?.profileData?.neighborhood,
+          city: user?.city,
+          zodiacSign: user?.profileData?.zodiac_sign,
+          interests: user?.profileData?.interests || [],
+          verifications: [],
+          stats: profileStats?.profile_stats || { matchCount: 0, groupCount: 0, responseRate: 0, memberSince: '' },
+          testimonials: [],
+          traits: [],
+        }}
+        userId={user?.id || ''}
+      />
+
       <RhomeAISheet
         visible={showAISheet}
         onDismiss={() => { setShowAISheet(false); setAiSheetContext('profile'); }}
@@ -1528,6 +1613,94 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: 'rgba(255,107,91,0.7)',
     flex: 1,
+  },
+  spTagline: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.6)',
+    fontStyle: 'italic',
+    textAlign: 'center',
+    paddingHorizontal: 20,
+    marginBottom: 12,
+  },
+  spStatsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    marginHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: '#141414',
+    borderRadius: 14,
+    marginBottom: 12,
+  },
+  spStatItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  spStatValue: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  spStatLabel: {
+    fontSize: 11,
+    color: '#A0A0A0',
+    marginTop: 2,
+  },
+  spStatDivider: {
+    width: 1,
+    height: 28,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  spTestimonialsSection: {
+    marginHorizontal: 16,
+    marginBottom: 12,
+    backgroundColor: '#141414',
+    borderRadius: 14,
+    padding: 14,
+  },
+  spSectionTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#fff',
+    marginBottom: 10,
+  },
+  spTestimonialPreview: {
+    marginBottom: 8,
+  },
+  spTestimonialStars: {
+    flexDirection: 'row',
+    gap: 2,
+    marginBottom: 4,
+  },
+  spTestimonialContent: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.6)',
+    fontStyle: 'italic',
+    lineHeight: 18,
+  },
+  spSeeAll: {
+    fontSize: 13,
+    color: '#ff6b5b',
+    fontWeight: '600',
+    marginTop: 4,
+  },
+  spShareBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginHorizontal: 16,
+    marginBottom: 12,
+    paddingVertical: 12,
+    backgroundColor: 'rgba(255,107,91,0.08)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,91,0.15)',
+  },
+  spShareBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#ff6b5b',
   },
   rpLifestyleGrid: {
     flexDirection: 'row',
