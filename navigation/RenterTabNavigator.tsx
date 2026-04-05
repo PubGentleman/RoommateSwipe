@@ -10,6 +10,7 @@ import { ExploreStackNavigator } from './ExploreStackNavigator';
 import { RoommatesStackNavigator } from './RoommatesStackNavigator';
 import { GroupsStackNavigator } from './GroupsStackNavigator';
 import { MyGroupStackNavigator } from './MyGroupStackNavigator';
+import { ApartmentGroupStackNavigator } from './ApartmentGroupStackNavigator';
 import { MessagesStackNavigator } from './MessagesStackNavigator';
 import { ProfileStackNavigator } from './ProfileStackNavigator';
 import SavedListingsScreen from '../screens/renter/SavedListingsScreen';
@@ -293,9 +294,10 @@ export const RenterTabNavigator = () => {
   const showRoommates = needsRoommates(searchType);
   const showMyGroup = isPreformedGroup(searchType);
   const showSaved = isFastLane(searchType);
-  const showGroups = showRoommates || showSaved;
+  const isApartmentSeeker = !!searchType && searchType !== 'with_roommates';
+  const showApartmentGroup = isApartmentSeeker;
 
-  const tabKey = showRoommates ? 'full' : showMyGroup ? 'group' : showGroups ? 'groups-lite' : 'lite';
+  const tabKey = showRoommates ? 'full' : showMyGroup ? 'group' : showApartmentGroup ? 'apt-group' : 'lite';
 
   return (
     <>
@@ -315,13 +317,16 @@ export const RenterTabNavigator = () => {
       {showRoommates ? (
         <Tab.Screen name="Roommates" component={RoommatesStackNavigator} />
       ) : null}
-      {showGroups ? (
+      {showRoommates ? (
         <Tab.Screen name="Groups" component={GroupsStackNavigator} />
       ) : null}
       {showMyGroup ? (
         <Tab.Screen name="MyGroup" component={MyGroupStackNavigator} />
       ) : null}
-      {(showSaved || showMyGroup) ? (
+      {showApartmentGroup && !showMyGroup ? (
+        <Tab.Screen name="MyGroup" component={ApartmentGroupStackNavigator} />
+      ) : null}
+      {(showSaved || showMyGroup || showApartmentGroup) ? (
         <Tab.Screen name="Saved" component={SavedListingsScreen} />
       ) : null}
       <Tab.Screen name="Messages" component={MessagesStackNavigator} />

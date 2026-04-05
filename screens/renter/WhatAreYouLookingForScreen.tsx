@@ -10,7 +10,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Feather } from '../../components/VectorIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../contexts/AuthContext';
-import { updateProfile } from '../../services/profileService';
+import { supabase } from '../../lib/supabase';
 import { RhomeLogo } from '../../components/RhomeLogo';
 
 type SearchType = 'solo' | 'with_partner' | 'with_roommates' | 'have_group' | 'entire_apartment';
@@ -77,13 +77,21 @@ export default function WhatAreYouLookingForScreen({ onComplete, isSettings, ini
     };
 
     try {
-      await updateProfile(user.id, updates);
+      const { error } = await supabase
+        .from('users')
+        .update(updates)
+        .eq('id', user.id);
+      if (error) throw error;
     } catch (err) {
-      console.warn('[Intent] Profile update failed, retrying once:', err);
+      console.warn('[Intent] Users table update failed, retrying once:', err);
       try {
-        await updateProfile(user.id, updates);
+        const { error } = await supabase
+          .from('users')
+          .update(updates)
+          .eq('id', user.id);
+        if (error) throw error;
       } catch (retryErr) {
-        console.warn('[Intent] Profile update retry also failed:', retryErr);
+        console.warn('[Intent] Users table update retry also failed:', retryErr);
       }
     }
 

@@ -292,8 +292,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         desired_bedroom_count: profile.desired_bedroom_count ?? undefined,
         household_gender_preference: profile.household_gender_preference || undefined,
         pi_auto_match_enabled: profile.pi_auto_match_enabled ?? undefined,
-        listing_type_preference: profile.listing_type_preference || 'any',
-        apartment_search_type: profile.apartment_search_type || null,
+        listing_type_preference: profile.listing_type_preference || supabaseUser.listing_type_preference || 'any',
+        apartment_search_type: supabaseUser.apartment_search_type || profile.apartment_search_type || null,
       } : {
         bio: supabaseUser.bio || undefined,
         occupation: supabaseUser.occupation || undefined,
@@ -524,9 +524,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
           if (session?.user?.id) {
             supabase
-              .from('profiles')
+              .from('users')
               .update(intentOverrides)
-              .eq('user_id', session.user.id)
+              .eq('id', session.user.id)
               .then(({ error }) => {
                 if (error) {
                   console.warn('[Auth] Failed to sync intent overrides to Supabase:', error);

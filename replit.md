@@ -93,4 +93,5 @@ The architecture includes a Babel module resolver, platform-specific UI, perform
 *   **recalculate-badges**: Uses `host_plan` (not `company_plan`) for company badge eligibility.
 *   **Client**: Hardcoded Supabase anon key fallback removed from `lib/supabase.ts`. `select('*')` replaced with explicit column lists in AuthContext, backgroundCheckService, boostService, agentMatchmakerService.
 *   **SQL Injection**: Fixed in calculate-match-scores — excludeIds are now validated against UUID regex before query interpolation.
-*   **Next migration**: 105.
+*   **Migration 105**: Adds `'entire_apartment'` to the `apartment_search_type` CHECK constraint on `users` table.
+*   **Next migration**: 106.
