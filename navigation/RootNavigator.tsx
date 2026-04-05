@@ -53,22 +53,30 @@ export const RootNavigator = () => {
   const [onboardingChecked, setOnboardingChecked] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [intentCompletedForUserId, setIntentCompletedForUserId] = useState<string | null>(null);
+  const [intentCheckDone, setIntentCheckDone] = useState(false);
   const [hasPendingInvite, setHasPendingInvite] = useState(false);
   const [pendingInviteChecked, setPendingInviteChecked] = useState(false);
 
   useEffect(() => {
-    if (user?.id && user.role === 'renter' && !user.profileData?.apartment_search_type) {
-      AsyncStorage.getItem('@rhome/renter_intent').then(saved => {
-        if (saved) {
-          try {
-            const parsed = JSON.parse(saved);
-            if (parsed.apartment_search_type) {
-              setIntentCompletedForUserId(user.id);
-            }
-          } catch (_) {}
-        }
-      });
+    if (!user?.id || user.role !== 'renter') {
+      setIntentCheckDone(true);
+      return;
     }
+    if (user.profileData?.apartment_search_type) {
+      setIntentCheckDone(true);
+      return;
+    }
+    AsyncStorage.getItem('@rhome/renter_intent').then(saved => {
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (parsed.apartment_search_type) {
+            setIntentCompletedForUserId(user.id);
+          }
+        } catch (_) {}
+      }
+      setIntentCheckDone(true);
+    }).catch(() => setIntentCheckDone(true));
   }, [user?.id, user?.profileData?.apartment_search_type]);
 
   useEffect(() => {
@@ -153,6 +161,7 @@ export const RootNavigator = () => {
   }
 
   const needsRenterIntent = user.role === 'renter'
+    && intentCheckDone
     && intentCompletedForUserId !== user.id
     && !user.profileData?.apartment_search_type
     && !hasPendingInvite;
