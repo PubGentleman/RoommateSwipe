@@ -123,71 +123,59 @@ export default function ApartmentGroupScreen() {
     const member = members.find(m => m.id === memberId);
     const memberName = member?.name || 'this member';
 
+    const doRemove = async () => {
+      try {
+        setMembers(prev => prev.filter(m => m.id !== memberId));
+
+        await removeMember(group.id, memberId);
+
+        const freshGroup = await getUserPreformedGroup(user!.id);
+        if (freshGroup) {
+          const freshMembers = await getGroupMembers(freshGroup.id);
+          const filteredMembers = freshMembers.filter(m => m.id !== memberId);
+          setGroup(freshGroup);
+          setMembers(filteredMembers);
+
+          const activeMembers = filteredMembers.filter(m => m.status === 'joined');
+          const freshOpenSlots = (freshGroup.group_size || 0) - activeMembers.length;
+
+          if (freshOpenSlots > 0) {
+            Alert.alert(
+              'Member Removed',
+              `Your group now has ${freshOpenSlots} open ${freshOpenSlots === 1 ? 'spot' : 'spots'}. What would you like to do?`,
+              [
+                { text: 'Nothing for Now', style: 'cancel' },
+                {
+                  text: 'Invite a Friend',
+                  onPress: () => shareInvite(),
+                },
+                {
+                  text: 'Find on Rhome',
+                  onPress: async () => {
+                    await enableReplacement(freshGroup.id, freshOpenSlots);
+                    loadData();
+                    Alert.alert(
+                      'You\'re Live!',
+                      'Your group is now visible to roommate seekers. You\'ll get notifications when someone requests to join.',
+                    );
+                  },
+                },
+              ],
+            );
+          }
+        }
+      } catch (err) {
+        console.error('[handleRemoveMember] Error:', err);
+        loadData();
+      }
+    };
+
     Alert.alert(
       'Remove Member',
-      `Are you sure you want to remove ${memberName} from the group? This cannot be undone.`,
+      `Remove ${memberName} from the group?`,
       [
         { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Remove',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const success = await removeMember(group.id, memberId);
-
-              const freshGroup = await getUserPreformedGroup(user!.id);
-              if (freshGroup) {
-                const freshMembers = await getGroupMembers(freshGroup.id);
-
-                const memberStillExists = freshMembers.some(m => m.id === memberId);
-                if (memberStillExists) {
-                  const forcedMembers = freshMembers.filter(m => m.id !== memberId);
-                  setGroup(freshGroup);
-                  setMembers(forcedMembers);
-                } else {
-                  setGroup(freshGroup);
-                  setMembers(freshMembers);
-                }
-
-                const activeMembers = (memberStillExists
-                  ? freshMembers.filter(m => m.id !== memberId)
-                  : freshMembers
-                ).filter(m => m.status === 'joined');
-                const freshOpenSlots = (freshGroup.group_size || 0) - activeMembers.length;
-
-                if (freshOpenSlots > 0) {
-                  Alert.alert(
-                    'Member Removed',
-                    `Your group now has ${freshOpenSlots} open ${freshOpenSlots === 1 ? 'spot' : 'spots'}. What would you like to do?`,
-                    [
-                      { text: 'Nothing for Now', style: 'cancel' },
-                      {
-                        text: 'Invite a Friend',
-                        onPress: () => shareInvite(),
-                      },
-                      {
-                        text: 'Find on Rhome',
-                        onPress: async () => {
-                          await enableReplacement(freshGroup.id, freshOpenSlots);
-                          loadData();
-                          Alert.alert(
-                            'You\'re Live!',
-                            'Your group is now visible to roommate seekers. You\'ll get notifications when someone requests to join.',
-                          );
-                        },
-                      },
-                    ],
-                  );
-                }
-              } else {
-                setMembers(prev => prev.filter(m => m.id !== memberId));
-              }
-            } catch (err) {
-              console.error('[handleRemoveMember] Error:', err);
-              Alert.alert('Error', 'Failed to remove member. Please try again.');
-            }
-          },
-        },
+        { text: 'Remove', style: 'destructive', onPress: doRemove },
       ],
     );
   };

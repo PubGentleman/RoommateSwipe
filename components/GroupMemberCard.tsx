@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Feather } from './VectorIcons';
 import { PreformedGroupMember } from '../types/models';
 
@@ -40,9 +40,17 @@ export function GroupMemberCard({ member, isLead, isCurrentUser, onRemove, showR
       </View>
 
       {showRemove && !isCurrentUser && !isLead ? (
-        <Pressable style={styles.removeBtn} onPress={onRemove}>
+        <TouchableOpacity
+          style={styles.removeBtn}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          activeOpacity={0.6}
+          onPress={() => {
+            console.log('[GroupMemberCard] Remove pressed for:', member.name);
+            onRemove?.();
+          }}
+        >
           <Feather name="x" size={16} color="#EF4444" />
-        </Pressable>
+        </TouchableOpacity>
       ) : null}
     </View>
   );
