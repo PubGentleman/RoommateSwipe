@@ -16,6 +16,7 @@ import { ScreenKeyboardAwareScrollView } from '../../components/ScreenKeyboardAw
 import { Image } from 'expo-image';
 import { GroupPropertySearchModal } from '../../components/GroupPropertySearchModal';
 import { LinearGradient } from 'expo-linear-gradient';
+import { AppHeader, HeaderActionButton } from '../../components/AppHeader';
 
 const ACCENT = '#ff6b5b';
 
@@ -174,27 +175,24 @@ export const CreateGroupScreen = ({ navigation, route }: any) => {
       style={{ backgroundColor: '#0a0a0a' }}
       contentContainerStyle={styles.container}
     >
-      <View style={styles.header}>
-        <Pressable
-          onPress={() => navigation.goBack()}
-          hitSlop={8}
-          style={styles.closeBtn}
-        >
-          <Feather name="x" size={18} color="rgba(255,255,255,0.6)" />
-        </Pressable>
-        <ThemedText style={styles.headerTitle}>New Group</ThemedText>
-        <Pressable onPress={handleCreate} disabled={creating || !canCreate}>
-          {creating ? (
+      <AppHeader
+        title="New Group"
+        mode="tab"
+        role="renter"
+        hideSeparator
+        rightActions={
+          creating ? (
             <ActivityIndicator size="small" color={ACCENT} />
           ) : (
-            <ThemedText style={[styles.headerAction, {
-              color: canCreate ? ACCENT : 'rgba(255,255,255,0.25)',
-            }]}>
-              Create
-            </ThemedText>
-          )}
-        </Pressable>
-      </View>
+            <HeaderActionButton
+              label="Create"
+              onPress={handleCreate}
+              variant="primary"
+              disabled={!canCreate}
+            />
+          )
+        }
+      />
 
       <View style={styles.heroSection}>
         <View style={styles.heroIconWrap}>
@@ -501,32 +499,6 @@ export const CreateGroupScreen = ({ navigation, route }: any) => {
 const styles = StyleSheet.create({
   container: {
     paddingBottom: 60,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 58,
-    paddingBottom: 12,
-  },
-  closeBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    flex: 1,
-    textAlign: 'center',
-    fontSize: 17,
-    fontWeight: '700',
-    color: '#fff',
-  },
-  headerAction: {
-    fontSize: 16,
-    fontWeight: '600',
   },
   heroSection: {
     alignItems: 'center',
