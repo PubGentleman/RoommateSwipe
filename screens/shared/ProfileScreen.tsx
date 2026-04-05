@@ -58,7 +58,7 @@ export const ProfileScreen = () => {
   const [editingTagline, setEditingTagline] = useState(false);
   const [taglineText, setTaglineText] = useState('');
 
-  const PROFILE_COLLAPSE_H = 280;
+  const PROFILE_COLLAPSE_H = 320;
   const profileScrollY = useSharedValue(0);
   const profileScrollHandler = useAnimatedScrollHandler({
     onScroll: (event) => { profileScrollY.value = event.contentOffset.y; },
