@@ -1,11 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   StyleSheet,
   Pressable,
   Text,
   ActivityIndicator,
-  ScrollView,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Feather } from '../../components/VectorIcons';
@@ -17,131 +16,103 @@ import { RhomeLogo } from '../../components/RhomeLogo';
 type SearchType = 'solo' | 'with_partner' | 'with_roommates' | 'have_group';
 type ListingPref = 'room' | 'entire_apartment' | 'any';
 
-const COMBINED_OPTIONS: {
-  id: string;
-  searchType: SearchType;
-  listingPref: ListingPref;
-  icon: string;
-  label: string;
-  description: string;
-  color: string;
-  action?: 'create_group';
-}[] = [
+const PATHS = [
   {
-    id: 'room',
-    searchType: 'with_roommates',
-    listingPref: 'room',
-    icon: 'search',
-    label: 'Find a Room',
-    description: 'Join a shared apartment with compatible roommates',
+    id: 'roommates',
+    label: 'Roommates',
+    icon: 'users' as const,
     color: '#ff6b5b',
+    description: 'Find compatible people to share a place with',
+    searchType: 'with_roommates' as SearchType,
+    listingPref: 'room' as ListingPref,
   },
   {
-    id: 'roommates_apartment',
-    searchType: 'with_roommates',
-    listingPref: 'entire_apartment',
-    icon: 'users',
-    label: 'Get an Apartment Together',
-    description: 'Find roommates to rent a whole place with',
-    color: '#a855f7',
-  },
-  {
-    id: 'solo',
-    searchType: 'solo',
-    listingPref: 'any',
-    icon: 'user',
-    label: 'Just Me',
-    description: 'Browse apartments for myself',
+    id: 'entire_apartment',
+    label: 'Entire Apartment',
+    icon: 'home' as const,
     color: '#4a9eff',
-  },
-  {
-    id: 'partner',
-    searchType: 'with_partner',
-    listingPref: 'any',
-    icon: 'heart',
-    label: 'Me & Partner',
-    description: 'Moving in with my significant other',
-    color: '#e83a7a',
-  },
-  {
-    id: 'group',
-    searchType: 'have_group',
-    listingPref: 'any',
-    icon: 'users',
-    label: 'With My Group',
-    description: 'I already have roommates lined up',
-    color: '#22c55e',
-    action: 'create_group',
+    description: 'Get a whole apartment for yourself or your group',
+    searchType: 'solo' as SearchType,
+    listingPref: 'entire_apartment' as ListingPref,
   },
 ];
 
 interface Props {
-  onComplete: (action?: 'create_group') => void;
+  onComplete: (action?: 'create_group' | 'find_roommates' | 'browse_listings') => void;
   isSettings?: boolean;
   initialIntent?: string;
   initialSubIntent?: string;
   initialListingPref?: string;
 }
 
-export default function WhatAreYouLookingForScreen({ onComplete, isSettings, initialSubIntent, initialListingPref }: Props) {
+export default function WhatAreYouLookingForScreen({ onComplete, isSettings, initialIntent, initialSubIntent }: Props) {
   const insets = useSafeAreaInsets();
   const { user, updateUser } = useAuth();
+  const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [selectedCard, setSelectedCard] = useState<string | null>(null);
   const [confirmAction, setConfirmAction] = useState<{
     title: string;
     message: string;
     onConfirm: () => void;
   } | null>(null);
 
-  const doSave = async (listingPref: ListingPref, searchType: SearchType) => {
+  useEffect(() => {
+    if (isSettings) {
+      const currentSearch = user?.profileData?.apartment_search_type;
+      if (currentSearch === 'with_roommates') {
+        setSelectedPath('roommates');
+      } else if (currentSearch) {
+        setSelectedPath('entire_apartment');
+      }
+    }
+  }, []);
+
+  const doSave = async (path: typeof PATHS[0]) => {
     if (!user) return;
     setSaving(true);
 
-    updateProfile(user.id, {
-      listing_type_preference: listingPref,
-      apartment_search_type: searchType,
-    }).catch(err => {
-      console.warn('Profile update failed during intent selection, will retry during onboarding:', err);
+    const updates = {
+      apartment_search_type: path.searchType,
+      listing_type_preference: path.listingPref,
+    };
+
+    updateProfile(user.id, updates).catch(err => {
+      console.warn('[Intent] Profile update failed:', err);
     });
 
     try {
-      await AsyncStorage.setItem('@rhome/renter_intent', JSON.stringify({
-        apartment_search_type: searchType,
-        listing_type_preference: listingPref,
-      }));
+      await AsyncStorage.setItem('@rhome/renter_intent', JSON.stringify(updates));
 
       updateUser({
         profileData: {
           ...user.profileData,
-          listing_type_preference: listingPref,
-          apartment_search_type: searchType,
+          apartment_search_type: path.searchType,
+          listing_type_preference: path.listingPref,
         },
-      }).catch(err => {
-        console.warn('User state sync failed (non-blocking):', err);
       });
 
-      setSaving(false);
+      onComplete(path.searchType === 'with_roommates' ? 'find_roommates' : 'browse_listings');
     } catch (err) {
-      console.error('Failed to save intent:', err);
-      setSaving(false);
+      console.error('[Intent] Save failed:', err);
       setConfirmAction({
         title: 'Something went wrong',
         message: 'Could not save your preference. Please try again.',
         onConfirm: () => setConfirmAction(null),
       });
+    } finally {
+      setSaving(false);
     }
   };
 
-  const handleSelect = async (option: typeof COMBINED_OPTIONS[0]) => {
+  const handleSelect = async (path: typeof PATHS[0]) => {
     if (saving) return;
-    setSelectedCard(option.id);
+    setSelectedPath(path.id);
 
     const currentSearch = user?.profileData?.apartment_search_type;
 
-    if (isSettings && currentSearch && currentSearch !== option.searchType) {
+    if (isSettings && currentSearch && currentSearch !== path.searchType) {
       const wasMatching = currentSearch === 'with_roommates';
-      const willMatch = option.searchType === 'with_roommates';
+      const willMatch = path.searchType === 'with_roommates';
       const wasGroup = currentSearch === 'have_group';
 
       if (wasMatching && !willMatch) {
@@ -150,15 +121,10 @@ export default function WhatAreYouLookingForScreen({ onComplete, isSettings, ini
           message: 'This will remove you from roommate matching and Pi auto-groups. Continue?',
           onConfirm: async () => {
             setConfirmAction(null);
-            await doSave(option.listingPref, option.searchType);
-            if (option.action === 'create_group') {
-              onComplete('create_group');
-            } else {
-              onComplete();
-            }
+            await doSave(path);
           },
         });
-        setSelectedCard(null);
+        setSelectedPath(null);
         return;
       } else if (wasGroup) {
         setConfirmAction({
@@ -166,15 +132,10 @@ export default function WhatAreYouLookingForScreen({ onComplete, isSettings, ini
           message: 'Changing your search intent will remove you from your current group. Continue?',
           onConfirm: async () => {
             setConfirmAction(null);
-            await doSave(option.listingPref, option.searchType);
-            if (option.action === 'create_group') {
-              onComplete('create_group');
-            } else {
-              onComplete();
-            }
+            await doSave(path);
           },
         });
-        setSelectedCard(null);
+        setSelectedPath(null);
         return;
       } else if (!wasMatching && willMatch) {
         setConfirmAction({
@@ -182,39 +143,24 @@ export default function WhatAreYouLookingForScreen({ onComplete, isSettings, ini
           message: "You'll be added to the roommate matching pool. Pi will start looking for your ideal roommates!",
           onConfirm: async () => {
             setConfirmAction(null);
-            await doSave(option.listingPref, option.searchType);
-            if (option.action === 'create_group') {
-              onComplete('create_group');
-            } else {
-              onComplete();
-            }
+            await doSave(path);
           },
         });
-        setSelectedCard(null);
+        setSelectedPath(null);
         return;
       }
     }
 
-    await doSave(option.listingPref, option.searchType);
-    if (option.action === 'create_group') {
-      onComplete('create_group');
-    } else {
-      onComplete();
-    }
+    await doSave(path);
   };
 
   const currentSearchType = user?.profileData?.apartment_search_type;
-  const currentListingPref = user?.profileData?.listing_type_preference;
-
-  const getCurrentOptionId = () => {
+  const getCurrentPathId = () => {
     if (!currentSearchType) return null;
-    return COMBINED_OPTIONS.find(o =>
-      o.searchType === currentSearchType &&
-      (o.listingPref === currentListingPref || !currentListingPref)
-    )?.id ?? null;
+    if (currentSearchType === 'with_roommates') return 'roommates';
+    return 'entire_apartment';
   };
-
-  const currentOptionId = getCurrentOptionId();
+  const currentPathId = getCurrentPathId();
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 20 }]}>
@@ -227,44 +173,42 @@ export default function WhatAreYouLookingForScreen({ onComplete, isSettings, ini
           <RhomeLogo variant="horizontal" size="sm" />
         )}
       </View>
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
+
+      <View style={styles.content}>
         <Text style={styles.headline}>What are you looking for?</Text>
         <Text style={styles.subheadline}>This personalizes your Rhome experience</Text>
-        <View style={styles.optionsGrid}>
-          {COMBINED_OPTIONS.map((option) => {
-            const isSelected = selectedCard === option.id;
-            const isCurrent = isSettings && currentOptionId === option.id;
-            return (
-              <Pressable
-                key={option.id}
-                style={[
-                  styles.optionCard,
-                  isCurrent ? { borderColor: option.color, borderWidth: 2, backgroundColor: `${option.color}10` } : null,
-                  isSelected ? { borderColor: option.color, backgroundColor: `${option.color}15` } : null,
-                ]}
-                onPress={() => handleSelect(option)}
-                disabled={saving}
-              >
-                <View style={[styles.iconWrap, { backgroundColor: `${option.color}20` }]}>
-                  <Feather name={option.icon as any} size={22} color={option.color} />
-                </View>
-                <Text style={styles.optionLabel}>{option.label}</Text>
-                <Text style={styles.optionDesc}>{option.description}</Text>
-                {isCurrent ? <Text style={[styles.optionDesc, { color: option.color, fontWeight: '600', marginTop: 2 }]}>Current</Text> : null}
-              </Pressable>
-            );
-          })}
-        </View>
-        {saving ? (
-          <View style={styles.savingWrap}>
-            <ActivityIndicator color="#ff6b5b" size="small" />
-          </View>
-        ) : null}
-      </ScrollView>
+
+        {PATHS.map((path) => {
+          const isSelected = selectedPath === path.id;
+          const isCurrent = isSettings && currentPathId === path.id;
+          return (
+            <Pressable
+              key={path.id}
+              onPress={() => handleSelect(path)}
+              disabled={saving}
+              style={({ pressed }) => [
+                styles.optionCard,
+                isCurrent ? { borderColor: path.color, borderWidth: 2, backgroundColor: `${path.color}10` } : null,
+                isSelected ? { borderColor: path.color, backgroundColor: `${path.color}15` } : null,
+                { opacity: pressed ? 0.8 : (saving && selectedPath !== path.id ? 0.5 : 1) },
+              ]}
+            >
+              <View style={[styles.iconWrap, { backgroundColor: `${path.color}20` }]}>
+                <Feather name={path.icon} size={24} color={path.color} />
+              </View>
+              <View style={styles.textWrap}>
+                <Text style={styles.optionLabel}>{path.label}</Text>
+                <Text style={styles.optionDesc}>{path.description}</Text>
+                {isCurrent ? <Text style={[styles.currentTag, { color: path.color }]}>Current</Text> : null}
+              </View>
+              {saving && selectedPath === path.id ? (
+                <ActivityIndicator size="small" color={path.color} />
+              ) : null}
+            </Pressable>
+          );
+        })}
+      </View>
+
       {confirmAction ? (
         <View style={styles.confirmOverlay}>
           <View style={styles.confirmBox}>
@@ -273,7 +217,7 @@ export default function WhatAreYouLookingForScreen({ onComplete, isSettings, ini
             <View style={styles.confirmButtons}>
               <Pressable
                 style={styles.confirmCancelBtn}
-                onPress={() => { setConfirmAction(null); setSelectedCard(null); }}
+                onPress={() => { setConfirmAction(null); setSelectedPath(null); }}
               >
                 <Text style={styles.confirmCancelText}>Cancel</Text>
               </Pressable>
@@ -310,62 +254,57 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  scroll: {
+  content: {
     flex: 1,
-  },
-  scrollContent: {
     paddingHorizontal: 24,
-    paddingBottom: 40,
   },
   headline: {
-    fontSize: 26,
+    fontSize: 28,
     fontWeight: '800',
     color: '#FFFFFF',
     marginBottom: 8,
-    textAlign: 'center',
   },
   subheadline: {
-    fontSize: 14,
+    fontSize: 15,
     color: 'rgba(255,255,255,0.5)',
-    textAlign: 'center',
-    marginBottom: 24,
-    lineHeight: 20,
-  },
-  optionsGrid: {
-    gap: 12,
+    marginBottom: 32,
   },
   optionCard: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.08)',
-    borderRadius: 18,
-    paddingVertical: 18,
-    paddingHorizontal: 20,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
+    backgroundColor: '#1a1a1a',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
   },
   iconWrap: {
-    width: 48,
-    height: 48,
+    width: 52,
+    height: 52,
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
+    marginRight: 16,
   },
-  optionLabel: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  optionDesc: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.45)',
-    lineHeight: 16,
+  textWrap: {
     flex: 1,
   },
-  savingWrap: {
-    alignItems: 'center',
-    marginTop: 20,
+  optionLabel: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: 4,
+  },
+  optionDesc: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.5)',
+    lineHeight: 18,
+  },
+  currentTag: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 4,
   },
   confirmOverlay: {
     ...StyleSheet.absoluteFillObject,
