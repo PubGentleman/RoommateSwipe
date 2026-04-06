@@ -60,16 +60,17 @@ serve(async (req) => {
         };
         const content = getPiNotifContent('pi_deadline_reminder', notifData);
 
-        for (const member of unresponded) {
-          await supabase.from('notifications').insert({
-            user_id: member.user_id,
-            type: 'pi_deadline_reminder',
-            title: content.title,
-            body: content.body,
-            read: false,
-            data: { groupId: group.id },
-          });
+        const reminderNotifs = unresponded.map((member: any) => ({
+          user_id: member.user_id,
+          type: 'pi_deadline_reminder',
+          title: content.title,
+          body: content.body,
+          read: false,
+          data: { groupId: group.id },
+        }));
+        await supabase.from('notifications').insert(reminderNotifs);
 
+        for (const member of unresponded) {
           await sendPushNotifications(
             supabase,
             member.user_id,
@@ -142,20 +143,24 @@ serve(async (req) => {
           .eq('id', group.id);
 
         const noRepContent = getPiNotifContent('pi_no_replacement', { groupId: group.id });
-        for (const member of accepted) {
-          await supabase.from('notifications').insert({
+        if (accepted.length > 0) {
+          const noRepNotifs = accepted.map((member: any) => ({
             user_id: member.user_id,
             type: 'pi_no_replacement',
             title: noRepContent.title,
             body: noRepContent.body,
             read: false,
             data: { groupId: group.id },
-          });
-          await sendPushNotifications(
-            supabase, member.user_id,
-            noRepContent.title, noRepContent.body,
-            { type: 'pi_no_replacement', groupId: group.id }
-          );
+          }));
+          await supabase.from('notifications').insert(noRepNotifs);
+
+          for (const member of accepted) {
+            await sendPushNotifications(
+              supabase, member.user_id,
+              noRepContent.title, noRepContent.body,
+              { type: 'pi_no_replacement', groupId: group.id }
+            );
+          }
         }
 
         dissolved++;
@@ -196,23 +201,26 @@ serve(async (req) => {
         };
         const content = getPiNotifContent('pi_replacement_found', notifData);
 
-        for (const member of accepted) {
-          await supabase.from('notifications').insert({
+        if (accepted.length > 0) {
+          const repFoundNotifs = accepted.map((member: any) => ({
             user_id: member.user_id,
             type: 'pi_replacement_found',
             title: content.title,
             body: content.body,
             read: false,
             data: notifData,
-          });
+          }));
+          await supabase.from('notifications').insert(repFoundNotifs);
 
-          await sendPushNotifications(
-            supabase,
-            member.user_id,
-            content.title,
-            content.body,
-            { type: 'pi_replacement_found', groupId: group.id }
-          );
+          for (const member of accepted) {
+            await sendPushNotifications(
+              supabase,
+              member.user_id,
+              content.title,
+              content.body,
+              { type: 'pi_replacement_found', groupId: group.id }
+            );
+          }
         }
 
         try {
@@ -257,23 +265,26 @@ serve(async (req) => {
         const expiredContent = getPiNotifContent('pi_group_expired', { groupId: group.id });
 
         const allNotifiable = members.filter((m: any) => m.status === 'accepted' || m.status === 'declined');
-        for (const member of allNotifiable) {
-          await supabase.from('notifications').insert({
+        if (allNotifiable.length > 0) {
+          const expiredNotifs = allNotifiable.map((member: any) => ({
             user_id: member.user_id,
             type: 'pi_group_expired',
             title: expiredContent.title,
             body: expiredContent.body,
             read: false,
             data: { groupId: group.id },
-          });
+          }));
+          await supabase.from('notifications').insert(expiredNotifs);
 
-          await sendPushNotifications(
-            supabase,
-            member.user_id,
-            expiredContent.title,
-            expiredContent.body,
-            { type: 'pi_group_expired', groupId: group.id }
-          );
+          for (const member of allNotifiable) {
+            await sendPushNotifications(
+              supabase,
+              member.user_id,
+              expiredContent.title,
+              expiredContent.body,
+              { type: 'pi_group_expired', groupId: group.id }
+            );
+          }
         }
 
         dissolved++;

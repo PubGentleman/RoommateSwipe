@@ -232,16 +232,22 @@ export async function requestGroupDissolve(userId: string, groupId: string): Pro
       .eq('group_id', groupId)
       .neq('user_id', userId);
 
-    if (otherMembers) {
-      for (const member of otherMembers) {
-        await supabase.from('notifications').insert({
-          user_id: member.user_id,
-          type: 'pi_group_dissolved_member',
-          title: 'Group dissolved',
-          body: "A member chose to start fresh. Don't worry -- Pi is still looking for your perfect roommates.",
-          read: false,
-          data: { groupId },
-        });
+    if (otherMembers && otherMembers.length > 0) {
+      const notifications = otherMembers.map(member => ({
+        user_id: member.user_id,
+        type: 'pi_group_dissolved_member',
+        title: 'Group dissolved',
+        body: "A member chose to start fresh. Don't worry -- Pi is still looking for your perfect roommates.",
+        read: false,
+        data: { groupId },
+      }));
+
+      const { error: notifError } = await supabase
+        .from('notifications')
+        .insert(notifications);
+
+      if (notifError) {
+        console.error('[piAutoMatchService] Failed to send dissolution notifications:', notifError);
       }
     }
 

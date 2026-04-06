@@ -118,8 +118,8 @@ serve(async (req) => {
     }
 
     const memberIds = members.map(m => m.user_id);
-    for (const userId of memberIds) {
-      await supabase.from('notifications').insert({
+    if (memberIds.length > 0) {
+      const notifications = memberIds.map(userId => ({
         user_id: userId,
         type: 'company_group_invite',
         title: 'A property matched your group!',
@@ -129,7 +129,15 @@ serve(async (req) => {
           listingId,
           groupId,
         }),
-      });
+      }));
+
+      const { error: notifError } = await supabase
+        .from('notifications')
+        .insert(notifications);
+
+      if (notifError) {
+        console.error('[company-auto-invite] Failed to send notifications:', notifError);
+      }
     }
 
     await supabase

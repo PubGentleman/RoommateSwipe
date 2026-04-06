@@ -33,9 +33,11 @@ serve(async (req) => {
       });
     }
 
+    const validBookings = bookings ?? [];
     let notified = 0;
-    for (const booking of bookings ?? []) {
-      await supabase.from('notifications').insert({
+
+    if (validBookings.length > 0) {
+      const notifications = validBookings.map(booking => ({
         user_id: booking.renter_id,
         type: 'movein_checkin',
         title: 'How\'s your new apartment?',
@@ -45,13 +47,23 @@ serve(async (req) => {
           bookingId: booking.id,
           screen: 'MoveInCheckin',
         }),
-      });
+      }));
 
-      await supabase.from('bookings')
-        .update({ checkin_sent_at: new Date().toISOString() })
-        .eq('id', booking.id);
+      const { error: notifError } = await supabase
+        .from('notifications')
+        .insert(notifications);
 
-      notified++;
+      if (notifError) {
+        console.error('[movein-checkin] Failed to send notifications:', notifError);
+      }
+
+      for (const booking of validBookings) {
+        await supabase.from('bookings')
+          .update({ checkin_sent_at: new Date().toISOString() })
+          .eq('id', booking.id);
+
+        notified++;
+      }
     }
 
     return new Response(JSON.stringify({ success: true, notified }), {

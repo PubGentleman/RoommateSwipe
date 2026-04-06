@@ -145,21 +145,25 @@ export function AIGroupSuggestionCard({ onAccepted, onDismissed }: Props) {
           role: 'admin',
         });
 
-        for (const memberId of suggestion.suggested_member_ids) {
-          await supabase.from('group_invites').insert({
+        if (suggestion.suggested_member_ids.length > 0) {
+          const invites = suggestion.suggested_member_ids.map(memberId => ({
             group_id: group.id,
             inviter_id: user.id,
             invited_user_id: memberId,
             message: `Hey! Our AI matched us based on compatibility. Want to look for a place together?`,
-          });
+          }));
 
-          await supabase.from('notifications').insert({
+          await supabase.from('group_invites').insert(invites);
+
+          const notifications = suggestion.suggested_member_ids.map(memberId => ({
             user_id: memberId,
             type: 'group_invite',
             title: `${user.fullName?.split(' ')[0] || 'Someone'} invited you to a group`,
             body: `Pi matched you as compatible roommates. Tap to join the group!`,
             data: JSON.stringify({ group_id: group.id }),
-          });
+          }));
+
+          await supabase.from('notifications').insert(notifications);
         }
 
         await supabase
