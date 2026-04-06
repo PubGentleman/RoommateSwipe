@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { canAccessMessages, canAccessConversation } from '../utils/messagingAccess';
+import { withRetry } from '../utils/retry';
 
 async function checkMessagingPaywall(userId: string, conversationId?: string) {
   if (!userId) return;
@@ -155,15 +156,19 @@ export async function sendMessage(userId: string, matchId: string, content: stri
     }
   }
 
-  const { data, error } = await supabase
-    .from('messages')
-    .insert({
-      match_id: matchId,
-      sender_id: userId,
-      content,
-    })
-    .select()
-    .single();
+  const { data, error } = await withRetry(
+    () =>
+      supabase
+        .from('messages')
+        .insert({
+          match_id: matchId,
+          sender_id: userId,
+          content,
+        })
+        .select()
+        .single(),
+    { maxRetries: 2 }
+  );
 
   if (error) throw error;
   return data;

@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+// NOTE: No automatic retry for payment operations — user should explicitly retry
 
 export type RenterPlan = 'basic' | 'plus' | 'elite';
 export type HostPlan = 'starter' | 'pro' | 'business';

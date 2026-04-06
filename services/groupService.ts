@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { withRetry } from '../utils/retry';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GroupType, GroupMember } from '../types/models';
 import { isWithinActivityCutoff, getRecencyMultiplier } from '../utils/activityDecay';
@@ -75,15 +76,17 @@ export async function getGroups(city?: string, type?: GroupType) {
 }
 
 export async function getGroup(id: string) {
-  const { data, error } = await supabase
-    .from('groups')
-    .select(`
-      *,
-      members:group_members(*, user:users(id, full_name, avatar_url, age, occupation)),
-      creator:users!created_by(id, full_name, avatar_url)
-    `)
-    .eq('id', id)
-    .single();
+  const { data, error } = await withRetry(() =>
+    supabase
+      .from('groups')
+      .select(`
+        *,
+        members:group_members(*, user:users(id, full_name, avatar_url, age, occupation)),
+        creator:users!created_by(id, full_name, avatar_url)
+      `)
+      .eq('id', id)
+      .single()
+  );
 
   if (error) throw error;
   return data;

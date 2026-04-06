@@ -8,6 +8,7 @@ import { getWeightProfile, recordSwipeWithScores, recalculateLearnedWeights } fr
 import { calculateWeightedCompatibility } from '../utils/matchingAlgorithm';
 import { createErrorHandler } from '../utils/errorLogger';
 import { withTimeout } from '../utils/asyncHelpers';
+import { withRetry } from '../utils/retry';
 
 export async function getSwipeDeck(userId: string, city?: string, filters?: {
   budgetMin?: number;
@@ -46,7 +47,7 @@ export async function getSwipeDeck(userId: string, city?: string, filters?: {
     query = query.eq('city', city);
   }
 
-  const { data, error } = await query.limit(50);
+  const { data, error } = await withRetry(() => query.limit(50));
   if (error) throw error;
 
   let currentSearchType: string | undefined = filters?.searchType;
