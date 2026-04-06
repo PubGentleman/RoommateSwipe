@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from "react";
 import { AppState, StyleSheet } from "react-native";
-import { NavigationContainer, createNavigationContainerRef } from "@react-navigation/native";
+import { NavigationContainer } from "@react-navigation/native";
+import { navigationRef } from "./navigation/navigationRef";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -30,7 +31,6 @@ import { joinGlobalPresence, leaveGlobalPresence, startPresenceHeartbeat, stopPr
 
 SplashScreen.preventAutoHideAsync();
 
-export const navigationRef = createNavigationContainerRef<any>();
 
 function ResponseTracker() {
   useResponseTracking();

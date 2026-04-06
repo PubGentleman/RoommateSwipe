@@ -12,6 +12,7 @@ import { identifyUser as rcIdentifyUser, logoutRevenueCat as rcLogout } from '..
 import { processReferralCommission } from '../services/affiliateService';
 import { registerForPushNotifications, removePushToken } from '../services/pushNotificationService';
 import { createErrorHandler } from '../utils/errorLogger';
+import { navigationRef } from '../navigation/navigationRef';
 
 export type UserRole = 'renter' | 'host';
 
@@ -2690,6 +2691,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const updated = { ...user, activeMode: mode as 'renter' | 'host' };
     setUser(updated);
     StorageService.setCurrentUser(updated).then(() => StorageService.addOrUpdateUser(updated));
+
+    if (navigationRef?.isReady()) {
+      navigationRef.reset({
+        index: 0,
+        routes: [{ name: 'Main' }],
+      });
+    }
+
     if (isSupabaseConfigured) {
       supabase
         .from('profiles')
@@ -2697,7 +2706,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .eq('user_id', user.id)
         .then(({ error }) => {
           if (error) console.error('[switchMode] Supabase error:', error);
-        });
+        })
+        .catch(createErrorHandler('AuthContext', 'switchMode'));
     }
   };
 
