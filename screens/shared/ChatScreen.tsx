@@ -203,6 +203,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   const gateStatus = useMemo(() => getProfileGateStatus(user), [user]);
   const [gateModal, setGateModal] = useState<{ visible: boolean; feature: string; requiredTier: ProfileTier } | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [messageLoadError, setMessageLoadError] = useState(false);
   const [inputText, setInputText] = useState('');
   const [otherUserTyping, setOtherUserTyping] = useState(false);
   const [highlightedId, setHighlightedId] = useState<string | null>(highlightMessageId || null);
@@ -1180,6 +1181,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
     const isGroupChatLoad = conversationId.startsWith('group-');
 
     try {
+      setMessageLoadError(false);
       if (isGroupChatLoad) {
         const groupId = conversationId.replace('group-', '');
         const groupMsgs = await getGroupMessages(groupId);
@@ -1225,6 +1227,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
       }
     } catch (supaError) {
       console.warn('Supabase getMessages failed, falling back to StorageService:', supaError);
+      setMessageLoadError(true);
     }
 
     const conversations = await StorageService.getConversations();
@@ -2761,6 +2764,19 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
           </View>
         ) : null;
       })()}
+
+      {messageLoadError ? (
+        <View style={{ padding: 20, alignItems: 'center' }}>
+          <Feather name="alert-circle" size={32} color="#FF6B6B" />
+          <ThemedText style={[Typography.body, { marginTop: 12, fontWeight: '600' }]}>Couldn't load messages</ThemedText>
+          <Pressable
+            onPress={() => { setMessageLoadError(false); loadMessages(); }}
+            style={{ marginTop: 12, paddingHorizontal: 20, paddingVertical: 10, backgroundColor: theme.primary, borderRadius: 8 }}
+          >
+            <Text style={{ color: '#fff', fontWeight: '600' }}>Retry</Text>
+          </Pressable>
+        </View>
+      ) : null}
 
       <View style={{ flex: 1 }}>
         <FlatList

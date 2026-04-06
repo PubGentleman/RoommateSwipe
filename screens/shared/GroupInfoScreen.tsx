@@ -1010,6 +1010,15 @@ export function GroupInfoScreen({ route, navigation }: Props) {
           }
           theme={theme}
         >
+          {!loading && group && (group.members || []).length === 0 ? (
+            <View style={{ padding: 24, alignItems: 'center' }}>
+              <Feather name="users" size={40} color={theme.textSecondary} />
+              <ThemedText style={[Typography.body, { marginTop: 12, fontWeight: '600' }]}>No members yet</ThemedText>
+              <ThemedText style={[Typography.small, { marginTop: 8, color: theme.textSecondary, textAlign: 'center' }]}>
+                Share your invite link to add roommates to this group.
+              </ThemedText>
+            </View>
+          ) : null}
           {(group.members || []).map((member: any) => {
             const isCurrentUser = member.id === user?.id;
             const isMemberAdmin = member.id === group.adminId;

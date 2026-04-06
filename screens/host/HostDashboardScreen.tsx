@@ -123,6 +123,7 @@ export const HostDashboardScreen = () => {
   const hostCompletion = user ? getHostCompletionPercentage(user) : 100;
   const dashboardTour = useTourSetup('hostDashboard', TOUR_CONTENT.hostDashboard);
   const [agentStats, setAgentStats] = useState<{ agentId: string; agentName: string; activeListings: number; pendingBookings: number; confirmedBookings: number }[]>([]);
+  const [agentStatsLoading, setAgentStatsLoading] = useState(false);
   const [expandedAgentId, setExpandedAgentId] = useState<string | null>(null);
   const [teamFilter, setTeamFilter] = useState<'all' | 'active' | 'pending' | 'confirmed'>('all');
   const [showReassignModal, setShowReassignModal] = useState(false);
@@ -300,6 +301,7 @@ export const HostDashboardScreen = () => {
     } catch (e) { console.warn('[HostDashboard] Failed to load Pi matchmaker data:', e); }
 
     if (user.hostType === 'company') {
+      setAgentStatsLoading(true);
       try {
         const stats = await getAgentStats(user.id);
         setAgentStats(stats);
@@ -310,7 +312,9 @@ export const HostDashboardScreen = () => {
         setUnassignedListings(noAgent);
         const alerts = await getAgentResponseAlerts(user.id);
         setResponseAlerts(alerts);
-      } catch (e) { console.warn('[HostDashboard] Failed to load company data:', e); }
+      } catch (e) { console.warn('[HostDashboard] Failed to load company data:', e); } finally {
+        setAgentStatsLoading(false);
+      }
     }
 
     if (isSupabaseConfigured && user.id) {
@@ -1207,7 +1211,13 @@ export const HostDashboardScreen = () => {
           </>
         ) : null}
 
-        {user?.hostType === 'company' && agentStats.length > 0 ? (
+        {user?.hostType === 'company' && agentStatsLoading ? (
+          <View style={{ padding: 20, alignItems: 'center' }}>
+            <ActivityIndicator size="small" color={ACCENT} />
+            <Text style={{ marginTop: 8, color: 'rgba(255,255,255,0.5)', fontSize: 13 }}>Loading team stats...</Text>
+          </View>
+        ) : null}
+        {user?.hostType === 'company' && !agentStatsLoading && agentStats.length > 0 ? (
           <>
             <View style={[styles.sectionHeader, { marginTop: 6 }]} ref={dashboardTour.setRef('team')} collapsable={false}>
               <Text style={styles.sectionTitle}>TEAM ACTIVITY</Text>

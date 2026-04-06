@@ -186,6 +186,7 @@ export const ExploreScreen = () => {
   const [paywallFeature, setPaywallFeature] = useState('');
   const [paywallPlan, setPaywallPlan] = useState<'plus' | 'elite'>('plus');
   const [activeQuickFilters, setActiveQuickFilters] = useState<Set<string>>(new Set());
+  const [filterLoading, setFilterLoading] = useState(false);
   const intentPref = user?.profileData?.listing_type_preference;
   const searchType = user?.profileData?.apartment_search_type;
   const isEntireApartmentSeeker = intentPref === 'entire_apartment' || (intentPref !== 'room' && (searchType === 'solo' || searchType === 'with_partner' || searchType === 'have_group'));
@@ -930,6 +931,7 @@ export const ExploreScreen = () => {
   };
 
   const applyFilters = () => {
+    setFilterLoading(true);
     let filtered = [...properties];
 
     const blockedIds = new Set(user?.blockedUsers || []);
@@ -1335,6 +1337,7 @@ export const ExploreScreen = () => {
     });
 
     setFilteredProperties(finalFeed);
+    setFilterLoading(false);
   };
 
   const renterPlan = normalizeRenterPlan(user?.subscription?.plan);
@@ -2330,6 +2333,14 @@ export const ExploreScreen = () => {
           onScroll={exploreScrollHandler}
           scrollEventThrottle={16}
           ListHeaderComponent={() => {
+            if (filterLoading) {
+              return (
+                <View style={{ padding: 16, alignItems: 'center' }}>
+                  <ActivityIndicator size="small" color={theme.primary} />
+                  <Text style={{ marginTop: 8, color: theme.textSecondary, fontSize: 13 }}>Updating results...</Text>
+                </View>
+              );
+            }
             const showProfileNudge = user && profileCompletion < 60 && !profileNudgeDismissed && viewMode !== 'saved';
             const showRecommendations = viewMode === 'all' && displayMode !== 'map' && recommendations.length > 0;
             if (!showProfileNudge && !showRecommendations) return null;
@@ -2417,19 +2428,19 @@ export const ExploreScreen = () => {
             );
           }}
           ListEmptyComponent={
-            <View style={styles.emptyStateInline}>
-              <Feather name={viewMode === 'saved' ? 'heart' : 'home'} size={64} color={theme.textSecondary} />
-              <ThemedText style={[Typography.h2, { marginTop: Spacing.xl, textAlign: 'center' }]}>
-                {viewMode === 'saved' ? 'No Saved Properties' : activeCity ? `No Properties in ${activeCity}` : 'No Properties Available'}
-              </ThemedText>
-              <ThemedText style={[Typography.body, { color: theme.textSecondary, marginTop: Spacing.sm, textAlign: 'center' }]}>
-                {viewMode === 'saved'
-                  ? 'Save properties by tapping the heart icon'
-                  : activeCity
-                    ? 'Try browsing All Cities or a different city'
-                    : 'Check back later for new listings'}
-              </ThemedText>
-            </View>
+            filterLoading ? null : (
+              <View style={styles.emptyStateInline}>
+                <Feather name={viewMode === 'saved' ? 'heart' : 'search'} size={64} color={theme.textSecondary} />
+                <ThemedText style={[Typography.h2, { marginTop: Spacing.xl, textAlign: 'center' }]}>
+                  {viewMode === 'saved' ? 'No Saved Properties' : 'No listings found'}
+                </ThemedText>
+                <ThemedText style={[Typography.body, { color: theme.textSecondary, marginTop: Spacing.sm, textAlign: 'center' }]}>
+                  {viewMode === 'saved'
+                    ? 'Save properties by tapping the heart icon'
+                    : 'Try adjusting your filters or expanding your search area.'}
+                </ThemedText>
+              </View>
+            )
           }
         />
       )}
