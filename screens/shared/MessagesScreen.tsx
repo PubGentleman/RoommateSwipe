@@ -24,6 +24,7 @@ import { useTourSetup } from '../../hooks/useTourSetup';
 import { TOUR_CONTENT } from '../../constants/tourSteps';
 import { isUserOnline, subscribeToPresence } from '../../services/presenceService';
 import { OnlineDot } from '../../components/OnlineDot';
+import { createErrorHandler } from '../../utils/errorLogger';
 
 function safeDate(value: any): Date {
   if (value instanceof Date && !isNaN(value.getTime())) return value;
@@ -166,7 +167,7 @@ export const MessagesScreen = () => {
 
       const [localConversations, supaConvResult, hostConvResult, matches, profiles, allUsers] = await Promise.all([
         StorageService.getConversations().catch(() => [] as Conversation[]),
-        loadConversationsFromSupabase().catch(() => null),
+        loadConversationsFromSupabase().catch(createErrorHandler('MessagesScreen', 'loadConversationsFromSupabase')),
         (isHostMode && user?.id) ? getHostConversations(user.id).catch(() => []) : Promise.resolve([]),
         isHostMode ? Promise.resolve([]) : StorageService.getMatches().catch(() => []),
         isHostMode ? Promise.resolve([]) : StorageService.getRoommateProfiles().catch(() => []),

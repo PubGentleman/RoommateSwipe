@@ -2,6 +2,7 @@ import { supabase } from '../lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PreformedGroup, PreformedGroupMember, GroupShortlistItem } from '../types/models';
 import { shouldLoadMockData } from '../utils/dataUtils';
+import { createErrorHandler } from '../utils/errorLogger';
 
 function generateInviteCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -168,11 +169,11 @@ export async function getGroupMembers(groupId: string): Promise<PreformedGroupMe
       if (error || !data || data.length === 0) return null;
       return data as PreformedGroupMember[];
     })
-    .catch(() => null);
+    .catch(createErrorHandler('preformedGroupService', 'getGroupMembers'));
 
   const localPromise = AsyncStorage.getItem(`@rhome/preformed_members_${groupId}`)
     .then(raw => (raw ? JSON.parse(raw) as PreformedGroupMember[] : null))
-    .catch(() => null);
+    .catch(createErrorHandler('preformedGroupService', 'getGroupMembersLocal'));
 
   const [supabaseResult, localResult] = await Promise.allSettled([supabasePromise, localPromise]);
   const supabaseMembers = supabaseResult.status === 'fulfilled' ? supabaseResult.value : null;
@@ -534,11 +535,11 @@ export async function getUserPreformedGroup(userId: string): Promise<PreformedGr
       if (error || !memberData) return null;
       return getGroupById(memberData.preformed_group_id);
     })
-    .catch(() => null);
+    .catch(createErrorHandler('preformedGroupService', 'getGroupByMembership'));
 
   const localPromise = AsyncStorage.getItem(`@rhome/preformed_group_${userId}`)
     .then(raw => (raw ? JSON.parse(raw) as PreformedGroup : null))
-    .catch(() => null);
+    .catch(createErrorHandler('preformedGroupService', 'getGroupLocal'));
 
   const [supabaseResult, localResult] = await Promise.allSettled([supabasePromise, localPromise]);
   const supabaseGroup = supabaseResult.status === 'fulfilled' ? supabaseResult.value : null;

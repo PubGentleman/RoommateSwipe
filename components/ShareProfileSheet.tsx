@@ -10,6 +10,7 @@ import { supabase } from '../lib/supabase';
 import { getProfileShareLink, trackProfileShare, togglePublicProfile, type PublicProfile } from '../services/socialProfileService';
 import { generateResumeText } from '../utils/roommateResume';
 import { normalizeRenterPlan } from '../constants/renterPlanLimits';
+import { createErrorHandler } from '../utils/errorLogger';
 
 interface Props {
   visible: boolean;
@@ -51,8 +52,8 @@ export function ShareProfileSheet({ visible, onClose, profile, userId, userPlan 
   const handleCopyLink = useCallback(async () => {
     try {
       await Clipboard.setStringAsync(shareLink);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-      trackProfileShare(userId, 'link', 'copy_link').catch(() => {});
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(createErrorHandler('ShareProfileSheet', 'notificationAsync'));
+      trackProfileShare(userId, 'link', 'copy_link').catch(createErrorHandler('ShareProfileSheet', 'trackProfileShare'));
       Alert.alert('Copied!', 'Profile link copied to clipboard');
     } catch {
       Alert.alert('Error', 'Failed to copy link');
@@ -70,7 +71,7 @@ export function ShareProfileSheet({ visible, onClose, profile, userId, userPlan 
       const canShare = await Sharing.isAvailableAsync();
       if (canShare) {
         await Sharing.shareAsync(uri, { mimeType: 'image/png' });
-        trackProfileShare(userId, 'card_image', 'share_card').catch(() => {});
+        trackProfileShare(userId, 'card_image', 'share_card').catch(createErrorHandler('ShareProfileSheet', 'trackProfileShare'));
       }
     } catch {
       Alert.alert('Error', 'Failed to generate share card');
@@ -85,12 +86,12 @@ export function ShareProfileSheet({ visible, onClose, profile, userId, userPlan 
       const canOpen = await Linking.canOpenURL(url);
       if (canOpen) {
         await Linking.openURL(url);
-        trackProfileShare(userId, 'link', 'sms').catch(() => {});
+        trackProfileShare(userId, 'link', 'sms').catch(createErrorHandler('ShareProfileSheet', 'trackProfileShare'));
       } else {
         await Clipboard.setStringAsync(shareMessage);
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(createErrorHandler('ShareProfileSheet', 'notificationAsync'));
         Alert.alert('Copied!', 'Message copied to clipboard');
-        trackProfileShare(userId, 'link', 'sms').catch(() => {});
+        trackProfileShare(userId, 'link', 'sms').catch(createErrorHandler('ShareProfileSheet', 'trackProfileShare'));
       }
     } catch {
       await Clipboard.setStringAsync(shareMessage);
@@ -104,7 +105,7 @@ export function ShareProfileSheet({ visible, onClose, profile, userId, userPlan 
       const canOpen = await Linking.canOpenURL(url);
       if (canOpen) {
         await Linking.openURL(url);
-        trackProfileShare(userId, 'link', 'whatsapp').catch(() => {});
+        trackProfileShare(userId, 'link', 'whatsapp').catch(createErrorHandler('ShareProfileSheet', 'trackProfileShare'));
       } else {
         Alert.alert('WhatsApp not available', 'WhatsApp is not installed on this device.');
       }
@@ -118,7 +119,7 @@ export function ShareProfileSheet({ visible, onClose, profile, userId, userPlan 
       const text = `Check out my roommate profile on @RhomeApp`;
       const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(shareLink)}`;
       await Linking.openURL(url);
-      trackProfileShare(userId, 'link', 'twitter').catch(() => {});
+      trackProfileShare(userId, 'link', 'twitter').catch(createErrorHandler('ShareProfileSheet', 'trackProfileShare'));
     } catch {
       Alert.alert('Error', 'Failed to open Twitter');
     }
@@ -132,8 +133,8 @@ export function ShareProfileSheet({ visible, onClose, profile, userId, userPlan 
     try {
       const resumeText = generateResumeText(profile);
       await Clipboard.setStringAsync(resumeText);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-      trackProfileShare(userId, 'link', 'resume_text').catch(() => {});
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(createErrorHandler('ShareProfileSheet', 'notificationAsync'));
+      trackProfileShare(userId, 'link', 'resume_text').catch(createErrorHandler('ShareProfileSheet', 'trackProfileShare'));
       Alert.alert('Copied!', 'Roommate resume copied to clipboard');
     } catch {
       Alert.alert('Error', 'Failed to generate resume');
@@ -144,7 +145,7 @@ export function ShareProfileSheet({ visible, onClose, profile, userId, userPlan 
     setPublicEnabled(val);
     try {
       await togglePublicProfile(userId, val);
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(createErrorHandler('ShareProfileSheet', 'impactAsync'));
     } catch {
       setPublicEnabled(!val);
     }

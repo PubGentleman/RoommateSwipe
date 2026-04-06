@@ -3,6 +3,7 @@ import { View, Pressable, StyleSheet, Text } from 'react-native';
 import { Audio } from 'expo-av';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, withRepeat, withSequence } from 'react-native-reanimated';
 import { Feather } from './VectorIcons';
+import { createErrorHandler } from '../utils/errorLogger';
 
 type Props = {
   audioUrl: string;
@@ -46,7 +47,7 @@ export default function VoiceMessageBubble({ audioUrl, durationMs, isOwnMessage 
 
   useEffect(() => {
     return () => {
-      soundRef.current?.unloadAsync().catch(() => {});
+      soundRef.current?.unloadAsync().catch(createErrorHandler('VoiceMessageBubble', 'unloadAsync'));
     };
   }, []);
 
@@ -70,7 +71,7 @@ export default function VoiceMessageBubble({ audioUrl, durationMs, isOwnMessage 
                 setIsPlaying(false);
                 setPosition(0);
                 playProgress.value = 0;
-                soundRef.current?.setPositionAsync(0).catch(() => {});
+                soundRef.current?.setPositionAsync(0).catch(createErrorHandler('VoiceMessageBubble', 'setPositionAsync'));
               }
             }
           }

@@ -14,6 +14,7 @@ import { getListing } from '../../services/listingService';
 import { getPlanLimits, type HostPlan } from '../../constants/planLimits';
 import { getImpressionStats, getBoostComparison } from '../../services/boostImpressionService';
 import { recordBoostActivation } from '../../services/boostManagementService';
+import { createErrorHandler } from '../../utils/errorLogger';
 
 const isDev = __DEV__;
 const BG = '#111';
@@ -177,7 +178,7 @@ export const ListingBoostScreen = () => {
         usedFreeBoost: useFree,
         usedCredit: false,
         pricePaidCents: useFree ? 0 : Math.round(option.price * 100),
-      }).catch(() => {});
+      }).catch(createErrorHandler('ListingBoostScreen', 'recordBoostPurchase'));
       const resultLabel = option.includesFeaturedBadge
         ? `Your listing is now featured for ${durationLabel} with a Featured badge!`
         : `Your listing has been boosted to the top of search for ${durationLabel}.`;
@@ -245,7 +246,7 @@ export const ListingBoostScreen = () => {
       usedFreeBoost: false,
       usedCredit: true,
       pricePaidCents: 0,
-    }).catch(() => {});
+    }).catch(createErrorHandler('ListingBoostScreen', 'recordBoostCredit'));
     const durationLabel = option.duration === '6h' ? '6 hours' : option.duration === '12h' ? '12 hours' : '24 hours';
     await showAlert({ title: 'Boost Applied!', message: `Your listing has been boosted for ${durationLabel} using a credit.`, variant: 'success' });
     navigation.goBack();

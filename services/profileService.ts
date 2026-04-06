@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { createErrorHandler } from '../utils/errorLogger';
 
 export interface ProfileData {
   budget_min?: number;
@@ -145,12 +146,12 @@ export async function updateProfile(userId: string, updates: ProfileData) {
     updates.ideal_roommate_text &&
     updates.ideal_roommate_text.trim().length > 20
   ) {
-    triggerPiParsing(updates.ideal_roommate_text).catch(() => {});
+    triggerPiParsing(updates.ideal_roommate_text).catch(createErrorHandler('profileService', 'triggerPiParsing'));
   }
 
   const matchingFieldsChanged = hasMatchingFieldChanges(updates);
   if (matchingFieldsChanged) {
-    triggerPiCacheInvalidation(userId).catch(() => {});
+    triggerPiCacheInvalidation(userId).catch(createErrorHandler('profileService', 'triggerPiCacheInvalidation'));
   }
 
   return result;

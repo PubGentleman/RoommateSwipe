@@ -44,7 +44,7 @@ export async function getCachedOrGenerateInsight(
     });
 
     if (error || !data) return cached as PiMatchInsight | null;
-    logAIUsage(userId, 'match_insight', 0, data.model_used).catch(() => {});
+    logAIUsage(userId, 'match_insight', 0, data.model_used).catch(createErrorHandler('piMatchingService', 'logAIUsage'));
     return data as PiMatchInsight;
   } catch {
     return null;
@@ -89,7 +89,7 @@ export async function generateDeckReranking(
     });
 
     if (error || !data) return null;
-    logAIUsage(userId, 'deck_rerank', 0, data.model_used).catch(() => {});
+    logAIUsage(userId, 'deck_rerank', 0, data.model_used).catch(createErrorHandler('piMatchingService', 'logAIUsage'));
     return data as PiDeckRanking;
   } catch {
     return null;
@@ -155,7 +155,7 @@ export async function parseIdealRoommateText(
     });
 
     if (error || !data) return null;
-    logAIUsage(userId, 'parse_preferences').catch(() => {});
+    logAIUsage(userId, 'parse_preferences').catch(createErrorHandler('piMatchingService', 'logAIUsage'));
     return data as PiParsedPreferences;
   } catch {
     return null;
@@ -188,7 +188,7 @@ export async function getHostRecommendations(
     });
 
     if (error || !data) return cached as PiHostRecommendation | null;
-    logAIUsage(userId, 'host_matchmaker', 0, data.model_used).catch(() => {});
+    logAIUsage(userId, 'host_matchmaker', 0, data.model_used).catch(createErrorHandler('piMatchingService', 'logAIUsage'));
     return data as PiHostRecommendation;
   } catch {
     return null;
@@ -399,3 +399,4 @@ export {
   getPendingAutoGroupCount,
   canJoinAutoGroup,
 } from './piAutoMatchService';
+import { createErrorHandler } from '../utils/errorLogger';

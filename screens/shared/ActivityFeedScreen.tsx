@@ -10,6 +10,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { getFeedEvents, markFeedRead, subscribeToFeed, type FeedEvent } from '../../services/activityFeedService';
 import { useFeedBadge } from '../../contexts/FeedBadgeContext';
 import { navigateToFeedAction } from '../../utils/feedNavigation';
+import { createErrorHandler } from '../../utils/errorLogger';
 
 type FilterTab = 'all' | 'matches' | 'groups' | 'listings' | 'social';
 
@@ -231,15 +232,15 @@ export function ActivityFeedScreen() {
 
   const handleMarkAllRead = async () => {
     if (!user?.id) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(createErrorHandler('ActivityFeedScreen', 'impactAsync'));
     setEvents(prev => prev.map(e => ({ ...e, read: true })));
-    markFeedRead(user.id).then(() => refreshFeedCount()).catch(() => {});
+    markFeedRead(user.id).then(() => refreshFeedCount()).catch(createErrorHandler('ActivityFeedScreen', 'markFeedRead'));
   };
 
   const handleEventPress = (event: FeedEvent) => {
     if (!event.read) {
       setEvents(prev => prev.map(e => e.id === event.id ? { ...e, read: true } : e));
-      if (user?.id) markFeedRead(user.id, [event.id]).then(() => refreshFeedCount()).catch(() => {});
+      if (user?.id) markFeedRead(user.id, [event.id]).then(() => refreshFeedCount()).catch(createErrorHandler('ActivityFeedScreen', 'markFeedRead'));
     }
     navigateToFeedAction(navigation, event.actionUrl);
   };
@@ -292,7 +293,7 @@ export function ActivityFeedScreen() {
             <Pressable
               key={tab.key}
               onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(createErrorHandler('ActivityFeedScreen', 'impactAsync'));
                 setActiveFilter(tab.key);
               }}
               style={[styles.filterPill, active ? styles.filterPillActive : null]}

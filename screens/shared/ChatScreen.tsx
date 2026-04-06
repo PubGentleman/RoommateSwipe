@@ -73,6 +73,7 @@ import VoiceMessageBubble from '../../components/VoiceMessageBubble';
 import LinkPreviewCard from '../../components/LinkPreviewCard';
 import MessageActionsSheet from '../../components/MessageActionsSheet';
 import { extractUrls } from '../../utils/linkPreview';
+import { createErrorHandler } from '../../utils/errorLogger';
 
 const QUICK_REACTIONS = ['\uD83D\uDC4D', '\u2764\uFE0F', '\uD83D\uDE02', '\uD83D\uDE2E', '\uD83D\uDE22', '\uD83D\uDD25'];
 const EXTENDED_EMOJIS = [
@@ -477,9 +478,9 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
 
     if (isGroupChat && !isInquiryChat && user?.id) {
       const groupId = conversationId.replace('group-', '');
-      getPinnedMessages(groupId).then(data => setPinnedMessages(data)).catch(() => {});
-      getGroupMemberMuteStatus(groupId, user.id).then(muted => setIsGroupMuted(muted)).catch(() => {});
-      getGroupSettings(groupId).then(s => setGroupChatSettings(s || {})).catch(() => {});
+      getPinnedMessages(groupId).then(data => setPinnedMessages(data)).catch(createErrorHandler('ChatScreen', 'getPinnedMessages'));
+      getGroupMemberMuteStatus(groupId, user.id).then(muted => setIsGroupMuted(muted)).catch(createErrorHandler('ChatScreen', 'getGroupMemberMuteStatus'));
+      getGroupSettings(groupId).then(s => setGroupChatSettings(s || {})).catch(createErrorHandler('ChatScreen', 'getGroupSettings'));
     }
   }, [conversationId, isInquiryChat, user?.id]);
 
@@ -512,7 +513,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
     const groupId = conversationId.replace('group-', '');
     const lastMsg = messages[messages.length - 1];
     if (lastMsg?.id) {
-      updateLastRead(groupId, user.id, lastMsg.id).catch(() => {});
+      updateLastRead(groupId, user.id, lastMsg.id).catch(createErrorHandler('ChatScreen', 'updateLastRead'));
     }
   }, [conversationId, isInquiryChat, user?.id, messages.length]);
 
@@ -690,7 +691,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
     if (messages.length > 0) {
       const msgIds = messages.map(m => m.id).filter(id => id && !id.startsWith('msg_') && !id.startsWith('sep-'));
       if (msgIds.length) {
-        getReactions(msgIds).then(setReactionsMap).catch(() => {});
+        getReactions(msgIds).then(setReactionsMap).catch(createErrorHandler('ChatScreen', 'getReactions'));
       }
     }
   }, [messages]);
@@ -1526,14 +1527,14 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
     await StorageService.setConversations(conversations);
     await incrementMessageCount();
     dispatchInsightTrigger('message_activity');
-    recordMessageActivity(conversationId).catch(() => {});
+    recordMessageActivity(conversationId).catch(createErrorHandler('ChatScreen', 'recordMessageActivity'));
 
     if (isInquiryChat && inquiryGroup?.hostId) {
       if (user.id === inquiryGroup.hostId) {
-        updateAgentResponseTimestamp(conversationId).catch(() => {});
+        updateAgentResponseTimestamp(conversationId).catch(createErrorHandler('ChatScreen', 'updateAgentResponseTimestamp'));
         setResponseDelayHours(0);
       } else {
-        updateRenterMessageTimestamp(conversationId).catch(() => {});
+        updateRenterMessageTimestamp(conversationId).catch(createErrorHandler('ChatScreen', 'updateRenterMessageTimestamp'));
       }
     }
 
@@ -1579,7 +1580,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
     if (matchIdForPresence) sendTypingIndicator(matchIdForPresence, false);
     setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
 
-    analyzeIntentAfterMessage().catch(() => {});
+    analyzeIntentAfterMessage().catch(createErrorHandler('ChatScreen', 'analyzeIntentAfterMessage'));
   };
 
   const handleCreateGroup = () => {

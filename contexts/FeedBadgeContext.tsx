@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useAuth } from './AuthContext';
 import { getUnreadFeedCount, subscribeToFeed } from '../services/activityFeedService';
+import { createErrorHandler } from '../utils/errorLogger';
 
 interface FeedBadgeContextType {
   unreadFeedCount: number;
@@ -20,7 +21,7 @@ export const FeedBadgeProvider = ({ children }: { children: React.ReactNode }) =
 
   const refreshFeedCount = useCallback(() => {
     if (!user?.id) return;
-    getUnreadFeedCount(user.id).then(setUnreadFeedCount).catch(() => {});
+    getUnreadFeedCount(user.id).then(setUnreadFeedCount).catch(createErrorHandler('FeedBadgeContext', 'getUnreadFeedCount'));
   }, [user?.id]);
 
   useEffect(() => {

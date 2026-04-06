@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../contexts/AuthContext';
 import { StorageService } from '../../utils/storage';
 import { supabase } from '../../lib/supabase';
+import { createErrorHandler } from '../../utils/errorLogger';
 
 const BG = '#0d0d0d';
 const CARD_BG = '#1a1a1a';
@@ -59,7 +60,7 @@ export const BillingHistoryScreen = () => {
           .limit(50)
           .then(r => r.data || [])
           .catch(() => []),
-        StorageService.getHostSubscription(user.id).catch(() => null),
+        StorageService.getHostSubscription(user.id).catch(createErrorHandler('BillingHistoryScreen', 'getHostSubscription')),
       ]);
 
       const mapped: BillingEntry[] = historyResult.map((t: any) => ({

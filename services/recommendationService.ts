@@ -1,6 +1,7 @@
 import { supabase } from '../lib/supabase';
 import { calculateListingMatchScore, ListingMatchInput } from '../utils/listingMatchScore';
 import { Property } from '../types/models';
+import { createErrorHandler } from '../utils/errorLogger';
 
 export interface RecommendedListing {
   listing: Property;
@@ -267,7 +268,7 @@ export async function getForYouListings(
     }));
 
     await supabase.from('user_recommendations').delete().eq('user_id', userId);
-    await supabase.from('user_recommendations').insert(cacheRows).catch(() => {});
+    await supabase.from('user_recommendations').insert(cacheRows).catch(createErrorHandler('recommendationService', 'cacheRecommendations'));
   }
 
   return topResults;

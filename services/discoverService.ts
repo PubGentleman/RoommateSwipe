@@ -6,6 +6,7 @@ import { getCachedDeckRanking, generateDeckReranking } from './piMatchingService
 import { RENTER_PLAN_LIMITS, normalizeRenterPlan } from '../constants/renterPlanLimits';
 import { getWeightProfile, recordSwipeWithScores, recalculateLearnedWeights } from './matchWeightService';
 import { calculateWeightedCompatibility } from '../utils/matchingAlgorithm';
+import { createErrorHandler } from '../utils/errorLogger';
 
 export async function getSwipeDeck(userId: string, city?: string, filters?: {
   budgetMin?: number;
@@ -225,7 +226,7 @@ export async function getSwipeDeck(userId: string, city?: string, filters?: {
         finalDeck = applyAIRanking(finalDeck, cached.ranked_user_ids);
       } else {
         const top30Ids = finalDeck.slice(0, 30).map((p: any) => p.id);
-        generateDeckReranking(userId, top30Ids).catch(() => {});
+        generateDeckReranking(userId, top30Ids).catch(createErrorHandler('discoverService', 'generateDeckReranking'));
       }
     } catch {}
   }
@@ -249,11 +250,11 @@ export async function sendLike(
 
   if (error) throw error;
 
-  incrementUsage(userId, 'interest_cards_today').catch(() => {});
+  incrementUsage(userId, 'interest_cards_today').catch(createErrorHandler('discoverService', 'incrementUsage'));
 
   supabase.functions.invoke('calculate-match-scores', {
     body: { userId },
-  }).catch(() => {});
+  }).catch(createErrorHandler('discoverService', 'calculateMatchScores'));
 
   supabase.functions.invoke('send-push-notification', {
     body: {
@@ -263,10 +264,10 @@ export async function sendLike(
       body: 'Open Rhome to see who sent you interest',
       data: {},
     },
-  }).catch(() => {});
+  }).catch(createErrorHandler('discoverService', 'sendInterestNotification'));
 
   if (matchBreakdown && matchScore !== undefined) {
-    recordSwipeWithScores(userId, recipientId, 'like', matchScore, matchBreakdown).catch(() => {});
+    recordSwipeWithScores(userId, recipientId, 'like', matchScore, matchBreakdown).catch(createErrorHandler('discoverService', 'recordSwipeWithScores'));
     triggerWeightRecalculation(userId);
   }
 
@@ -277,7 +278,7 @@ export async function sendLike(
     .eq('status', 'matched')
     .single()
     .then(({ data: match }) => match)
-    .catch(() => null);
+    .catch(createErrorHandler('discoverService', 'checkMatchStatus'));
 
   return { interestCard: data, matchPromise };
 }
@@ -297,7 +298,7 @@ export async function sendPass(
   if (error) throw error;
 
   if (matchBreakdown && matchScore !== undefined) {
-    recordSwipeWithScores(userId, recipientId, 'pass', matchScore, matchBreakdown).catch(() => {});
+    recordSwipeWithScores(userId, recipientId, 'pass', matchScore, matchBreakdown).catch(createErrorHandler('discoverService', 'recordSwipeWithScores'));
     triggerWeightRecalculation(userId);
   }
 }
@@ -307,7 +308,7 @@ const swipeCounters: Record<string, number> = {};
 function triggerWeightRecalculation(userId: string) {
   swipeCounters[userId] = (swipeCounters[userId] || 0) + 1;
   if (swipeCounters[userId] % 10 === 0) {
-    recalculateLearnedWeights(userId).catch(() => {});
+    recalculateLearnedWeights(userId).catch(createErrorHandler('discoverService', 'recalculateLearnedWeights'));
   }
 }
 
@@ -383,7 +384,7 @@ export async function acceptInterestCard(userId: string, cardId: string, senderI
       body: 'Someone accepted your interest. Start chatting!',
       data: { matchId: match?.id },
     },
-  }).catch(() => {});
+  }).catch(createErrorHandler('discoverService', 'sendMatchNotification'));
 
   return { match };
 }

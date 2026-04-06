@@ -54,6 +54,7 @@ import { Spacing } from '../../constants/theme';
 import { supabase } from '../../lib/supabase';
 import { ReportBlockModal } from '../../components/ReportBlockModal';
 import { reportGroup, reportUser, blockUser as blockUserRemote } from '../../services/moderationService';
+import { createErrorHandler } from '../../utils/errorLogger';
 
 type Tab = 'members' | 'shortlist' | 'tours' | 'settings';
 
@@ -511,7 +512,7 @@ export default function MyGroupScreen() {
                       {isLead ? (
                         <Pressable
                           onPress={() => {
-                            resendGroupInvite(inv.id).catch(() => {});
+                            resendGroupInvite(inv.id).catch(createErrorHandler('MyGroupScreen', 'resendGroupInvite'));
                             Alert.alert('Invite Resent', 'The invite has been resent.');
                           }}
                           style={{ paddingHorizontal: 10, paddingVertical: 6, backgroundColor: 'rgba(245,158,11,0.1)', borderRadius: 8 }}

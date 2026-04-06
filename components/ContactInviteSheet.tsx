@@ -5,6 +5,7 @@ import * as Haptics from 'expo-haptics';
 import { Feather } from './VectorIcons';
 import { trackInvite, getReferralLink } from '../services/referralService';
 import { useAuth } from '../contexts/AuthContext';
+import { createErrorHandler } from '../utils/errorLogger';
 
 interface Props {
   visible: boolean;
@@ -83,7 +84,7 @@ export function ContactInviteSheet({ visible, onClose, referralCode, onInvitesSe
   };
 
   const toggleContact = (id: string) => {
-    Haptics.selectionAsync().catch(() => {});
+    Haptics.selectionAsync().catch(createErrorHandler('ContactInviteSheet', 'selectionAsync'));
     setContacts(prev => prev.map(c => c.id === id ? { ...c, selected: !c.selected } : c));
   };
 

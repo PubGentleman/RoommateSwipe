@@ -22,6 +22,7 @@ import {
   type BoostSummary,
   type AutoBoostSchedule,
 } from '../../services/boostManagementService';
+import { createErrorHandler } from '../../utils/errorLogger';
 
 const BG = '#0d0d0d';
 const CARD_BG = '#1a1a1a';
@@ -94,9 +95,9 @@ export const BoostManagementScreen = () => {
 
       const [historyData, summaryData, schedulesData, activeData, listingsData] = await Promise.all([
         getBoostHistory(user.id, 20).catch(() => []),
-        getBoostSummary(user.id, creds).catch(() => null),
+        getBoostSummary(user.id, creds).catch(createErrorHandler('BoostManagementScreen', 'getBoostSummary')),
         getAutoBoostSchedules(user.id).catch(() => []),
-        getActiveBoost(user.id).catch(() => null),
+        getActiveBoost(user.id).catch(createErrorHandler('BoostManagementScreen', 'getActiveBoost')),
         getMyListings(user.id).catch(() => []),
       ]);
 

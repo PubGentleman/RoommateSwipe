@@ -74,6 +74,7 @@ import { getCachedOrGenerateInsight, getCachedDeckRanking } from '../../services
 import { DailyQuestionCard } from '../../components/DailyQuestionCard';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getCompletionPercentage } from '../../utils/profileReminderUtils';
+import { createErrorHandler } from '../../utils/errorLogger';
 
 const PROFILE_PROMPT_KEY = 'hasSeenProfilePrompt';
 const PROFILE_PROMPT_DISMISS_KEY = 'profile_prompt_dismissed_date';
@@ -329,7 +330,7 @@ export const RoommatesScreen = () => {
           setHighlightedProfileId(result.profile.id);
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         }
-      }).catch(() => {});
+      }).catch(createErrorHandler('RoommatesScreen', 'getBestMatchToday'));
     }
   }, [user?.id]);
 
@@ -411,7 +412,7 @@ export const RoommatesScreen = () => {
         lastLoadTime.current = now;
       }
 
-      getDailySwipeCount().then(count => setDailySwipesUsed(count)).catch(() => {});
+      getDailySwipeCount().then(count => setDailySwipesUsed(count)).catch(createErrorHandler('RoommatesScreen', 'getDailySwipeCount'));
 
       if (user) {
         (async () => {
@@ -596,7 +597,7 @@ export const RoommatesScreen = () => {
       const photos = Array.isArray(profile.photos) ? profile.photos : profile.photos ? [profile.photos] : [];
       (photos as string[]).slice(0, 2).forEach((uri: string) => {
         if (uri && uri.startsWith('http')) {
-          Image.prefetch(uri).catch(() => {});
+          Image.prefetch(uri).catch(createErrorHandler('RoommatesScreen', 'prefetch'));
         }
       });
     });
@@ -747,7 +748,7 @@ export const RoommatesScreen = () => {
         if (adj.direction === 'up') boosted.add(adj.user_id);
       }
       setPiBoostedIds(boosted);
-    }).catch(() => {});
+    }).catch(createErrorHandler('RoommatesScreen', 'getCachedDeckRanking'));
   }, [renterLimits.hasPiDeckReranking, profiles.length]);
 
   useEffect(() => {
@@ -771,7 +772,7 @@ export const RoommatesScreen = () => {
         piSummaryCache.current[profileId] = insight.summary;
         setPiCardSummary(insight.summary);
       }
-    }).catch(() => {}).finally(() => { if (!stale) setPiCardLoading(false); });
+    }).catch(createErrorHandler('RoommatesScreen', 'finally')).finally(() => { if (!stale) setPiCardLoading(false); });
     return () => { stale = true; };
   }, [currentProfile?.id]);
 
@@ -1068,9 +1069,9 @@ export const RoommatesScreen = () => {
       }
       const matchedProfile = profiles.find(p => p.id === profileId);
       const score = matchedProfile?.compatibility;
-      recordSwipe(isRight, score).catch(() => {});
+      recordSwipe(isRight, score).catch(createErrorHandler('RoommatesScreen', 'recordSwipe'));
       if (isRight) {
-        checkMicroQuestionTrigger().catch(() => {});
+        checkMicroQuestionTrigger().catch(createErrorHandler('RoommatesScreen', 'checkMicroQuestionTrigger'));
       }
       checkRefinementTrigger();
     } catch (error) {
@@ -1233,7 +1234,7 @@ export const RoommatesScreen = () => {
     });
 
   const trackProfileView = (viewedId: string, viewerId: string) => {
-    StorageService.addProfileView(viewedId, viewerId).catch(() => {});
+    StorageService.addProfileView(viewedId, viewerId).catch(createErrorHandler('RoommatesScreen', 'addProfileView'));
   };
 
   const tap = Gesture.Tap()

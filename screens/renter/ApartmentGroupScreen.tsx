@@ -40,6 +40,7 @@ import { TourEventCard } from '../../components/TourEventCard';
 import { TourScheduleForm } from '../../components/TourScheduleForm';
 import { PreformedGroup, PreformedGroupMember } from '../../types/models';
 import { RhomeLogo } from '../../components/RhomeLogo';
+import { createErrorHandler } from '../../utils/errorLogger';
 
 const ACCENT = '#4a9eff';
 
@@ -451,7 +452,7 @@ export default function ApartmentGroupScreen() {
                     {isLead ? (
                       <Pressable
                         onPress={async () => {
-                          resendGroupInvite(inv.id).catch(() => {});
+                          resendGroupInvite(inv.id).catch(createErrorHandler('ApartmentGroupScreen', 'resendGroupInvite'));
                           await showAlert({ title: 'Sent!', message: 'Invite resent.', variant: 'success' });
                         }}
                         style={styles.resendBtn}

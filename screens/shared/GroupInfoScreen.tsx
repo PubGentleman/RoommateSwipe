@@ -43,6 +43,7 @@ import { ReportBlockModal } from '../../components/ReportBlockModal';
 import { reportGroup, reportUser, blockUser as blockUserRemote } from '../../services/moderationService';
 import { EventCard } from '../../components/EventCard';
 import { getGroupEvents, type RhomeEvent } from '../../services/eventService';
+import { createErrorHandler } from '../../utils/errorLogger';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -154,22 +155,22 @@ export function GroupInfoScreen({ route, navigation }: Props) {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           }
         })
-        .catch(() => {})
+        .catch(createErrorHandler('GroupInfoScreen', 'getSuggestedGroupMembers'))
         .finally(() => setLoadingSuggestions(false));
     }
   }, [group?.id, user?.id, canSeeAI, spotsNeeded, isRenter]);
 
   useEffect(() => {
     if (groupId && user) {
-      getGroupHealth(groupId, user.id).then(setHealth).catch(() => {});
+      getGroupHealth(groupId, user.id).then(setHealth).catch(createErrorHandler('GroupInfoScreen', 'getGroupHealth'));
     }
   }, [groupId, group?.id]);
 
   useEffect(() => {
     if (groupId && user?.id) {
       import('../../services/groupService').then(({ getGroupSettings, getGroupMemberMuteStatus }) => {
-        getGroupSettings(groupId).then(setGroupChatSettings).catch(() => {});
-        getGroupMemberMuteStatus(groupId, user.id).then(setMuted).catch(() => {});
+        getGroupSettings(groupId).then(setGroupChatSettings).catch(createErrorHandler('GroupInfoScreen', 'getGroupSettings'));
+        getGroupMemberMuteStatus(groupId, user.id).then(setMuted).catch(createErrorHandler('GroupInfoScreen', 'getGroupMemberMuteStatus'));
       });
     }
   }, [groupId, user?.id]);
@@ -180,7 +181,7 @@ export function GroupInfoScreen({ route, navigation }: Props) {
       getGroupLikers(groupId)
         .then(setGroupLikers)
         .catch(() => {
-          StorageService.getGroupLikersForGroup(groupId).then(setGroupLikers).catch(() => {});
+          StorageService.getGroupLikersForGroup(groupId).then(setGroupLikers).catch(createErrorHandler('GroupInfoScreen', 'getGroupLikersForGroup'));
         })
         .finally(() => setLoadingLikers(false));
     }
@@ -191,7 +192,7 @@ export function GroupInfoScreen({ route, navigation }: Props) {
       if (group?.id && user?.id) {
         getGroupEvents(groupId, user.id)
           .then(setGroupEvents)
-          .catch(() => {});
+          .catch(createErrorHandler('GroupInfoScreen', 'getGroupEvents'));
       }
     }, [group?.id, user?.id])
   );

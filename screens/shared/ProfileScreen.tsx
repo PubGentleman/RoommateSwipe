@@ -32,6 +32,7 @@ import { getProfileGateStatus, TIER_INFO, ProfileTier } from '../../utils/profil
 import LevelUpToast from '../../components/LevelUpToast';
 import { ShareProfileSheet } from '../../components/ShareProfileSheet';
 import { getReceivedTestimonials, refreshProfileStats, updateTagline, getTraitEmoji, type PublicProfile, type Testimonial } from '../../services/socialProfileService';
+import { createErrorHandler } from '../../utils/errorLogger';
 
 type ProfileScreenNavigationProp = NativeStackNavigationProp<ProfileStackParamList, 'ProfileMain'>;
 
@@ -178,7 +179,7 @@ export const ProfileScreen = () => {
               .eq('user_id', userId)
               .single(),
             !isHost ? StorageService.getInterestCardsForRenter(userId).catch(() => []) : Promise.resolve([]),
-            getAffiliateForUser(userId).catch(() => null),
+            getAffiliateForUser(userId).catch(createErrorHandler('ProfileScreen', 'getAffiliateForUser')),
           ]);
           if (!isMounted) return;
 

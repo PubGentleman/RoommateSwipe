@@ -4,6 +4,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { Feather } from './VectorIcons';
 import type { FeedEvent } from '../services/activityFeedService';
+import { createErrorHandler } from '../utils/errorLogger';
 
 interface Props {
   event: FeedEvent;
@@ -59,7 +60,7 @@ export function FeedEventCard({ event, onPress, index = 0 }: Props) {
   const compatScore = event.metadata?.compatibilityScore;
 
   const handlePress = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(createErrorHandler('FeedEventCard', 'impactAsync'));
     onPress();
   };
 

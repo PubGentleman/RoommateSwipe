@@ -37,6 +37,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ReportBlockModal } from '../../components/ReportBlockModal';
 import { reportUser, blockUser as blockUserRemote } from '../../services/moderationService';
 import { withTimeout } from '../../utils/queryTimeout';
+import { createErrorHandler } from '../../utils/errorLogger';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const CARD_WIDTH = SCREEN_WIDTH - Spacing.xxl;
@@ -129,14 +130,14 @@ export const GroupsScreen = () => {
         getMyPendingInvites(user.id)
           .then(setPendingInvites)
           .catch(() => {
-            StorageService.getPendingGroupInvites(user.id).then(setPendingInvites).catch(() => {});
+            StorageService.getPendingGroupInvites(user.id).then(setPendingInvites).catch(createErrorHandler('GroupsScreen', 'getPendingGroupInvites'));
           });
         getMyPendingCompanyInvites(user.id)
           .then(setCompanyInvites)
           .catch(() => setCompanyInvites([]));
       }
       if (user?.role === 'host') {
-        getMyListings(user.id).catch(() => {});
+        getMyListings(user.id).catch(createErrorHandler('GroupsScreen', 'getMyListings'));
       }
     }, [user, activeCity, activeSubArea])
   );
@@ -170,7 +171,7 @@ export const GroupsScreen = () => {
             .filter(([, h]) => h.score > 0)
             .sort(([, a], [, b]) => b.score - a.score);
           setBestGroupId(ranked.length > 0 ? ranked[0][0] : null);
-        }).catch(() => {});
+        }).catch(createErrorHandler('GroupsScreen', 'loadGroupHealth'));
       }, 100);
       return () => clearTimeout(timer);
     }
@@ -320,7 +321,7 @@ export const GroupsScreen = () => {
         ]).then(([count, active]) => {
           setPiPendingCount(count);
           setPiAutoMatchActive(active);
-        }).catch(() => {});
+        }).catch(createErrorHandler('GroupsScreen', 'loadAutoMatchStatus'));
       }
     } catch (error) {
       console.error('Error loading groups:', error);

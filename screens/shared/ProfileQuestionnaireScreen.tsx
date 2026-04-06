@@ -54,6 +54,7 @@ import { BOROUGH_NEIGHBORHOODS } from '../../constants/transitData';
 import { updateProfile } from '../../services/profileService';
 import { AppHeader } from '../../components/AppHeader';
 import { RhomeLogo } from '../../components/RhomeLogo';
+import { createErrorHandler } from '../../utils/errorLogger';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
@@ -768,7 +769,7 @@ export const ProfileQuestionnaireScreen = () => {
       const nextIdx = currentFilteredIndex + 1;
       setCurrentFilteredIndex(nextIdx);
       try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
-      updateUser(buildProfileData()).catch(() => {});
+      updateUser(buildProfileData()).catch(createErrorHandler('ProfileQuestionnaireScreen', 'updateUser'));
 
       try {
         if (user?.id) {
@@ -1699,7 +1700,7 @@ export const ProfileQuestionnaireScreen = () => {
               onPress={() => {
                 setDirection('forward');
                 setCurrentFilteredIndex(prev => Math.min(prev + 1, stepsToShow.length - 1));
-                updateUser(buildProfileData()).catch(() => {});
+                updateUser(buildProfileData()).catch(createErrorHandler('ProfileQuestionnaireScreen', 'updateUser'));
               }}
               hitSlop={8}
               style={{ paddingHorizontal: 4, paddingVertical: 4 }}

@@ -6,6 +6,7 @@ import Animated, { FadeInDown, ZoomIn } from 'react-native-reanimated';
 import { Feather } from '../../components/VectorIcons';
 import { writeTestimonial, getTraitEmoji, canWriteTestimonial } from '../../services/socialProfileService';
 import { useAuth } from '../../contexts/AuthContext';
+import { createErrorHandler } from '../../utils/errorLogger';
 
 const RELATIONSHIPS = ['Roommate', 'Group Member', 'Matched', 'Co-searcher'];
 const RATING_LABELS = ['Terrible', 'Bad', 'OK', 'Good', 'Great'];
@@ -46,7 +47,7 @@ export default function WriteTestimonialScreen() {
 
   const handleNext = () => {
     if (step < 3) {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(createErrorHandler('WriteTestimonialScreen', 'impactAsync'));
       setStep(step + 1);
     } else {
       handleSubmit();
@@ -59,7 +60,7 @@ export default function WriteTestimonialScreen() {
   };
 
   const toggleTrait = (trait: string) => {
-    Haptics.selectionAsync().catch(() => {});
+    Haptics.selectionAsync().catch(createErrorHandler('WriteTestimonialScreen', 'selectionAsync'));
     setSelectedTraits(prev => {
       if (prev.includes(trait)) return prev.filter(t => t !== trait);
       if (prev.length >= MAX_TRAITS) return prev;
@@ -82,7 +83,7 @@ export default function WriteTestimonialScreen() {
         relationship.toLowerCase().replace(' ', '_'),
         selectedTraits.map(t => t.toLowerCase())
       );
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(createErrorHandler('WriteTestimonialScreen', 'notificationAsync'));
       setSubmitted(true);
       setTimeout(() => navigation.goBack(), 2500);
     } catch (e: any) {
@@ -136,7 +137,7 @@ export default function WriteTestimonialScreen() {
                   <Pressable
                     key={r}
                     style={[styles.pill, relationship === r ? styles.pillSelected : null]}
-                    onPress={() => { setRelationship(r); Haptics.selectionAsync().catch(() => {}); }}
+                    onPress={() => { setRelationship(r); Haptics.selectionAsync().catch(createErrorHandler('WriteTestimonialScreen', 'setRelationship')); }}
                   >
                     <Text style={[styles.pillText, relationship === r ? styles.pillTextSelected : null]}>{r}</Text>
                   </Pressable>
@@ -150,7 +151,7 @@ export default function WriteTestimonialScreen() {
                 {[1, 2, 3, 4, 5].map(i => (
                   <Pressable
                     key={i}
-                    onPress={() => { setRating(i); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); }}
+                    onPress={() => { setRating(i); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(createErrorHandler('WriteTestimonialScreen', 'setRating')); }}
                     style={styles.starBtn}
                   >
                     <Feather name="star" size={36} color={i <= rating ? '#ff6b5b' : '#333'} />

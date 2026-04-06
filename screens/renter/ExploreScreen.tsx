@@ -83,6 +83,7 @@ import { getProfileGateStatus, getItemsForTier, ProfileTier } from '../../utils/
 import FeatureGateModal from '../../components/FeatureGateModal';
 import { useTourSetup } from '../../hooks/useTourSetup';
 import { TOUR_CONTENT } from '../../constants/tourSteps';
+import { createErrorHandler } from '../../utils/errorLogger';
 
 const BG = '#111';
 const CARD_BG = '#1a1a1a';
@@ -271,7 +272,7 @@ export const ExploreScreen = () => {
             loadSavedProperties(),
             loadHostProfiles(),
             loadUserGroups(),
-          ]).catch(() => {});
+          ]).catch(createErrorHandler('ExploreScreen', 'loadSecondaryData'));
         }
       } catch (e) {
         console.warn('[Explore] Load error:', e);
@@ -363,7 +364,7 @@ export const ExploreScreen = () => {
           setIsLoading(false);
           usedSupabase = true;
           loadDiscoverableGroups(mapped);
-          getAgentsWithCriticalStatus().then(setCriticalAgentIds).catch(() => {});
+          getAgentsWithCriticalStatus().then(setCriticalAgentIds).catch(createErrorHandler('ExploreScreen', 'getAgentsWithCriticalStatus'));
         }
       } catch (supabaseErr) {
         console.warn('Supabase getListings failed, using local data:', supabaseErr);
@@ -391,7 +392,7 @@ export const ExploreScreen = () => {
 
   useEffect(() => {
     if (selectedProperty && showPropertyDetail) {
-      getReviewSummary(selectedProperty.id).then(setDetailReviewSummary).catch(() => {});
+      getReviewSummary(selectedProperty.id).then(setDetailReviewSummary).catch(createErrorHandler('ExploreScreen', 'getReviewSummary'));
 
       if (user?.id) {
         setReviewEligibilityLoaded(false);
@@ -430,7 +431,7 @@ export const ExploreScreen = () => {
     });
     if (result.success) {
       setShowWriteReview(false);
-      getReviewSummary(selectedProperty.id).then(setDetailReviewSummary).catch(() => {});
+      getReviewSummary(selectedProperty.id).then(setDetailReviewSummary).catch(createErrorHandler('ExploreScreen', 'getReviewSummary'));
       await showAlert({ title: 'Review Submitted', message: 'Thank you for your review!' });
     } else {
       await showAlert({ title: 'Error', message: result.error || 'Could not submit review.' });
@@ -624,7 +625,7 @@ export const ExploreScreen = () => {
       if (newFilters.listingTypes) setListingTypeFilter(newFilters.listingTypes);
       navigation.setParams({ applySavedFilters: undefined, savedSearchId: undefined } as any);
       if (savedSearchId) {
-        markMatchesSeen(savedSearchId, []).catch(() => {});
+        markMatchesSeen(savedSearchId, []).catch(createErrorHandler('ExploreScreen', 'markMatchesSeen'));
       }
     }
   }, [(route.params as any)?.applySavedFilters]);
@@ -633,7 +634,7 @@ export const ExploreScreen = () => {
     if (user?.id) {
       getSavedSearches(user.id)
         .then(s => setSavedSearchCount(s.length))
-        .catch(() => {});
+        .catch(createErrorHandler('ExploreScreen', 'getSavedSearches'));
     }
   }, [user?.id]);
 
@@ -3358,7 +3359,7 @@ export const ExploreScreen = () => {
                   hostId={selectedProperty.hostId || selectedProperty.hostProfileId || ''}
                   onClose={() => {
                     setShowReviewsModal(false);
-                    getReviewSummary(selectedProperty.id).then(setDetailReviewSummary).catch(() => {});
+                    getReviewSummary(selectedProperty.id).then(setDetailReviewSummary).catch(createErrorHandler('ExploreScreen', 'getReviewSummary'));
                   }}
                 />
               </Modal>

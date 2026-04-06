@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, Pressable, StyleSheet, Linking } from 'react-native';
 import { Feather } from './VectorIcons';
+import { createErrorHandler } from '../utils/errorLogger';
 
 interface ChatFileMessageProps {
   url: string;
@@ -28,7 +29,7 @@ const ChatFileMessage: React.FC<ChatFileMessageProps> = ({
   url, filename, mimeType, sizeBytes, isMine, timestamp,
 }) => {
   const handleOpen = () => {
-    Linking.openURL(url).catch(() => {});
+    Linking.openURL(url).catch(createErrorHandler('ChatFileMessage', 'openURL'));
   };
 
   return (

@@ -11,6 +11,7 @@ import { getAgentPlanLimits, getAgentListingLimitMessage, type AgentPlan } from 
 import { identifyUser as rcIdentifyUser, logoutRevenueCat as rcLogout } from '../lib/revenueCat';
 import { processReferralCommission } from '../services/affiliateService';
 import { registerForPushNotifications, removePushToken } from '../services/pushNotificationService';
+import { createErrorHandler } from '../utils/errorLogger';
 
 export type UserRole = 'renter' | 'host';
 
@@ -420,7 +421,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (mappedUser.role === 'renter' && mappedUser.onboardingStep === 'profile') {
         mappedUser.onboardingStep = 'complete';
-        supabase.from('users').update({ onboarding_step: 'complete' }).eq('id', session.user.id).catch(() => {});
+        supabase.from('users').update({ onboarding_step: 'complete' }).eq('id', session.user.id).catch(createErrorHandler('AuthContext', 'updateOnboardingStep'));
       }
 
       if (userData.is_deleted) {
@@ -443,7 +444,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return;
         }
       } else {
-        supabase.from('users').update({ last_active_at: new Date().toISOString() }).eq('id', session.user.id).then(() => {}).catch(() => {});
+        supabase.from('users').update({ last_active_at: new Date().toISOString() }).eq('id', session.user.id).then(() => {}).catch(createErrorHandler('AuthContext', 'updateLastActive'));
       }
 
       const localUser = await StorageService.getCurrentUser();
@@ -545,19 +546,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       setUser(mappedUser);
 
-      StorageService.setCurrentUser(mappedUser).catch(() => {});
-      StorageService.addOrUpdateUser(mappedUser).catch(() => {});
+      StorageService.setCurrentUser(mappedUser).catch(createErrorHandler('AuthContext', 'setCurrentUser'));
+      StorageService.addOrUpdateUser(mappedUser).catch(createErrorHandler('AuthContext', 'addOrUpdateUser'));
 
-      rcIdentifyUser(mappedUser.id).catch(() => {});
+      rcIdentifyUser(mappedUser.id).catch(createErrorHandler('AuthContext', 'rcIdentifyUser'));
 
-      StorageService.seedUserSpecificMockData(mappedUser.id, mappedUser.name, mappedUser.role, mappedUser.hostType).catch(() => {});
+      StorageService.seedUserSpecificMockData(mappedUser.id, mappedUser.name, mappedUser.role, mappedUser.hostType).catch(createErrorHandler('AuthContext', 'seedUserSpecificMockData'));
     } catch (error) {
       console.error('Error loading user from Supabase:', error);
       try {
         await StorageService.initializeWithMockData();
         const fallbackUser = await StorageService.getCurrentUser();
         if (fallbackUser) {
-          StorageService.seedUserSpecificMockData(fallbackUser.id, fallbackUser.name, fallbackUser.role, fallbackUser.hostType).catch(() => {});
+          StorageService.seedUserSpecificMockData(fallbackUser.id, fallbackUser.name, fallbackUser.role, fallbackUser.hostType).catch(createErrorHandler('AuthContext', 'seedUserSpecificMockData'));
           if (fallbackUser.hostType === 'agent' && !fallbackUser.licenseNumber) {
             fallbackUser.licenseNumber = 'NY-10987654';
             fallbackUser.agencyName = 'Premier Realty Group';
@@ -670,7 +671,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         currentUser.emailVerified = true;
       }
       const resetUser = await resetDailyMessagesIfNeeded(currentUser);
-      StorageService.seedUserSpecificMockData(resetUser.id, resetUser.name, resetUser.role, resetUser.hostType).catch(() => {});
+      StorageService.seedUserSpecificMockData(resetUser.id, resetUser.name, resetUser.role, resetUser.hostType).catch(createErrorHandler('AuthContext', 'seedUserSpecificMockData'));
       setUser(resetUser);
     }
     setIsLoading(false);
@@ -1090,7 +1091,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await supabase.from('subscriptions').update(updatePayload).eq('user_id', user.id);
     setUser(updatedUser);
     console.log('[Auth] Upgraded to Plus:', updatedUser.subscription);
-    processReferralCommission(user.id, 'plus').catch(() => {});
+    processReferralCommission(user.id, 'plus').catch(createErrorHandler('AuthContext', 'processReferralCommission'));
   };
 
   const upgradeToElite = async (billingCycle: 'monthly' | '3month' | 'annual' = 'monthly', stripeSubscriptionId?: string) => {
@@ -1117,7 +1118,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await supabase.from('subscriptions').update(updatePayload).eq('user_id', user.id);
     setUser(updatedUser);
     console.log('[Auth] Upgraded to Elite:', updatedUser.subscription);
-    processReferralCommission(user.id, 'elite').catch(() => {});
+    processReferralCommission(user.id, 'elite').catch(createErrorHandler('AuthContext', 'processReferralCommission'));
   };
 
   const downgradeToPlan = async (targetPlan: 'basic' | 'plus') => {

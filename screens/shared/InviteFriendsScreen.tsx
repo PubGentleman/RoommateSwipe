@@ -18,6 +18,7 @@ import {
   type RewardMilestone,
 } from '../../services/referralService';
 import { ContactInviteSheet } from '../../components/ContactInviteSheet';
+import { createErrorHandler } from '../../utils/errorLogger';
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
   invited: { label: 'Invited', color: '#A0A0A0', bg: 'rgba(160,160,160,0.12)' },
@@ -79,12 +80,12 @@ export default function InviteFriendsScreen() {
 
   const handleCopyLink = async () => {
     await Clipboard.setStringAsync(link);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(createErrorHandler('InviteFriendsScreen', 'notificationAsync'));
     Alert.alert('Copied!', 'Referral link copied to clipboard');
   };
 
   const handleSMS = async () => {
-    if (user?.id) trackLinkShare(user.id, 'sms').catch(() => {});
+    if (user?.id) trackLinkShare(user.id, 'sms').catch(createErrorHandler('InviteFriendsScreen', 'trackLinkShare'));
     const url = Platform.OS === 'ios'
       ? `sms:&body=${encodeURIComponent(shareMessage)}`
       : `sms:?body=${encodeURIComponent(shareMessage)}`;
@@ -96,7 +97,7 @@ export default function InviteFriendsScreen() {
   };
 
   const handleWhatsApp = async () => {
-    if (user?.id) trackLinkShare(user.id, 'social').catch(() => {});
+    if (user?.id) trackLinkShare(user.id, 'social').catch(createErrorHandler('InviteFriendsScreen', 'trackLinkShare'));
     const url = `https://wa.me/?text=${encodeURIComponent(shareMessage)}`;
     try {
       const canOpen = await Linking.canOpenURL(url);
@@ -106,14 +107,14 @@ export default function InviteFriendsScreen() {
   };
 
   const handleTwitter = async () => {
-    if (user?.id) trackLinkShare(user.id, 'social').catch(() => {});
+    if (user?.id) trackLinkShare(user.id, 'social').catch(createErrorHandler('InviteFriendsScreen', 'trackLinkShare'));
     const text = `I've been using @RhomeApp to find roommates. Join me:`;
     const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(link)}`;
     try { await Linking.openURL(url); } catch {}
   };
 
   const handleNativeShare = async () => {
-    if (user?.id) trackLinkShare(user.id, 'link').catch(() => {});
+    if (user?.id) trackLinkShare(user.id, 'link').catch(createErrorHandler('InviteFriendsScreen', 'trackLinkShare'));
     try { await Share.share({ message: shareMessage }); } catch {}
   };
 

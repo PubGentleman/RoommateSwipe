@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from './AuthContext';
+import { createErrorHandler } from '../utils/errorLogger';
 
 const SELECTED_CITY_KEY = 'rhome_selected_city';
 const SELECTED_SUB_AREA_KEY = 'rhome_selected_sub_area';
@@ -73,7 +74,7 @@ export const CityProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const addRecentCity = useCallback((city: string) => {
     setRecentCitiesState(prev => {
       const updated = [city, ...prev.filter(c => c !== city)].slice(0, MAX_RECENT_CITIES);
-      AsyncStorage.setItem(RECENT_CITIES_KEY, JSON.stringify(updated)).catch(() => {});
+      AsyncStorage.setItem(RECENT_CITIES_KEY, JSON.stringify(updated)).catch(createErrorHandler('CityContext', 'setItem'));
       return updated;
     });
   }, []);
@@ -81,9 +82,9 @@ export const CityProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const setActiveSubArea = useCallback((subArea: string | null) => {
     setActiveSubAreaState(subArea);
     if (subArea) {
-      AsyncStorage.setItem(SELECTED_SUB_AREA_KEY, subArea).catch(() => {});
+      AsyncStorage.setItem(SELECTED_SUB_AREA_KEY, subArea).catch(createErrorHandler('CityContext', 'setItem'));
     } else {
-      AsyncStorage.removeItem(SELECTED_SUB_AREA_KEY).catch(() => {});
+      AsyncStorage.removeItem(SELECTED_SUB_AREA_KEY).catch(createErrorHandler('CityContext', 'removeItem'));
     }
   }, []);
 
@@ -92,10 +93,10 @@ export const CityProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setActiveSubArea(null);
     hasUserSetCity.current = true;
     if (city) {
-      AsyncStorage.setItem(SELECTED_CITY_KEY, city).catch(() => {});
+      AsyncStorage.setItem(SELECTED_CITY_KEY, city).catch(createErrorHandler('CityContext', 'setItem'));
       addRecentCity(city);
     } else {
-      AsyncStorage.removeItem(SELECTED_CITY_KEY).catch(() => {});
+      AsyncStorage.removeItem(SELECTED_CITY_KEY).catch(createErrorHandler('CityContext', 'removeItem'));
     }
   }, [addRecentCity, setActiveSubArea]);
 

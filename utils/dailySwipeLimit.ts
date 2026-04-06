@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createErrorHandler } from '../utils/errorLogger';
 
 const DAILY_SWIPE_KEY = '@rhome/daily_swipe_count';
 const DAILY_SWIPE_DATE_KEY = '@rhome/daily_swipe_date';
@@ -15,7 +16,7 @@ function getLocalDateString(): string {
 
 function serialize<T>(fn: () => Promise<T>): Promise<T> {
   const next = pendingOp.then(fn, fn);
-  pendingOp = next.catch(() => {});
+  pendingOp = next.catch(createErrorHandler('dailySwipeLimit', 'serialize'));
   return next;
 }
 

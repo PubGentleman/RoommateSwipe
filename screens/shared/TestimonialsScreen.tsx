@@ -6,6 +6,7 @@ import { Feather } from '../../components/VectorIcons';
 import { getReceivedTestimonials, getTestimonialsWrittenByMe, updateTestimonialStatus, getTraitEmoji, getProfileShareLink } from '../../services/socialProfileService';
 import { useAuth } from '../../contexts/AuthContext';
 import { normalizeRenterPlan } from '../../constants/renterPlanLimits';
+import { createErrorHandler } from '../../utils/errorLogger';
 
 type Tab = 'received' | 'written';
 
@@ -130,7 +131,7 @@ export default function TestimonialsScreen() {
     if (!user?.id) return;
     try {
       await updateTestimonialStatus(id, user.id, 'approved');
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(createErrorHandler('TestimonialsScreen', 'notificationAsync'));
       setReceived(prev => prev.map(t => t.id === id ? { ...t, status: 'approved' } : t));
     } catch {
       Alert.alert('Error', 'Failed to approve testimonial');
@@ -141,7 +142,7 @@ export default function TestimonialsScreen() {
     if (!user?.id) return;
     try {
       await updateTestimonialStatus(id, user.id, 'hidden');
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(createErrorHandler('TestimonialsScreen', 'impactAsync'));
       setReceived(prev => prev.filter(t => t.id !== id));
     } catch {
       Alert.alert('Error', 'Failed to hide testimonial');
