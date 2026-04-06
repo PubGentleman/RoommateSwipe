@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase';
-import { createErrorHandler } from '../utils/errorLogger';
+import { createErrorHandler, logError } from '../utils/errorLogger';
 
 export interface ProfileData {
   budget_min?: number;
@@ -116,30 +116,18 @@ export async function updateProfile(userId: string, updates: ProfileData) {
     throw new Error('At least 3 photos are required to save your profile');
   }
 
-  const { data: existing } = await supabase
+  const { data: result, error } = await supabase
     .from('profiles')
-    .select('id')
-    .eq('user_id', userId)
+    .upsert(
+      { user_id: userId, ...updates, updated_at: new Date().toISOString() },
+      { onConflict: 'user_id' }
+    )
+    .select()
     .single();
 
-  let result;
-  if (existing) {
-    const { data, error } = await supabase
-      .from('profiles')
-      .update(updates)
-      .eq('user_id', userId)
-      .select()
-      .single();
-    if (error) throw error;
-    result = data;
-  } else {
-    const { data, error } = await supabase
-      .from('profiles')
-      .insert({ user_id: userId, ...updates })
-      .select()
-      .single();
-    if (error) throw error;
-    result = data;
+  if (error) {
+    logError(error, { service: 'profileService', method: 'saveProfile' });
+    throw error;
   }
 
   if (
