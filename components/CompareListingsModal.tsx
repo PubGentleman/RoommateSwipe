@@ -72,13 +72,14 @@ const CompareListingsModal: React.FC<Props> = ({ visible, onClose, items, totalM
                   );
                 }
 
-                const val = (item.listing as any)?.[row.key] ?? (row.key === 'price' ? item.listing?.rent : undefined);
+                const listingRecord = item.listing as Record<string, unknown> | undefined;
+                const val = listingRecord?.[row.key] ?? (row.key === 'price' ? item.listing?.rent : undefined);
                 const formatted = row.format(val);
                 const isBestPrice = row.key === 'price' && val === Math.min(
-                  ...items.map(i => (i.listing as any)?.price || (i.listing as any)?.rent || Infinity)
+                  ...items.map(i => { const r = i.listing as Record<string, unknown> | undefined; return (r?.price as number) || (r?.rent as number) || Infinity; })
                 );
                 const isBestRating = row.key === 'average_rating' && val && val === Math.max(
-                  ...items.map(i => (i.listing as any)?.average_rating || 0)
+                  ...items.map(i => { const r = i.listing as Record<string, unknown> | undefined; return (r?.average_rating as number) || 0; })
                 );
 
                 return (

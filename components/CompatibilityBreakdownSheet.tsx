@@ -68,7 +68,7 @@ export default function CompatibilityBreakdownSheet({
   const renderCategoryBar = (cat: BreakdownCategory) => (
     <View key={cat.key} style={styles.categoryRow}>
       <View style={styles.categoryHeader}>
-        <Feather name={cat.icon as any} size={14} color={STATUS_COLORS[cat.status]} />
+        <Feather name={cat.icon as React.ComponentProps<typeof Feather>['name']} size={14} color={STATUS_COLORS[cat.status]} />
         <Text style={styles.categoryLabel}>{cat.label}</Text>
         <Text style={[styles.categoryScore, { color: STATUS_COLORS[cat.status] }]}>
           {cat.score}%
@@ -123,7 +123,7 @@ export default function CompatibilityBreakdownSheet({
                     {breakdown.strengths.map((s, i) => (
                       <View key={i} style={styles.insightRow}>
                         <View style={[styles.insightDot, { backgroundColor: '#3ECF8E' }]} />
-                        <Feather name={s.icon as any} size={13} color="#3ECF8E" />
+                        <Feather name={s.icon as React.ComponentProps<typeof Feather>['name']} size={13} color="#3ECF8E" />
                         <Text style={styles.insightText}>{s.text}</Text>
                       </View>
                     ))}
@@ -138,7 +138,7 @@ export default function CompatibilityBreakdownSheet({
                         <View style={[styles.insightDot, {
                           backgroundColor: f.severity === 'critical' ? '#ef4444' : '#F39C12'
                         }]} />
-                        <Feather name={f.icon as any} size={13} color={f.severity === 'critical' ? '#ef4444' : '#F39C12'} />
+                        <Feather name={f.icon as React.ComponentProps<typeof Feather>['name']} size={13} color={f.severity === 'critical' ? '#ef4444' : '#F39C12'} />
                         <Text style={styles.insightText}>{f.text}</Text>
                       </View>
                     ))}

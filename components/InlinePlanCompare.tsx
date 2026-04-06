@@ -107,7 +107,7 @@ export default function InlinePlanCompare({ role, currentPlan, highlightPlan, on
                     <ThemedText style={styles.featureLabel}>{feature.label}</ThemedText>
                   </View>
                   {plans.map(plan => {
-                    const value = (plan.limits as any)?.[feature.key];
+                    const value = (plan.limits as Record<string, unknown>)?.[feature.key];
                     const formatted = feature.format(value);
                     const isYes = formatted === 'Yes';
                     const isDash = formatted === '--';
