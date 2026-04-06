@@ -13,18 +13,10 @@
       "bundleIdentifier": "com.rhome.app",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
-      },
-      "config": {
-        "googleMapsApiKey": "${EXPO_PUBLIC_GOOGLE_MAPS_API_KEY}"
       }
     },
     "android": {
       "package": "com.rhome.app",
-      "config": {
-        "googleMaps": {
-          "apiKey": "${EXPO_PUBLIC_GOOGLE_MAPS_API_KEY}"
-        }
-      },
       "adaptiveIcon": {
         "backgroundColor": "#0F1020",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
