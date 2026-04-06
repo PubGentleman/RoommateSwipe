@@ -100,7 +100,7 @@ export const MyInterestsScreen = () => {
           title: 'Interest Expired',
           body: `Your interest in ${card.propertyTitle} has expired`,
           isRead: false,
-          createdAt: new Date(),
+          createdAt: new Date().toISOString(),
           data: { interestCardId: card.id, propertyId: card.propertyId },
         });
       }
@@ -216,7 +216,7 @@ export const MyInterestsScreen = () => {
       title: 'New Interest',
       body: `${user.name} is interested in ${card.propertyTitle}`,
       isRead: false,
-      createdAt: new Date(),
+      createdAt: new Date().toISOString(),
       data: { interestCardId: newCard.id, propertyId: card.propertyId, fromUserId: user.id, fromUserName: user.name },
     });
     await refreshUnreadCount();

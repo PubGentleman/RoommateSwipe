@@ -985,7 +985,7 @@ export function scoreGroupForListing(
 
   let timelineFit = 50;
   if (listing.availableDate) {
-    const availDate = new Date(listing.availableDate instanceof Date ? listing.availableDate : listing.availableDate);
+    const availDate = new Date(listing.availableDate);
     const avgDaysDiff = members.reduce((sum, m) => {
       if (!m.moveInDate) return sum + 30;
       return sum + Math.abs((availDate.getTime() - new Date(m.moveInDate).getTime()) / (1000 * 60 * 60 * 24));
@@ -1026,7 +1026,7 @@ export function calculateRenterRelevance(renter: AgentRenter, listing: Property)
   else if ((renter.budgetMax ?? 0) >= perPersonRent * 0.8) score += 15;
 
   if (listing.availableDate && renter.moveInDate) {
-    const daysDiff = Math.abs((new Date(listing.availableDate instanceof Date ? listing.availableDate : listing.availableDate).getTime() - new Date(renter.moveInDate).getTime()) / (1000 * 60 * 60 * 24));
+    const daysDiff = Math.abs((new Date(listing.availableDate).getTime() - new Date(renter.moveInDate).getTime()) / (1000 * 60 * 60 * 24));
     if (daysDiff <= 14) score += 20;
     else if (daysDiff <= 30) score += 10;
     else if (daysDiff <= 60) score += 5;

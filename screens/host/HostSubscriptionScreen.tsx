@@ -270,7 +270,7 @@ export const HostSubscriptionScreen = () => {
         title: 'Plan Updated',
         body: `You're now on the ${planData.label} plan at $${price}/mo`,
         isRead: false,
-        createdAt: new Date(),
+        createdAt: new Date().toISOString(),
         data: { plan: storedPlan },
       });
       clearTimeout(safetyTimeout);

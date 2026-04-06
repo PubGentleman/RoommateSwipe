@@ -259,7 +259,7 @@ export async function sendResponsePendingNotification(
     title: 'Response Pending',
     body: `Your message to ${agentName} is still pending a response`,
     isRead: false,
-    createdAt: new Date(),
+    createdAt: new Date().toISOString(),
     data: {
       conversationId,
       type: 'response_pending',
@@ -305,7 +305,7 @@ export async function requestDifferentAgent(
     title: 'Agent Reassignment Requested',
     body: `${renterName} has requested a different agent. ${agentName} has not responded within 48 hours.`,
     isRead: false,
-    createdAt: new Date(),
+    createdAt: new Date().toISOString(),
     data: {
       conversationId,
       type: 'reassign_request',

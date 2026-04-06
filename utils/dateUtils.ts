@@ -38,3 +38,25 @@ export const fromISODate = (iso: string): string => {
   if (parts.length !== 3) return '';
   return `${parts[1]}/${parts[2]}/${parts[0]}`;
 };
+
+export function parseDate(dateStr: string | Date | null | undefined): Date | null {
+  if (!dateStr) return null;
+  if (dateStr instanceof Date) return dateStr;
+  const parsed = new Date(dateStr);
+  return isNaN(parsed.getTime()) ? null : parsed;
+}
+
+export function formatRelativeTime(dateStr: string | null | undefined): string {
+  const date = parseDate(dateStr);
+  if (!date) return '';
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  if (diffMins < 1) return 'just now';
+  if (diffMins < 60) return `${diffMins}m ago`;
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return date.toLocaleDateString();
+}

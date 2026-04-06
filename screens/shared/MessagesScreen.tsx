@@ -283,7 +283,7 @@ export const MessagesScreen = () => {
       }
       setMatchesMap(mMap);
 
-      recentMatchProfiles.sort((a, b) => b.match.matchedAt.getTime() - a.match.matchedAt.getTime());
+      recentMatchProfiles.sort((a, b) => new Date(b.match.matchedAt).getTime() - new Date(a.match.matchedAt).getTime());
       setNewMatches(recentMatchProfiles.slice(0, 10));
 
       const blockedIds = user.blockedUsers || [];

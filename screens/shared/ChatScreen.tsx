@@ -312,7 +312,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
           senderName: msg.senderName,
           text: msg.content,
           content: msg.content,
-          timestamp: new Date(msg.createdAt),
+          timestamp: msg.createdAt,
           read: true,
         }));
       } else {
@@ -322,9 +322,9 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
           senderId: msg.is_system_message ? 'system' : msg.sender_id,
           text: msg.content,
           content: msg.content,
-          timestamp: new Date(msg.created_at),
+          timestamp: msg.created_at,
           read: msg.read || false,
-          readAt: msg.read_at ? new Date(msg.read_at) : undefined,
+          readAt: msg.read_at || undefined,
           message_type: msg.message_type || 'text',
           metadata: msg.metadata || undefined,
           reply_to_id: msg.reply_to_id || undefined,
@@ -340,8 +340,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
         const uniqueOlder = olderMsgs.filter(m => !existingIds.has(m.id));
         setMessages(prev => [...uniqueOlder, ...prev]);
         const oldest = olderMsgs[0];
-        const ts = oldest.timestamp instanceof Date ? oldest.timestamp.toISOString() : String(oldest.timestamp);
-        setMessagesCursor(ts);
+        setMessagesCursor(String(oldest.timestamp));
       }
       setHasOlderMessages(olderMsgs.length >= MESSAGES_PAGE_SIZE);
     } catch (err) {
@@ -401,7 +400,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
         senderId: 'system',
         text: 'Host accepted your inquiry. The full address has been shared with your group.',
         content: 'Host accepted your inquiry. The full address has been shared with your group.',
-        timestamp: new Date(),
+        timestamp: new Date().toISOString(),
         read: true,
       };
       setMessages(prev => [...prev, systemMsg]);
@@ -432,7 +431,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
         senderId: 'system',
         text: 'The host has declined this inquiry.',
         content: 'The host has declined this inquiry.',
-        timestamp: new Date(),
+        timestamp: new Date().toISOString(),
         read: true,
       };
       setMessages(prev => [...prev, systemMsg]);
@@ -512,7 +511,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
             conversationId,
             senderId: 'system',
             text: 'Contact info is now visible in this conversation.',
-            timestamp: new Date(),
+            timestamp: new Date().toISOString(),
             read: true,
             type: 'system',
           } as any]);
@@ -661,7 +660,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
           senderName: newMsg.senderName,
           text: newMsg.content,
           content: newMsg.content,
-          timestamp: new Date(newMsg.createdAt),
+          timestamp: newMsg.createdAt,
           read: true,
         } as any;
         setMessages(prev => {
@@ -688,9 +687,9 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
           senderId: newMsg.is_system_message ? 'system' : newMsg.sender_id,
           text: newMsg.content,
           content: newMsg.content,
-          timestamp: new Date(newMsg.created_at),
+          timestamp: newMsg.created_at,
           read: newMsg.read || false,
-          readAt: newMsg.read_at ? new Date(newMsg.read_at) : undefined,
+          readAt: newMsg.read_at || undefined,
           message_type: newMsg.message_type || 'text',
           metadata: newMsg.metadata || undefined,
           reply_to_id: newMsg.reply_to_id || undefined,
@@ -965,7 +964,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
           senderId: user.id,
           text: '',
           content: '',
-          timestamp: new Date(),
+          timestamp: new Date().toISOString(),
           read: false,
           message_type: 'voice',
           metadata: { voice_url: result.uri, duration_ms: result.durationMs },
@@ -1258,7 +1257,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
             senderName: msg.senderName,
             text: msg.content,
             content: msg.content,
-            timestamp: new Date(msg.createdAt),
+            timestamp: msg.createdAt,
             read: true,
           }));
           loadedFromSupabase = true;
@@ -1277,9 +1276,9 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
             senderId: msg.is_system_message ? 'system' : msg.sender_id,
             text: msg.content,
             content: msg.content,
-            timestamp: new Date(msg.created_at),
+            timestamp: msg.created_at,
             read: msg.read || false,
-            readAt: msg.read_at ? new Date(msg.read_at) : undefined,
+            readAt: msg.read_at || undefined,
             message_type: msg.message_type || 'text',
             metadata: msg.metadata || undefined,
             reply_to_id: msg.reply_to_id || undefined,
@@ -1300,7 +1299,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
     const conversation = conversations.find(c => c.id === conversationId);
     const localMessages: Message[] = (conversation?.messages || []).map((msg: Message) => {
       if (msg.senderId === user?.id && !msg.readAt && msg.read !== false) {
-        return { ...msg, readAt: new Date(new Date(msg.timestamp).getTime() + 60000) };
+        return { ...msg, readAt: new Date(new Date(msg.timestamp).getTime() + 60000).toISOString() };
       }
       return msg;
     });
@@ -1323,8 +1322,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
 
     if (loadedMessages.length > 0) {
       const oldest = loadedMessages[0];
-      const ts = oldest.timestamp instanceof Date ? oldest.timestamp.toISOString() : String(oldest.timestamp);
-      setMessagesCursor(ts);
+      setMessagesCursor(String(oldest.timestamp));
       setHasOlderMessages(loadedMessages.length >= MESSAGES_PAGE_SIZE);
     } else {
       setHasOlderMessages(false);
@@ -1352,7 +1350,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
               senderId: 'system',
               text: 'Interest accepted! You can now message each other.',
               content: 'Interest accepted! You can now message each other.',
-              timestamp: new Date(),
+              timestamp: new Date().toISOString(),
               read: true,
             };
             setMessages(prev => [...prev, acceptMsg]);
@@ -1520,7 +1518,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
         participants: otherUser ? [user.id, otherUser.id] : [user.id],
         messages: [],
         lastMessage: '',
-        timestamp: new Date(),
+        timestamp: new Date().toISOString(),
         unreadCount: 0,
         createdAt: new Date().toISOString(),
         isInquiryThread: inquiryGroup?.isInquiryThread || false,
@@ -1568,7 +1566,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
           senderName: user.name || user.email || 'You',
           text: inputText.trim(),
           content: inputText.trim(),
-          timestamp: new Date(),
+          timestamp: new Date().toISOString(),
           read: true,
         } as any;
         sentViaSupabase = true;
@@ -1584,7 +1582,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
           senderId: supaMsg.sender_id,
           text: supaMsg.content,
           content: supaMsg.content,
-          timestamp: new Date(supaMsg.created_at),
+          timestamp: supaMsg.created_at,
           read: false,
           reply_to_id: replyToMessage?.id,
           reply_to: replyToMessage ? { id: replyToMessage.id, content: replyToMessage.text || replyToMessage.content || '', sender_id: replyToMessage.senderId } : undefined,
@@ -1598,7 +1596,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
         senderId: user.id,
         text: inputText.trim(),
         content: inputText.trim(),
-        timestamp: new Date(),
+        timestamp: new Date().toISOString(),
         read: false,
       };
     }
@@ -1647,7 +1645,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
         title: 'New Message',
         body: `${user.name || 'Someone'}: ${inputText.trim().substring(0, 80)}${inputText.trim().length > 80 ? '...' : ''}`,
         isRead: false,
-        createdAt: new Date(),
+        createdAt: new Date().toISOString(),
         data: {
           conversationId,
           fromUserId: user.id,
@@ -1718,7 +1716,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
         senderId: user.id,
         text: displayContent,
         content: displayContent,
-        timestamp: new Date(),
+        timestamp: new Date().toISOString(),
         read: false,
         message_type: 'visit_request',
         metadata,
@@ -1768,7 +1766,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
         senderId: user.id,
         text: displayContent,
         content: displayContent,
-        timestamp: new Date(),
+        timestamp: new Date().toISOString(),
         read: false,
         message_type: 'booking_offer',
         metadata,

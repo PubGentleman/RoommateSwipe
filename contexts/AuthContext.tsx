@@ -173,11 +173,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const now = new Date();
 
     if (user.subscription?.scheduledPlan && user.subscription?.scheduledChangeDate) {
-      const changeDate = user.subscription.scheduledChangeDate instanceof Date 
-        ? user.subscription.scheduledChangeDate 
-        : new Date(user.subscription.scheduledChangeDate);
+      const changeDate = new Date(user.subscription.scheduledChangeDate);
       if (!isNaN(changeDate.getTime()) && changeDate.getTime() <= now.getTime()) {
-        const newExpiresAt = new Date(changeDate.getTime() + 30 * 24 * 60 * 60 * 1000);
+        const newExpiresAt = new Date(changeDate.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
         updated = {
           ...updated,
           subscription: {
@@ -193,16 +191,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     if (user.hostSubscription?.scheduledPlan && user.hostSubscription?.scheduledChangeDate) {
-      const changeDate = user.hostSubscription.scheduledChangeDate instanceof Date 
-        ? user.hostSubscription.scheduledChangeDate 
-        : new Date(String(user.hostSubscription.scheduledChangeDate));
+      const changeDate = new Date(user.hostSubscription.scheduledChangeDate);
       if (!isNaN(changeDate.getTime()) && changeDate.getTime() <= now.getTime()) {
         updated = {
           ...updated,
           hostSubscription: {
             plan: user.hostSubscription.scheduledPlan,
             status: 'active',
-            expiresAt: new Date(changeDate.getTime() + 30 * 24 * 60 * 60 * 1000),
+            expiresAt: new Date(changeDate.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString(),
             scheduledPlan: undefined,
             scheduledChangeDate: undefined,
             billingCycle: user.hostSubscription.billingCycle || 'monthly',
@@ -248,7 +244,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       subscription: {
         plan: subscription?.plan || 'basic',
         status: subscription?.status || 'active',
-        expiresAt: subscription?.current_period_end ? new Date(subscription.current_period_end) : undefined,
+        expiresAt: subscription?.current_period_end || undefined,
         billingCycle: subscription?.billing_cycle || 'monthly',
         billingHistory: [],
       },
@@ -965,7 +961,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const updatedUser: User = {
       ...user,
       isDeleted: true,
-      deletedAt: new Date(),
+      deletedAt: new Date().toISOString(),
     };
     await StorageService.setCurrentUser(updatedUser);
     await StorageService.addOrUpdateUser(updatedUser);
@@ -1576,7 +1572,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           title: 'Your Profile Boost Expired',
           body: notifBody,
           isRead: false,
-          createdAt: new Date(),
+          createdAt: new Date().toISOString(),
         };
         await StorageService.addNotification(notification);
 
@@ -1612,7 +1608,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     const now = new Date();
-    const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
 
     const updatedUser: User = {
       ...user,
@@ -2032,7 +2028,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const reportUserAction = async (reportedUserId: string, reason: string) => {
     if (!user) return;
     await StorageService.reportUser(user.id, reportedUserId, reason);
-    const updatedReportedUsers = [...(user.reportedUsers || []), { userId: reportedUserId, reason, reportedAt: new Date() }];
+    const updatedReportedUsers = [...(user.reportedUsers || []), { userId: reportedUserId, reason, reportedAt: new Date().toISOString() }];
     const updatedUser: User = { ...user, reportedUsers: updatedReportedUsers };
     await StorageService.setCurrentUser(updatedUser);
     setUser(updatedUser);
@@ -2086,7 +2082,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       ...currentCredits,
       [creditType]: (currentCredits[creditType] || 0) + creditRewards[creditType],
       totalAdsWatched: (currentCredits.totalAdsWatched || 0) + 1,
-      lastAdWatched: new Date(),
+      lastAdWatched: new Date().toISOString(),
     };
 
     const updatedUser: User = {
@@ -2535,7 +2531,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const downgradeHostPlan = async (plan: string) => {
     if (!user) return;
-    const changeDate = user.hostSubscription?.expiresAt || new Date();
+    const changeDate = user.hostSubscription?.expiresAt || new Date().toISOString();
     const updated = {
       ...user,
       hostSubscription: {
@@ -2631,8 +2627,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const purchaseListingBoost = async (propertyId: string): Promise<{ success: boolean; message: string }> => {
     if (!user) return { success: false, message: 'Not logged in' };
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 7);
+    const expiresAtDate = new Date();
+    expiresAtDate.setDate(expiresAtDate.getDate() + 7);
+    const expiresAt = expiresAtDate.toISOString();
     const currentBoosts = user.purchases?.listingBoosts || [];
     const updated = {
       ...user,

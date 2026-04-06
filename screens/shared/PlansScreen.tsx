@@ -243,7 +243,7 @@ export const PlansScreen = () => {
         title: 'Plan Updated',
         body: `Welcome to ${planName}! You now have access to all ${planName} features.`,
         isRead: false,
-        createdAt: new Date(),
+        createdAt: new Date().toISOString(),
         data: { plan: selectedPlan },
       });
       setSelectedPlan(null);

@@ -71,13 +71,13 @@ export const StorageService = {
           id: `match_${currentUserId}_1`,
           userId1: currentUserId,
           userId2: '1',
-          matchedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+          matchedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
         },
         {
           id: `match_${currentUserId}_2`,
           userId1: currentUserId,
           userId2: '2',
-          matchedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
+          matchedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
         },
       ];
       
@@ -153,8 +153,8 @@ export const StorageService = {
           propertyType: p.propertyType || 'lease',
           roomType: p.roomType || 'entire',
           existingRoommates: p.existingRoommates || [],
-          availableDate: p.availableDate ? new Date(p.availableDate) : undefined,
-          rentedDate: p.rentedDate ? new Date(p.rentedDate) : undefined,
+          availableDate: p.availableDate || undefined,
+          rentedDate: p.rentedDate || undefined,
         };
         if (!parsed.available && parsed.availableDate && !parsed.is_rented) {
           const avail = new Date(parsed.availableDate);
@@ -247,9 +247,8 @@ export const StorageService = {
       const property = properties.find(p => p.id === propertyId);
       if (!property) return;
 
-      const rentedDate = new Date();
       property.available = false;
-      property.rentedDate = rentedDate;
+      property.rentedDate = new Date().toISOString();
       await this.setProperties(properties);
 
       const users = await this.getUsers();
@@ -263,7 +262,7 @@ export const StorageService = {
             title: 'Property Rented',
             body: `${property.title} has been rented and is no longer available`,
             isRead: false,
-            createdAt: new Date(),
+            createdAt: new Date().toISOString(),
             data: {
               propertyId: property.id,
             },
@@ -313,7 +312,7 @@ export const StorageService = {
             title,
             body,
             isRead: false,
-            createdAt: new Date(),
+            createdAt: new Date().toISOString(),
             data: { propertyId },
           });
         }
@@ -360,7 +359,7 @@ export const StorageService = {
             lifestyleTags: [],
             occupationTypes: [],
             memberPhotos,
-            createdAt: g.createdAt instanceof Date ? g.createdAt.toISOString() : g.createdAt,
+            createdAt: g.createdAt,
           };
         });
     } catch (error) {
@@ -376,7 +375,6 @@ export const StorageService = {
       const groups = JSON.parse(data);
       return groups.map((group: any) => ({
         ...group,
-        createdAt: new Date(group.createdAt),
       }));
     } catch (error) {
       console.error('Error getting groups:', error);
@@ -562,7 +560,7 @@ export const StorageService = {
               title: 'New Group Member',
               body: `${newMemberName} joined ${group.name}`,
               isRead: false,
-              createdAt: new Date(),
+              createdAt: new Date().toISOString(),
               data: {
                 groupId: group.id,
                 fromUserId: userId,
@@ -580,7 +578,7 @@ export const StorageService = {
             title: 'Group Update',
             body: `${newMemberName} joined ${group.name} that you're interested in`,
             isRead: false,
-            createdAt: new Date(),
+            createdAt: new Date().toISOString(),
             data: {
               groupId: group.id,
               fromUserId: userId,
@@ -662,7 +660,7 @@ export const StorageService = {
         title: 'Group Invite',
         body: `${invite.invitedByName} invited you to join "${invite.groupName}"`,
         isRead: false,
-        createdAt: new Date(),
+        createdAt: new Date().toISOString(),
         data: { groupId: invite.groupId, fromUserId: invite.invitedByUserId, fromUserName: invite.invitedByName },
       });
     } catch (error) {
@@ -721,12 +719,10 @@ export const StorageService = {
       const conversations = JSON.parse(data);
       return conversations.map((conv: any) => ({
         ...conv,
-        timestamp: new Date(conv.timestamp),
         messages: (conv.messages || []).map((msg: any) => ({
           ...msg,
           text: msg.text || msg.content || '',
           content: msg.content || msg.text || '',
-          timestamp: new Date(msg.timestamp),
         })),
       }));
     } catch (error) {
@@ -778,7 +774,6 @@ export const StorageService = {
       const matches = JSON.parse(data);
       return matches.map((match: any) => ({
         ...match,
-        matchedAt: new Date(match.matchedAt),
       }));
     } catch (error) {
       console.error('Error getting matches:', error);
@@ -824,7 +819,7 @@ export const StorageService = {
       const applications = JSON.parse(data);
       return applications.map((app: any) => ({
         ...app,
-        submittedDate: app.submittedDate ? new Date(app.submittedDate) : (app.submittedAt ? new Date(app.submittedAt) : new Date()),
+        submittedDate: app.submittedDate || app.submittedAt || new Date().toISOString(),
       }));
     } catch (error) {
       console.error('Error getting applications:', error);
@@ -943,7 +938,7 @@ export const StorageService = {
             likerId: userId,
             likerName: currentUser?.name || 'Unknown',
             likerPhoto: currentUser?.profilePicture,
-            likedAt: new Date(),
+            likedAt: new Date().toISOString(),
             isSuperLike,
           });
           await this.addOrUpdateUser(likedUser);
@@ -967,7 +962,7 @@ export const StorageService = {
             superLikerId,
             superLikerName: superLikerName || 'Unknown',
             superLikerPhoto,
-            superLikedAt: new Date(),
+            superLikedAt: new Date().toISOString(),
           });
           await this.addOrUpdateUser(targetUser);
         }
@@ -1271,12 +1266,12 @@ export const StorageService = {
       const existingMatches = await this.getMatches();
       if (!isHost) {
         const matchesToAdd: Match[] = [
-          { id: `match-${userId.slice(0, 6)}-1`, userId1: userId, userId2: '1', matchedAt: new Date(now - 1000 * 60 * 60 * 24 * 2), matchType: 'mutual' },
-          { id: `match-${userId.slice(0, 6)}-2`, userId1: userId, userId2: '2', matchedAt: new Date(now - 1000 * 60 * 60 * 24 * 3), matchType: 'mutual' },
-          { id: `match-${userId.slice(0, 6)}-3`, userId1: '3', userId2: userId, matchedAt: new Date(now - 1000 * 60 * 60 * 12), matchType: 'super_interest', isSuperLike: true, superLiker: '3' },
-          { id: `match-${userId.slice(0, 6)}-5`, userId1: userId, userId2: '5', matchedAt: new Date(now - 1000 * 60 * 60 * 24), matchType: 'mutual' },
-          { id: `match-${userId.slice(0, 6)}-4`, userId1: '4', userId2: userId, matchedAt: new Date(now - 1000 * 60 * 60 * 6), matchType: 'mutual' },
-          { id: `match-${userId.slice(0, 6)}-6`, userId1: userId, userId2: '6', matchedAt: new Date(now - 1000 * 60 * 60 * 48), matchType: 'cold' },
+          { id: `match-${userId.slice(0, 6)}-1`, userId1: userId, userId2: '1', matchedAt: new Date(now - 1000 * 60 * 60 * 24 * 2).toISOString(), matchType: 'mutual' },
+          { id: `match-${userId.slice(0, 6)}-2`, userId1: userId, userId2: '2', matchedAt: new Date(now - 1000 * 60 * 60 * 24 * 3).toISOString(), matchType: 'mutual' },
+          { id: `match-${userId.slice(0, 6)}-3`, userId1: '3', userId2: userId, matchedAt: new Date(now - 1000 * 60 * 60 * 12).toISOString(), matchType: 'super_interest', isSuperLike: true, superLiker: '3' },
+          { id: `match-${userId.slice(0, 6)}-5`, userId1: userId, userId2: '5', matchedAt: new Date(now - 1000 * 60 * 60 * 24).toISOString(), matchType: 'mutual' },
+          { id: `match-${userId.slice(0, 6)}-4`, userId1: '4', userId2: userId, matchedAt: new Date(now - 1000 * 60 * 60 * 6).toISOString(), matchType: 'mutual' },
+          { id: `match-${userId.slice(0, 6)}-6`, userId1: userId, userId2: '6', matchedAt: new Date(now - 1000 * 60 * 60 * 48).toISOString(), matchType: 'cold' },
         ];
         for (const m of matchesToAdd) {
           if (!existingMatches.some(em => em.id === m.id)) {
@@ -1292,42 +1287,42 @@ export const StorageService = {
         const conversationSeeds: Conversation[] = [
           {
             id: '1', participant: { id: '1', name: 'Sarah Johnson', photo: 'https://picsum.photos/100/100?random=1', online: true },
-            lastMessage: 'That sounds great! When can we schedule a viewing?', timestamp: new Date(now - 1000 * 60 * 5), unread: 2,
+            lastMessage: 'That sounds great! When can we schedule a viewing?', timestamp: new Date(now - 1000 * 60 * 5).toISOString(), unread: 2,
             messages: [
-              { id: 'm1a', senderId: '1', text: 'Hey! I saw we matched. Are you still looking in Williamsburg?', content: 'Hey! I saw we matched. Are you still looking in Williamsburg?', timestamp: new Date(now - 1000 * 60 * 60 * 4) },
-              { id: 'm1b', senderId: userId, text: 'Yes! I love the area. Have you lived there before?', content: 'Yes! I love the area. Have you lived there before?', timestamp: new Date(now - 1000 * 60 * 60 * 3.5) },
-              { id: 'm1c', senderId: '1', text: 'I have been there for 2 years. The food scene is amazing. What is your budget range?', content: 'I have been there for 2 years. The food scene is amazing. What is your budget range?', timestamp: new Date(now - 1000 * 60 * 60 * 3) },
-              { id: 'm1d', senderId: userId, text: 'Around $1,200 for my share. I work from home 3 days a week so a quiet space matters.', content: 'Around $1,200 for my share. I work from home 3 days a week so a quiet space matters.', timestamp: new Date(now - 1000 * 60 * 60 * 2.5) },
-              { id: 'm1e', senderId: '1', text: 'That sounds great! When can we schedule a viewing?', content: 'That sounds great! When can we schedule a viewing?', timestamp: new Date(now - 1000 * 60 * 5) },
+              { id: 'm1a', senderId: '1', text: 'Hey! I saw we matched. Are you still looking in Williamsburg?', content: 'Hey! I saw we matched. Are you still looking in Williamsburg?', timestamp: new Date(now - 1000 * 60 * 60 * 4).toISOString() },
+              { id: 'm1b', senderId: userId, text: 'Yes! I love the area. Have you lived there before?', content: 'Yes! I love the area. Have you lived there before?', timestamp: new Date(now - 1000 * 60 * 60 * 3.5).toISOString() },
+              { id: 'm1c', senderId: '1', text: 'I have been there for 2 years. The food scene is amazing. What is your budget range?', content: 'I have been there for 2 years. The food scene is amazing. What is your budget range?', timestamp: new Date(now - 1000 * 60 * 60 * 3).toISOString() },
+              { id: 'm1d', senderId: userId, text: 'Around $1,200 for my share. I work from home 3 days a week so a quiet space matters.', content: 'Around $1,200 for my share. I work from home 3 days a week so a quiet space matters.', timestamp: new Date(now - 1000 * 60 * 60 * 2.5).toISOString() },
+              { id: 'm1e', senderId: '1', text: 'That sounds great! When can we schedule a viewing?', content: 'That sounds great! When can we schedule a viewing?', timestamp: new Date(now - 1000 * 60 * 5).toISOString() },
             ],
           },
           {
             id: '2', participant: { id: '2', name: 'Michael Chen', photo: 'https://picsum.photos/100/100?random=2', online: false },
-            lastMessage: 'Thanks for reaching out!', timestamp: new Date(now - 1000 * 60 * 60 * 2), unread: 0,
+            lastMessage: 'Thanks for reaching out!', timestamp: new Date(now - 1000 * 60 * 60 * 2).toISOString(), unread: 0,
             messages: [
-              { id: 'm2a', senderId: '2', text: 'Hi there! I noticed we have similar interests. I am also a tech professional.', content: 'Hi there! I noticed we have similar interests. I am also a tech professional.', timestamp: new Date(now - 1000 * 60 * 60 * 24) },
-              { id: 'm2b', senderId: userId, text: 'Nice to meet you! What area are you looking at?', content: 'Nice to meet you! What area are you looking at?', timestamp: new Date(now - 1000 * 60 * 60 * 20) },
-              { id: 'm2c', senderId: '2', text: 'Financial District or Tribeca. Close to the subway is a must for me.', content: 'Financial District or Tribeca. Close to the subway is a must for me.', timestamp: new Date(now - 1000 * 60 * 60 * 18) },
-              { id: 'm2d', senderId: userId, text: 'Thanks for reaching out!', content: 'Thanks for reaching out!', timestamp: new Date(now - 1000 * 60 * 60 * 2) },
+              { id: 'm2a', senderId: '2', text: 'Hi there! I noticed we have similar interests. I am also a tech professional.', content: 'Hi there! I noticed we have similar interests. I am also a tech professional.', timestamp: new Date(now - 1000 * 60 * 60 * 24).toISOString() },
+              { id: 'm2b', senderId: userId, text: 'Nice to meet you! What area are you looking at?', content: 'Nice to meet you! What area are you looking at?', timestamp: new Date(now - 1000 * 60 * 60 * 20).toISOString() },
+              { id: 'm2c', senderId: '2', text: 'Financial District or Tribeca. Close to the subway is a must for me.', content: 'Financial District or Tribeca. Close to the subway is a must for me.', timestamp: new Date(now - 1000 * 60 * 60 * 18).toISOString() },
+              { id: 'm2d', senderId: userId, text: 'Thanks for reaching out!', content: 'Thanks for reaching out!', timestamp: new Date(now - 1000 * 60 * 60 * 2).toISOString() },
             ],
           },
           {
             id: '3', participant: { id: '3', name: 'Emily Rodriguez', photo: 'https://picsum.photos/100/100?random=3', online: true },
-            lastMessage: 'Same! Let me know when you want to check out some places.', timestamp: new Date(now - 1000 * 60 * 15), unread: 1,
+            lastMessage: 'Same! Let me know when you want to check out some places.', timestamp: new Date(now - 1000 * 60 * 15).toISOString(), unread: 1,
             messages: [
-              { id: 'm3a', senderId: userId, text: 'Hey Emily! I see you are also interested in Williamsburg.', content: 'Hey Emily! I see you are also interested in Williamsburg.', timestamp: new Date(now - 1000 * 60 * 60) },
-              { id: 'm3b', senderId: '3', text: 'Yes! It is my favorite neighborhood. Do you have a move-in date in mind?', content: 'Yes! It is my favorite neighborhood. Do you have a move-in date in mind?', timestamp: new Date(now - 1000 * 60 * 30) },
-              { id: 'm3c', senderId: userId, text: 'I am flexible but ideally by next month. How about you?', content: 'I am flexible but ideally by next month. How about you?', timestamp: new Date(now - 1000 * 60 * 20) },
-              { id: 'm3d', senderId: '3', text: 'Same! Let me know when you want to check out some places.', content: 'Same! Let me know when you want to check out some places.', timestamp: new Date(now - 1000 * 60 * 15) },
+              { id: 'm3a', senderId: userId, text: 'Hey Emily! I see you are also interested in Williamsburg.', content: 'Hey Emily! I see you are also interested in Williamsburg.', timestamp: new Date(now - 1000 * 60 * 60).toISOString() },
+              { id: 'm3b', senderId: '3', text: 'Yes! It is my favorite neighborhood. Do you have a move-in date in mind?', content: 'Yes! It is my favorite neighborhood. Do you have a move-in date in mind?', timestamp: new Date(now - 1000 * 60 * 30).toISOString() },
+              { id: 'm3c', senderId: userId, text: 'I am flexible but ideally by next month. How about you?', content: 'I am flexible but ideally by next month. How about you?', timestamp: new Date(now - 1000 * 60 * 20).toISOString() },
+              { id: 'm3d', senderId: '3', text: 'Same! Let me know when you want to check out some places.', content: 'Same! Let me know when you want to check out some places.', timestamp: new Date(now - 1000 * 60 * 15).toISOString() },
             ],
           },
           {
             id: '5', participant: { id: '5', name: 'Jessica Park', photo: 'https://picsum.photos/100/100?random=5', online: true },
-            lastMessage: 'The room is still available! Want to set up a video call?', timestamp: new Date(now - 1000 * 60 * 60), unread: 3,
+            lastMessage: 'The room is still available! Want to set up a video call?', timestamp: new Date(now - 1000 * 60 * 60).toISOString(), unread: 3,
             messages: [
-              { id: 'm5a', senderId: '5', text: 'Hi! I have a room available in my apartment. Want to hear about it?', content: 'Hi! I have a room available in my apartment. Want to hear about it?', timestamp: new Date(now - 1000 * 60 * 60 * 5) },
-              { id: 'm5b', senderId: userId, text: 'Absolutely! Where is it located and what is the rent?', content: 'Absolutely! Where is it located and what is the rent?', timestamp: new Date(now - 1000 * 60 * 60 * 4) },
-              { id: 'm5c', senderId: '5', text: 'The room is still available! Want to set up a video call?', content: 'The room is still available! Want to set up a video call?', timestamp: new Date(now - 1000 * 60 * 60) },
+              { id: 'm5a', senderId: '5', text: 'Hi! I have a room available in my apartment. Want to hear about it?', content: 'Hi! I have a room available in my apartment. Want to hear about it?', timestamp: new Date(now - 1000 * 60 * 60 * 5).toISOString() },
+              { id: 'm5b', senderId: userId, text: 'Absolutely! Where is it located and what is the rent?', content: 'Absolutely! Where is it located and what is the rent?', timestamp: new Date(now - 1000 * 60 * 60 * 4).toISOString() },
+              { id: 'm5c', senderId: '5', text: 'The room is still available! Want to set up a video call?', content: 'The room is still available! Want to set up a video call?', timestamp: new Date(now - 1000 * 60 * 60).toISOString() },
             ],
           },
         ];
@@ -1561,7 +1556,7 @@ export const StorageService = {
           likerId: l.fromUserId,
           likerName: l.fromUserName,
           likerPhoto: l.fromUserPhoto,
-          likedAt: new Date(l.timestamp),
+          likedAt: typeof l.timestamp === 'string' ? l.timestamp : new Date(l.timestamp).toISOString(),
           isSuperLike: l.isSuperLike,
         }));
         await AsyncStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
@@ -1593,8 +1588,7 @@ export const StorageService = {
       const allNotifications: Notification[] = data ? JSON.parse(data) : [];
       return allNotifications
         .filter(n => n.userId === userId)
-        .map(n => ({ ...n, createdAt: new Date(n.createdAt) }))
-        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     } catch (error) {
       console.error('Error getting notifications:', error);
       return [];
@@ -1757,11 +1751,10 @@ export const StorageService = {
         return [];
       }
       
-      type ProfileView = { viewerId: string; viewerName: string; viewerPhoto?: string; viewedAt: Date };
+      type ProfileView = { viewerId: string; viewerName: string; viewerPhoto?: string; viewedAt: string };
       
       return user.profileViews
-        .map((v): ProfileView => ({ ...v, viewedAt: new Date(v.viewedAt) }))
-        .sort((a: ProfileView, b: ProfileView) => b.viewedAt.getTime() - a.viewedAt.getTime());
+        .sort((a: ProfileView, b: ProfileView) => new Date(b.viewedAt).getTime() - new Date(a.viewedAt).getTime());
     } catch (error) {
       console.error('Error getting profile views:', error);
       return [];
@@ -1783,7 +1776,7 @@ export const StorageService = {
           title: 'New Match!',
           body: 'You matched with Sarah Chen. Start a conversation!',
           isRead: false,
-          createdAt: new Date(Date.now() - 1000 * 60 * 5),
+          createdAt: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
         },
         {
           id: 'notif-2',
@@ -1792,7 +1785,7 @@ export const StorageService = {
           title: 'New Message',
           body: 'Alex Martinez sent you a message',
           isRead: false,
-          createdAt: new Date(Date.now() - 1000 * 60 * 30),
+          createdAt: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
         },
         {
           id: 'notif-3',
@@ -1801,7 +1794,7 @@ export const StorageService = {
           title: 'Group Invitation',
           body: 'Jordan Taylor invited you to join Williamsburg Roommates',
           isRead: false,
-          createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2),
+          createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
         },
         {
           id: 'notif-4',
@@ -1810,7 +1803,7 @@ export const StorageService = {
           title: 'Property Update',
           body: 'Modern 2BR Apartment in Williamsburg is now available',
           isRead: true,
-          createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24),
+          createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
         },
         {
           id: 'notif-5',
@@ -1819,7 +1812,7 @@ export const StorageService = {
           title: 'Application Update',
           body: 'Your application for Cozy Studio in East Village has been reviewed',
           isRead: true,
-          createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2),
+          createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toISOString(),
         },
         {
           id: 'notif-6',
@@ -1828,7 +1821,7 @@ export const StorageService = {
           title: 'Welcome to Rhome!',
           body: 'Complete your profile to start finding compatible roommates',
           isRead: true,
-          createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3),
+          createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3).toISOString(),
         },
       ];
 
@@ -1908,7 +1901,7 @@ export const StorageService = {
         currentUser.reportedUsers.push({
           userId: reportedUserId,
           reason,
-          reportedAt: new Date(),
+          reportedAt: new Date().toISOString(),
         });
         await this.addOrUpdateUser(currentUser);
 
@@ -2176,7 +2169,7 @@ export const StorageService = {
             title: 'Listing Boosted',
             body: `${property.title} is now boosted and will appear at the top of search results`,
             isRead: false,
-            createdAt: new Date(),
+            createdAt: new Date().toISOString(),
             data: { propertyId: listingId },
           });
         }

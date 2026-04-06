@@ -35,7 +35,7 @@ export const ApplicationsScreen = () => {
           applicantPhoto: card.sender?.avatar_url || '',
           status: card.status === 'accepted' ? 'approved' : card.status === 'passed' ? 'rejected' : 'pending',
           message: card.personal_note || '',
-          submittedDate: new Date(card.created_at),
+          submittedDate: card.created_at,
           notes: '',
         }));
         setApplications(mappedApps);
@@ -98,9 +98,11 @@ export const ApplicationsScreen = () => {
     setApplications(prev => prev.map(a => a.id === appId ? updated : a));
   };
 
-  const formatDate = (date: Date) => {
-    if (!date || !(date instanceof Date) || isNaN(date.getTime())) return 'Unknown';
-    const days = Math.floor((new Date().getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+  const formatDate = (date: string | Date | null | undefined) => {
+    if (!date) return 'Unknown';
+    const d = typeof date === 'string' ? new Date(date) : date;
+    if (isNaN(d.getTime())) return 'Unknown';
+    const days = Math.floor((new Date().getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
     if (days === 0) return 'Today';
     if (days === 1) return 'Yesterday';
     return `${days} days ago`;

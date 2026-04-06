@@ -149,7 +149,7 @@ export const CreateGroupScreen = ({ navigation, route }: any) => {
           maxMembers: getMemberLimit(userPlanForLimit, selectedListing?.bedrooms || null),
           budget: user?.profileData?.budget || 2000,
           preferredLocation: user?.profileData?.city || 'Your City',
-          createdAt: new Date(),
+          createdAt: new Date().toISOString(),
           createdBy: user.id,
         };
         await StorageService.addOrUpdateGroup(localGroup as any);

@@ -393,7 +393,7 @@ export async function getHostConversations(hostId: string): Promise<any[]> {
           avatar: memberUser?.avatar_url || null,
           participant: memberUser || null,
           lastMessage: lastMsg?.content || '',
-          timestamp: new Date(lastMsg?.created_at || group.updated_at),
+          timestamp: lastMsg?.created_at || group.updated_at,
           unread,
           messages: [],
         };

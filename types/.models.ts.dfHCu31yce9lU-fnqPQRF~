@@ -572,11 +572,11 @@ export interface User {
   };
   rewindData?: {
     rewindsUsedToday: number;
-    lastRewindReset: string;
+    lastRewindReset: Date;
   };
   superLikeData?: {
     superLikesUsedToday: number;
-    lastSuperLikeReset: string;
+    lastSuperLikeReset: Date;
   };
   piAdvisorData?: {
     questionsToday: number;
@@ -590,20 +590,20 @@ export interface User {
     viewerId: string;
     viewerName: string;
     viewerPhoto?: string;
-    viewedAt: string;
+    viewedAt: Date;
   }>;
   receivedLikes?: Array<{
     likerId: string;
     likerName: string;
     likerPhoto?: string;
-    likedAt: string;
+    likedAt: Date;
     isSuperLike?: boolean;
   }>;
   receivedSuperLikes?: Array<{
     superLikerId: string;
     superLikerName: string;
     superLikerPhoto?: string;
-    superLikedAt: string;
+    superLikedAt: Date;
   }>;
   adCredits?: {
     rewinds: number;
@@ -611,7 +611,7 @@ export interface User {
     boosts: number;
     messages: number;
     totalAdsWatched: number;
-    lastAdWatched?: string;
+    lastAdWatched?: Date;
   };
   freeMessageUnlockUsed?: boolean;
   freeMessageUnlockConversationId?: string;
@@ -705,17 +705,17 @@ export interface User {
     boostReminders: boolean;
     systemAlerts: boolean;
   };
-  lastActiveAt?: string;
+  lastActiveAt?: Date;
   isDeleted?: boolean;
-  deletedAt?: string;
+  deletedAt?: Date;
   blockedUsers?: string[];
   reportedUsers?: Array<{
     userId: string;
     reason: string;
-    reportedAt: string;
+    reportedAt: Date;
   }>;
   aiAssistantData?: {
-    lastMicroQuestionDate?: string;
+    lastMicroQuestionDate?: Date;
     questionsAsked?: string[];
     microQuestionPreferences?: {
       privacyImportance?: string;
@@ -764,7 +764,7 @@ export interface Notification {
   title: string;
   body: string;
   isRead: boolean;
-  createdAt: string;
+  createdAt: Date;
   data?: {
     matchId?: string;
     conversationId?: string;

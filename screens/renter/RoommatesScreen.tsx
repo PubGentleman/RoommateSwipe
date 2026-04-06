@@ -983,7 +983,7 @@ export const RoommatesScreen = () => {
             title: 'Super Like!',
             body: `${user?.name || 'Someone'} super liked you!`,
             isRead: false,
-            createdAt: new Date(),
+            createdAt: new Date().toISOString(),
             data: {
               fromUserId: userId,
               fromUserName: user?.name,
@@ -1006,7 +1006,7 @@ export const RoommatesScreen = () => {
               id: `match_${Date.now()}`,
               userId1: userId,
               userId2: profileId,
-              matchedAt: new Date(),
+              matchedAt: new Date().toISOString(),
               isSuperLike,
               superLiker: isSuperLike ? userId : undefined,
               matchType: isSuperLike ? 'super_interest' : 'mutual',
@@ -1032,7 +1032,7 @@ export const RoommatesScreen = () => {
             title: 'New Match!',
             body: `You and ${matchedName} are a match! Start a conversation.`,
             isRead: false,
-            createdAt: new Date(),
+            createdAt: new Date().toISOString(),
             data: {
               matchId,
               fromUserId: profileId,
@@ -1048,7 +1048,7 @@ export const RoommatesScreen = () => {
             title: 'New Match!',
             body: `You and ${user?.name || 'Someone'} are a match! Start a conversation.`,
             isRead: false,
-            createdAt: new Date(),
+            createdAt: new Date().toISOString(),
             data: {
               matchId,
               fromUserId: userId,
@@ -1111,7 +1111,7 @@ export const RoommatesScreen = () => {
       title: 'You got a Super Interest!',
       body: `${user.name || 'Someone'} really wants to connect with you`,
       isRead: false,
-      createdAt: new Date(),
+      createdAt: new Date().toISOString(),
       data: {
         fromUserId: user.id,
         fromUserName: user.name,
@@ -1147,7 +1147,7 @@ export const RoommatesScreen = () => {
       senderId: 'system',
       text: 'You sent a Super Interest. The host will see this at the top of their inquiries.',
       content: 'You sent a Super Interest. The host will see this at the top of their inquiries.',
-      timestamp: new Date(),
+      timestamp: new Date().toISOString(),
       read: true,
     };
     const superInterestConversation: Conversation = {
@@ -1159,7 +1159,7 @@ export const RoommatesScreen = () => {
         online: false,
       },
       lastMessage: 'Super Interest sent — awaiting response',
-      timestamp: new Date(),
+      timestamp: new Date().toISOString(),
       unread: 0,
       messages: [siSystemMessage],
       isInquiryThread: true,
@@ -1179,7 +1179,7 @@ export const RoommatesScreen = () => {
         id: `match_${Date.now()}`,
         userId1: user.id,
         userId2: currentProfile.id,
-        matchedAt: new Date(),
+        matchedAt: new Date().toISOString(),
         isSuperLike: true,
         superLiker: user.id,
         matchType: 'super_interest',
@@ -1193,7 +1193,7 @@ export const RoommatesScreen = () => {
         title: 'New Match!',
         body: `You and ${currentProfile.name} are a match!`,
         isRead: false,
-        createdAt: new Date(),
+        createdAt: new Date().toISOString(),
         data: { matchId: match.id, fromUserId: currentProfile.id, fromUserName: currentProfile.name, fromUserPhoto: currentProfile.photos?.[0] },
       });
       await StorageService.addNotification({
@@ -1203,7 +1203,7 @@ export const RoommatesScreen = () => {
         title: 'New Match!',
         body: `You and ${user.name || 'Someone'} are a match!`,
         isRead: false,
-        createdAt: new Date(),
+        createdAt: new Date().toISOString(),
         data: { matchId: match.id, fromUserId: user.id, fromUserName: user.name, fromUserPhoto: user.profilePicture },
       });
       setShowMatch(true);
@@ -1748,7 +1748,7 @@ export const RoommatesScreen = () => {
         senderId: 'system',
         text: systemText,
         content: systemText,
-        timestamp: new Date(),
+        timestamp: new Date().toISOString(),
         read: true,
       };
 
@@ -1762,7 +1762,7 @@ export const RoommatesScreen = () => {
         },
         lastMessage: isCold ? 'Direct message request sent' : 'You matched! Say hello.',
         lastMessageTime: new Date(),
-        timestamp: new Date(),
+        timestamp: new Date().toISOString(),
         unreadCount: 0,
         unread: 0,
         messages: [systemMessage],
@@ -1779,7 +1779,7 @@ export const RoommatesScreen = () => {
         title: isCold ? 'New Message Request' : 'New Match!',
         body: `${user.name} wants to chat with you`,
         isRead: false,
-        createdAt: new Date(),
+        createdAt: new Date().toISOString(),
         data: {
           conversationId,
           fromUserId: user.id,
@@ -2363,7 +2363,7 @@ export const RoommatesScreen = () => {
                 senderId: 'system',
                 text: systemText,
                 content: systemText,
-                timestamp: new Date(),
+                timestamp: new Date().toISOString(),
                 read: true,
               };
 
@@ -2377,7 +2377,7 @@ export const RoommatesScreen = () => {
                 },
                 lastMessage: 'You matched! Say hello.',
                 lastMessageTime: new Date(),
-                timestamp: new Date(),
+                timestamp: new Date().toISOString(),
                 unreadCount: 0,
                 unread: 0,
                 messages: [systemMessage],
@@ -2394,7 +2394,7 @@ export const RoommatesScreen = () => {
                 title: 'New Match!',
                 body: `${user?.name} wants to chat with you`,
                 isRead: false,
-                createdAt: new Date(),
+                createdAt: new Date().toISOString(),
                 data: {
                   conversationId,
                   fromUserId: user?.id,

@@ -23,7 +23,7 @@ const mapSupabaseNotification = (row: any): Notification => ({
   title: row.title,
   body: row.body,
   isRead: row.read ?? row.isRead ?? false,
-  createdAt: new Date(row.created_at || row.createdAt),
+  createdAt: row.created_at || row.createdAt || new Date().toISOString(),
   data: typeof row.data === 'string' ? (() => { try { return JSON.parse(row.data); } catch { return undefined; } })() : (row.data || undefined),
 });
 
@@ -70,7 +70,7 @@ export const NotificationsScreen = () => {
         title: `${inv.agentName} wants you in their group!`,
         body: `"${inv.listingTitle}" - ${inv.listingBedrooms}BR at $${inv.listingRent?.toLocaleString()}/mo`,
         isRead: false,
-        createdAt: new Date(inv.sentAt),
+        createdAt: inv.sentAt || new Date().toISOString(),
         data: {
           agentInviteId: inv.id,
           listingTitle: inv.listingTitle,

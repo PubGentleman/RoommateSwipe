@@ -715,7 +715,7 @@ export const CreateEditListingScreen = () => {
           neighborhood: neighborhood.trim() || undefined,
           zip_code: zipCode.trim() || undefined,
           address: address.trim(),
-          availableDate: new Date(resolvedAvailableDate),
+          availableDate: resolvedAvailableDate,
           amenities: selectedAmenities,
           photos: photos,
           available: !availableDate || new Date(availableDate).setHours(0,0,0,0) <= new Date().setHours(0,0,0,0),

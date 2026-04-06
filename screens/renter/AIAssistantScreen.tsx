@@ -219,7 +219,7 @@ export const AIAssistantScreen = ({ navigation }: AIAssistantScreenProps) => {
         id: 'welcome',
         text: introText,
         isUser: false,
-        timestamp: new Date(),
+        timestamp: new Date().toISOString(),
         isWelcome: true,
         suggestions: suggestedQuestions,
       };
@@ -251,7 +251,7 @@ export const AIAssistantScreen = ({ navigation }: AIAssistantScreenProps) => {
           id: `limit_${Date.now()}`,
           text: access.message || "You've reached your daily limit. Upgrade to Plus for unlimited access!",
           isUser: false,
-          timestamp: new Date(),
+          timestamp: new Date().toISOString(),
           isLimitMessage: true,
         };
         setMessages(prev => [...prev, limitMsg]);
@@ -264,7 +264,7 @@ export const AIAssistantScreen = ({ navigation }: AIAssistantScreenProps) => {
       id: `user_${Date.now()}`,
       text: messageText,
       isUser: true,
-      timestamp: new Date(),
+      timestamp: new Date().toISOString(),
     };
 
     setMessages(prev => [...prev, userMessage]);
@@ -276,7 +276,7 @@ export const AIAssistantScreen = ({ navigation }: AIAssistantScreenProps) => {
       id: aiMessageId,
       text: '',
       isUser: false,
-      timestamp: new Date(),
+      timestamp: new Date().toISOString(),
     };
     setMessages(prev => [...prev, aiMessage]);
 
