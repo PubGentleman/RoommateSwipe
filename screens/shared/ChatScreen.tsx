@@ -1811,7 +1811,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
     }
   };
 
-  const renderChatItem = ({ item }: { item: ChatListItem }) => {
+  const renderChatItem = useCallback(({ item }: { item: ChatListItem }) => {
     if ((item as DateSeparatorItem).type === 'date_separator') {
       const sep = item as DateSeparatorItem;
       return (
@@ -2174,7 +2174,9 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
     }
 
     return bubbleContent;
-  };
+  }, [user, reactionsMap, highlightedId, theme, messages, editingMessageId, editText, messagingLocked, isInquiryChat, inquiryGroup, chatHostInfo, chatGroupSize, isGroupLeader, contactInfoVisible, showReactionBar, showLockedReadReceipt, cardActionLoading, groupMembers, userPlan, navigation, otherUser, conversationId, handleToggleReaction, handleLongPressMessage, handleConfirmVisit, handleDeclineVisit, handleProposeNewTime, handleAcceptBooking, handleDeclineBooking, handleSaveEdit]);
+
+  const chatKeyExtractor = useCallback((item: any) => item.id, []);
 
   const isGroupChat = conversationId.startsWith('group-');
   if (!otherUser && !isInquiryChat && !isGroupChat) {
@@ -2783,7 +2785,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
           ref={flatListRef}
           data={processedMessages}
           renderItem={renderChatItem as any}
-          keyExtractor={(item: any) => item.id}
+          keyExtractor={chatKeyExtractor}
           contentContainerStyle={[styles.messagesList, { paddingBottom: Spacing.lg }]}
           onContentSizeChange={() => {
             if (isNearBottom.current) {

@@ -662,7 +662,7 @@ export const ExploreScreen = () => {
     return calculateCompatibility(user, hostProfile);
   };
 
-  const handleInterestPress = async (property?: Property) => {
+  const handleInterestPress = useCallback(async (property?: Property) => {
     const target = property || selectedProperty;
     if (!user || !target) return;
     if (property) setSelectedProperty(property);
@@ -677,7 +677,7 @@ export const ExploreScreen = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setInterestNote('');
     setShowUnifiedInterestSheet(true);
-  };
+  }, [user, selectedProperty, canSendInterest]);
 
   const handleSendUnifiedInterest = async (note: string) => {
     if (!user || !selectedProperty) return;
@@ -1470,7 +1470,7 @@ export const ExploreScreen = () => {
   };
 
 
-  const toggleSave = async (id: string) => {
+  const toggleSave = useCallback(async (id: string) => {
     if (!user?.id) return;
 
     if (!gateStatus.canSave) {
@@ -1543,9 +1543,9 @@ export const ExploreScreen = () => {
       }
       setSaved(rollbackSaved);
     }
-  };
+  }, [user, gateStatus.canSave, saved, viewMode, properties, forYouListings]);
 
-  const toggleQuickFilter = (key: string) => {
+  const toggleQuickFilter = useCallback((key: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setActiveQuickFilters(prev => {
       const next = new Set(prev);
@@ -1558,9 +1558,9 @@ export const ExploreScreen = () => {
       }
       return next;
     });
-  };
+  }, []);
 
-  const handleListingTypeChip = (type: string) => {
+  const handleListingTypeChip = useCallback((type: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setListingTypeFilter(prev => {
       if (prev.includes(type)) {
@@ -1568,9 +1568,9 @@ export const ExploreScreen = () => {
       }
       return [...prev, type];
     });
-  };
+  }, []);
 
-  const handleLeaseTypeChip = (type: string) => {
+  const handleLeaseTypeChip = useCallback((type: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setLeaseTypeFilter(prev => {
       if (prev.includes(type)) {
@@ -1578,12 +1578,12 @@ export const ExploreScreen = () => {
       }
       return [...prev, type];
     });
-  };
+  }, []);
 
   const isBasic = renterPlan === 'free';
 
 
-  const renderProperty = ({ item, index }: { item: Property; index: number }) => {
+  const renderProperty = useCallback(({ item, index }: { item: Property; index: number }) => {
     const hostUser = item.hostProfileId ? hostProfiles.get(item.hostProfileId) : null;
     const hostProfile = hostUser ? getUserAsRoommateProfile(hostUser) : null;
     const compatibility = hostProfile && user ? calculateCompatibility(user, hostProfile) : null;
@@ -1972,7 +1972,7 @@ export const ExploreScreen = () => {
         </View>
       </Pressable>
     );
-  };
+  }, [hostProfiles, user, saved, exploreTour, isBasic, discoverableGroups, criticalAgentIds, navigation, toggleSave, handleInterestPress, canViewListing, useListingView]);
 
   if (error) {
     return (
