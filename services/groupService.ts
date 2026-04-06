@@ -57,15 +57,32 @@ export async function getGroups(city?: string, type?: GroupType) {
     .order('created_at', { ascending: false });
 
   if (city) query = query.eq('city', city);
-  if (type) query = query.eq('type', type);
 
-  const { data, error } = await query;
+  let { data, error } = await query;
+
+  if (error && error.message?.includes('column') && error.message?.includes('type')) {
+    const fallbackQuery = supabase
+      .from('groups')
+      .select(`
+        *,
+        members:group_members(user_id, role, status)
+      `)
+      .order('created_at', { ascending: false });
+    if (city) fallbackQuery.eq('city', city);
+    const fallback = await fallbackQuery;
+    data = fallback.data;
+    error = fallback.error;
+  }
+
   if (error) {
     console.error('[getGroups] Query error:', error.message);
     throw error;
   }
 
-  const groups = data || [];
+  let groups = data || [];
+  if (type) {
+    groups = groups.filter((g: any) => g.type === type);
+  }
   return groups
     .filter((g: any) => isWithinActivityCutoff(g.updated_at || g.created_at))
     .sort((a: any, b: any) => {

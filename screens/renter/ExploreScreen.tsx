@@ -1732,9 +1732,9 @@ export const ExploreScreen = () => {
           </View>
           <Pressable
             style={[styles.saveBtn, saved.has(item.id) ? styles.saveBtnActive : null]}
-            onPress={() => toggleSave(item.id)}
+            onPress={(e) => { e.stopPropagation(); toggleSave(item.id); }}
             accessibilityLabel={saved.has(item.id) ? 'Unsave listing' : 'Save listing'}
-            accessibilityRole="button"
+            {...(Platform.OS !== 'web' ? { accessibilityRole: 'button' } : {})}
           >
             <Feather
               name="heart"
@@ -1842,13 +1842,14 @@ export const ExploreScreen = () => {
             <Feather name="map-pin" size={12} color="rgba(255,107,91,0.55)" />
             <Text style={styles.locationText}>{formatLocation(item)}</Text>
             <Pressable
-              onPress={() => {
+              onPress={(e) => {
+                e.stopPropagation();
                 setSelectedProperty(item);
                 setShowNeighborhoodSheet(true);
               }}
               style={styles.areaInfoPill}
               accessibilityLabel="View area info"
-              accessibilityRole="button"
+              {...(Platform.OS !== 'web' ? { accessibilityRole: 'button' } : {})}
             >
               <Feather name="cpu" size={11} color="#ff6b5b" />
               <Text style={styles.areaInfoPillText}>Area info</Text>

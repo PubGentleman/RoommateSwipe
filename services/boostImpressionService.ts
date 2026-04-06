@@ -1,7 +1,9 @@
-import { supabase } from '../lib/supabase';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { shouldLoadMockData } from '../utils/dataUtils';
 
 const FLUSH_INTERVAL = 15000;
 const MAX_BATCH_SIZE = 25;
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 interface ImpressionEvent {
   listing_id: string;
@@ -57,24 +59,33 @@ export function trackImpression(
 export async function flushImpressions() {
   if (queue.length === 0) return;
 
-  const batch = [...queue];
+  if (!isSupabaseConfigured || shouldLoadMockData()) {
+    queue = [];
+    return;
+  }
+
+  const validBatch = queue.filter(
+    e => UUID_REGEX.test(e.listing_id) && UUID_REGEX.test(e.viewer_id)
+  );
   queue = [];
+
+  if (validBatch.length === 0) return;
 
   try {
     const { error } = await supabase
       .from('boost_impressions')
-      .insert(batch);
+      .insert(validBatch);
 
     if (error) {
       console.error('Failed to flush impressions:', error);
-      if (queue.length + batch.length < 500) {
-        queue.unshift(...batch);
+      if (queue.length + validBatch.length < 500) {
+        queue.unshift(...validBatch);
       }
     }
   } catch (err) {
     console.error('Impression flush error:', err);
-    if (queue.length + batch.length < 500) {
-      queue.unshift(...batch);
+    if (queue.length + validBatch.length < 500) {
+      queue.unshift(...validBatch);
     }
   }
 }
