@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { validateAndSanitize } from '../utils/inputValidation';
 
 export interface MatchWeightProfile {
   user_id: string;
@@ -58,9 +59,15 @@ export async function updateWeightProfile(
     'weight_smoking' | 'weight_pets' | 'weight_lifestyle' | 'weight_social'
   >>
 ): Promise<MatchWeightProfile> {
+  const ALLOWED_WEIGHT_FIELDS = [
+    'weight_location', 'weight_budget', 'weight_sleep', 'weight_cleanliness',
+    'weight_smoking', 'weight_pets', 'weight_lifestyle', 'weight_social',
+  ];
+  const sanitizedWeights = validateAndSanitize(weights as unknown as Record<string, unknown>, ALLOWED_WEIGHT_FIELDS);
+
   const { data, error } = await supabase
     .from('match_weight_profiles')
-    .update({ ...weights, updated_at: new Date().toISOString() })
+    .update({ ...sanitizedWeights, updated_at: new Date().toISOString() })
     .eq('user_id', userId)
     .select()
     .single();

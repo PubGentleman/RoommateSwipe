@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { validateAndSanitize } from '../utils/inputValidation';
 
 export interface SavedSearch {
   id: string;
@@ -75,9 +76,15 @@ export async function updateSavedSearch(
   searchId: string,
   updates: Partial<Pick<SavedSearch, 'name' | 'filters' | 'notify_enabled' | 'notify_frequency'>>
 ): Promise<SavedSearch> {
+  const ALLOWED_SEARCH_FIELDS = ['name', 'filters', 'notify_enabled', 'notify_frequency'];
+  const SEARCH_RULES: Record<string, { maxLength?: number }> = {
+    name: { maxLength: 100 },
+  };
+  const sanitizedUpdates = validateAndSanitize(updates as unknown as Record<string, unknown>, ALLOWED_SEARCH_FIELDS, SEARCH_RULES);
+
   const { data, error } = await supabase
     .from('saved_searches')
-    .update({ ...updates, updated_at: new Date().toISOString() })
+    .update({ ...sanitizedUpdates, updated_at: new Date().toISOString() })
     .eq('id', searchId)
     .select()
     .single();

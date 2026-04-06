@@ -4,6 +4,7 @@ import { GroupType, GroupMember } from '../types/models';
 import { isWithinActivityCutoff, getRecencyMultiplier } from '../utils/activityDecay';
 import { shouldLoadMockData } from '../utils/dataUtils';
 import { withTimeout } from '../utils/asyncHelpers';
+import { validateAndSanitize } from '../utils/inputValidation';
 
 interface SupabaseGroupMessageRow {
   id: string;
@@ -205,13 +206,25 @@ export async function createGroup(userId: string, group: GroupData) {
 
   await checkEmailVerifiedForGroups();
 
+  const ALLOWED_GROUP_FIELDS = [
+    'name', 'description', 'city', 'state', 'max_members', 'budget_min', 'budget_max',
+    'move_in_date', 'photo_url', 'type', 'listing_id', 'host_id', 'listing_address',
+    'is_archived', 'is_visible_to_hosts', 'address_revealed', 'inquiry_status',
+  ];
+  const GROUP_RULES: Record<string, { required?: boolean; maxLength?: number; allowedValues?: string[] }> = {
+    name: { required: true, maxLength: 100 },
+    description: { maxLength: 500 },
+    max_members: { allowedValues: ['2', '3', '4', '5', '6'] },
+  };
+  const sanitizedGroup = validateAndSanitize(group as unknown as Record<string, unknown>, ALLOWED_GROUP_FIELDS, GROUP_RULES);
+
   const { data, error } = await supabase
     .from('groups')
     .insert({
       created_by: userId,
       type: group.type || 'roommate',
       is_visible_to_hosts: group.type === 'listing_inquiry' ? false : true,
-      ...group,
+      ...sanitizedGroup,
     })
     .select()
     .single();
@@ -408,9 +421,20 @@ export async function updateMemberCouple(
 }
 
 export async function updateGroup(id: string, updates: Partial<GroupData>) {
+  const ALLOWED_UPDATE_FIELDS = [
+    'name', 'description', 'city', 'state', 'max_members', 'budget_min', 'budget_max',
+    'move_in_date', 'photo_url', 'is_archived', 'is_visible_to_hosts',
+    'address_revealed', 'inquiry_status',
+  ];
+  const UPDATE_RULES: Record<string, { maxLength?: number }> = {
+    name: { maxLength: 100 },
+    description: { maxLength: 500 },
+  };
+  const sanitizedUpdates = validateAndSanitize(updates as unknown as Record<string, unknown>, ALLOWED_UPDATE_FIELDS, UPDATE_RULES);
+
   const { data, error } = await supabase
     .from('groups')
-    .update(updates)
+    .update(sanitizedUpdates)
     .eq('id', id)
     .select()
     .single();

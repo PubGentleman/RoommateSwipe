@@ -10,6 +10,7 @@ import { Feather } from '../../../components/VectorIcons';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useTheme } from '../../../hooks/useTheme';
 import { supabase } from '../../../lib/supabase';
+import { validateAndSanitize } from '../../../utils/inputValidation';
 import OnboardingHeader from '../../../components/OnboardingHeader';
 import { PricePickerPair } from '../../../components/PricePicker';
 
@@ -421,9 +422,18 @@ export default function RoommateOnboardingScreen() {
         const cleanFields = Object.fromEntries(
           Object.entries(profileFields).filter(([_, v]) => v !== undefined)
         );
+        const ALLOWED_PROFILE_FIELDS = [
+          'budget_min', 'budget_max', 'sleep_schedule', 'cleanliness', 'noise_tolerance',
+          'ideal_roommate_text', 'smoking', 'dealbreakers', 'pets', 'max_roommates',
+          'household_gender_preference', 'room_type',
+        ];
+        const PROFILE_RULES: Record<string, { maxLength?: number }> = {
+          ideal_roommate_text: { maxLength: 1000 },
+        };
+        const sanitizedFields = validateAndSanitize(cleanFields as Record<string, unknown>, ALLOWED_PROFILE_FIELDS, PROFILE_RULES);
         const { error: profileError } = await supabase
           .from('profiles')
-          .upsert({ user_id: user.id, ...cleanFields }, { onConflict: 'user_id' });
+          .upsert({ user_id: user.id, ...sanitizedFields }, { onConflict: 'user_id' });
         if (profileError) console.error('Error saving profile preferences:', profileError);
       }
 

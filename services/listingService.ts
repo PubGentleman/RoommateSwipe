@@ -1,6 +1,7 @@
 import { supabase } from '../lib/supabase';
 import { Property } from '../types/models';
 import { StorageService } from '../utils/storage';
+import { validateAndSanitize } from '../utils/inputValidation';
 
 export interface ListingData {
   title: string;
@@ -147,9 +148,24 @@ export async function getMyListings(userId: string) {
 export async function createListing(userId: string, listing: ListingData) {
   if (!userId) throw new Error('Not authenticated');
 
+  const ALLOWED_LISTING_FIELDS = [
+    'title', 'description', 'rent', 'bedrooms', 'bathrooms', 'sqft', 'property_type',
+    'address', 'city', 'state', 'neighborhood', 'zip_code', 'room_type', 'amenities',
+    'photos', 'available_date', 'is_active', 'is_paused', 'is_rented', 'is_featured',
+    'rented_date', 'coordinates', 'transit_info', 'walk_score', 'walk_score_label',
+    'transit_score', 'transit_score_label', 'host_name', 'host_profile_id',
+    'existing_roommates', 'outreach_unlocked_at', 'assigned_agent_id',
+  ];
+  const LISTING_RULES: Record<string, { required?: boolean; maxLength?: number }> = {
+    title: { required: true, maxLength: 200 },
+    description: { maxLength: 5000 },
+    address: { maxLength: 500 },
+  };
+  const sanitizedListing = validateAndSanitize(listing as unknown as Record<string, unknown>, ALLOWED_LISTING_FIELDS, LISTING_RULES);
+
   const { data, error } = await supabase
     .from('listings')
-    .insert({ host_id: userId, ...listing })
+    .insert({ host_id: userId, ...sanitizedListing })
     .select()
     .single();
 
@@ -158,9 +174,24 @@ export async function createListing(userId: string, listing: ListingData) {
 }
 
 export async function updateListing(id: string, updates: Partial<ListingData>, userId?: string) {
+  const ALLOWED_UPDATE_FIELDS = [
+    'title', 'description', 'rent', 'bedrooms', 'bathrooms', 'sqft', 'property_type',
+    'address', 'city', 'state', 'neighborhood', 'zip_code', 'room_type', 'amenities',
+    'photos', 'available_date', 'is_active', 'is_paused', 'is_rented', 'is_featured',
+    'rented_date', 'coordinates', 'transit_info', 'walk_score', 'walk_score_label',
+    'transit_score', 'transit_score_label', 'host_name', 'host_profile_id',
+    'existing_roommates', 'outreach_unlocked_at', 'assigned_agent_id',
+  ];
+  const LISTING_UPDATE_RULES: Record<string, { maxLength?: number }> = {
+    title: { maxLength: 200 },
+    description: { maxLength: 5000 },
+    address: { maxLength: 500 },
+  };
+  const sanitizedUpdates = validateAndSanitize(updates as unknown as Record<string, unknown>, ALLOWED_UPDATE_FIELDS, LISTING_UPDATE_RULES);
+
   let query = supabase
     .from('listings')
-    .update(updates)
+    .update(sanitizedUpdates)
     .eq('id', id);
 
   if (userId) {
