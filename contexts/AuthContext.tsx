@@ -2767,7 +2767,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const localData = await AsyncStorage.getItem(`@rhome/team_members_${user.id}`);
       if (localData) {
         const members = JSON.parse(localData);
-        return members.map((m: any) => ({
+        return members.map((m: { id: string; user_id: string; email: string; name: string; role: string; status?: string; invited_at?: string; joined_at?: string }) => ({
           id: m.id,
           companyUserId: user.id,
           memberUserId: m.user_id,
