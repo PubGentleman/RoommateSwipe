@@ -10,7 +10,7 @@ export const createMockNotifications = (userId: string): Notification[] => {
       title: 'New Match!',
       body: 'You and Sarah Johnson matched! Start chatting to see if you\'re compatible roommates.',
       isRead: false,
-      createdAt: new Date(now - 1000 * 60 * 30),
+      createdAt: new Date(now - 1000 * 60 * 30).toISOString(),
       data: { matchId: `match-${userId.slice(0, 6)}-1`, fromUserId: '1', fromUserName: 'Sarah Johnson', fromUserPhoto: 'https://picsum.photos/100/100?random=1' },
     },
     {
@@ -20,7 +20,7 @@ export const createMockNotifications = (userId: string): Notification[] => {
       title: 'Someone sent you a Super Interest!',
       body: 'Emily Rodriguez is very interested in rooming with you.',
       isRead: false,
-      createdAt: new Date(now - 1000 * 60 * 60 * 2),
+      createdAt: new Date(now - 1000 * 60 * 60 * 2).toISOString(),
       data: { fromUserId: '3', fromUserName: 'Emily Rodriguez', fromUserPhoto: 'https://picsum.photos/100/100?random=3' },
     },
     {
@@ -30,7 +30,7 @@ export const createMockNotifications = (userId: string): Notification[] => {
       title: 'New Message',
       body: 'Michael Chen: Hey, are you still looking in Brooklyn?',
       isRead: true,
-      createdAt: new Date(now - 1000 * 60 * 60 * 5),
+      createdAt: new Date(now - 1000 * 60 * 60 * 5).toISOString(),
       data: { conversationId: '2', fromUserId: '2', fromUserName: 'Michael Chen' },
     },
     {
@@ -40,7 +40,7 @@ export const createMockNotifications = (userId: string): Notification[] => {
       title: 'Group Invitation',
       body: 'You\'ve been invited to join "Williamsburg Trio" group.',
       isRead: false,
-      createdAt: new Date(now - 1000 * 60 * 60 * 8),
+      createdAt: new Date(now - 1000 * 60 * 60 * 8).toISOString(),
       data: { group_id: '1', fromUserName: 'Sarah Johnson' },
     },
     {
@@ -50,7 +50,7 @@ export const createMockNotifications = (userId: string): Notification[] => {
       title: 'New Interest Card',
       body: 'A renter is interested in your listing "Cozy Suburban House".',
       isRead: true,
-      createdAt: new Date(now - 1000 * 60 * 60 * 12),
+      createdAt: new Date(now - 1000 * 60 * 60 * 12).toISOString(),
       data: { propertyId: '2', fromUserName: 'Jessica Park', interestCardId: 'ic-1' },
     },
     {
@@ -60,7 +60,7 @@ export const createMockNotifications = (userId: string): Notification[] => {
       title: 'Welcome to Rhome!',
       body: 'Complete your profile to get better matches and increase your visibility.',
       isRead: true,
-      createdAt: new Date(now - 1000 * 60 * 60 * 24 * 2),
+      createdAt: new Date(now - 1000 * 60 * 60 * 24 * 2).toISOString(),
     },
     {
       id: `notif-${userId.slice(0, 6)}-7`,
@@ -69,7 +69,7 @@ export const createMockNotifications = (userId: string): Notification[] => {
       title: 'Price Drop Alert',
       body: 'A listing you saved in Williamsburg just dropped its price by $200/mo.',
       isRead: false,
-      createdAt: new Date(now - 1000 * 60 * 60 * 18),
+      createdAt: new Date(now - 1000 * 60 * 60 * 18).toISOString(),
       data: { propertyId: '2' },
     },
     {
@@ -79,7 +79,7 @@ export const createMockNotifications = (userId: string): Notification[] => {
       title: 'Interest Accepted!',
       body: 'Your interest in "Modern Downtown Apartment" was accepted. You can now chat with the host.',
       isRead: false,
-      createdAt: new Date(now - 1000 * 60 * 60 * 4),
+      createdAt: new Date(now - 1000 * 60 * 60 * 4).toISOString(),
       data: { propertyId: '1', conversationId: '5' },
     },
     {
@@ -89,7 +89,7 @@ export const createMockNotifications = (userId: string): Notification[] => {
       title: 'Pi Found a Group for You!',
       body: 'Pi assembled a potential roommate group based on your preferences. Check it out!',
       isRead: false,
-      createdAt: new Date(now - 1000 * 60 * 60 * 6),
+      createdAt: new Date(now - 1000 * 60 * 60 * 6).toISOString(),
       data: { groupId: '14' },
     },
     {
@@ -99,7 +99,7 @@ export const createMockNotifications = (userId: string): Notification[] => {
       title: 'Don\'t Miss Out!',
       body: '3 new listings in your preferred neighborhoods were posted today.',
       isRead: true,
-      createdAt: new Date(now - 1000 * 60 * 60 * 36),
+      createdAt: new Date(now - 1000 * 60 * 60 * 36).toISOString(),
     },
     {
       id: `notif-${userId.slice(0, 6)}-11`,
@@ -108,7 +108,7 @@ export const createMockNotifications = (userId: string): Notification[] => {
       title: 'Agent Invitation',
       body: 'Agent Derek Ward has a listing that matches your preferences.',
       isRead: false,
-      createdAt: new Date(now - 1000 * 60 * 60 * 10),
+      createdAt: new Date(now - 1000 * 60 * 60 * 10).toISOString(),
       data: { agentName: 'Derek Ward', listingTitle: 'Luxury Penthouse Suite', listingRent: 3500 },
     },
     {
@@ -118,7 +118,7 @@ export const createMockNotifications = (userId: string): Notification[] => {
       title: 'Joined Group!',
       body: 'You\'ve been accepted into "Brooklyn Creatives" group.',
       isRead: true,
-      createdAt: new Date(now - 1000 * 60 * 60 * 24),
+      createdAt: new Date(now - 1000 * 60 * 60 * 24).toISOString(),
       data: { groupId: '2' },
     },
   ];
@@ -185,7 +185,7 @@ export const createHostMockNotifications = (userId: string): Notification[] => {
       title: 'New Interest Card!',
       body: 'Sarah Johnson is interested in your listing. 89% compatibility match!',
       isRead: false,
-      createdAt: new Date(now - 1000 * 60 * 45),
+      createdAt: new Date(now - 1000 * 60 * 45).toISOString(),
       data: { fromUserId: '1', fromUserName: 'Sarah Johnson', fromUserPhoto: 'https://picsum.photos/100/100?random=1', interestCardId: 'ic-1' },
     },
     {
@@ -195,7 +195,7 @@ export const createHostMockNotifications = (userId: string): Notification[] => {
       title: 'Super Interest Received!',
       body: 'Michael Chen sent a Super Interest for your listing. They\'re very eager to connect.',
       isRead: false,
-      createdAt: new Date(now - 1000 * 60 * 60 * 3),
+      createdAt: new Date(now - 1000 * 60 * 60 * 3).toISOString(),
       data: { fromUserId: '2', fromUserName: 'Michael Chen', fromUserPhoto: 'https://picsum.photos/100/100?random=2', interestCardId: 'ic-2' },
     },
     {
@@ -205,7 +205,7 @@ export const createHostMockNotifications = (userId: string): Notification[] => {
       title: 'New Message',
       body: 'Emily Rodriguez: When would be a good time to see the apartment?',
       isRead: true,
-      createdAt: new Date(now - 1000 * 60 * 60 * 8),
+      createdAt: new Date(now - 1000 * 60 * 60 * 8).toISOString(),
       data: { conversationId: '3', fromUserId: '3', fromUserName: 'Emily Rodriguez' },
     },
     {
@@ -215,7 +215,7 @@ export const createHostMockNotifications = (userId: string): Notification[] => {
       title: 'Pi Found a Group Match!',
       body: 'A group of 3 renters matches your listing requirements. Review them now.',
       isRead: false,
-      createdAt: new Date(now - 1000 * 60 * 60 * 6),
+      createdAt: new Date(now - 1000 * 60 * 60 * 6).toISOString(),
       data: { groupId: '1' },
     },
     {
@@ -225,7 +225,7 @@ export const createHostMockNotifications = (userId: string): Notification[] => {
       title: 'Listing Performance',
       body: 'Your listing has received 24 views this week. Consider boosting for more visibility.',
       isRead: true,
-      createdAt: new Date(now - 1000 * 60 * 60 * 24),
+      createdAt: new Date(now - 1000 * 60 * 60 * 24).toISOString(),
     },
     {
       id: `hnotif-${userId.slice(0, 6)}-6`,
@@ -234,7 +234,7 @@ export const createHostMockNotifications = (userId: string): Notification[] => {
       title: 'Boost Expired',
       body: 'Your listing boost has expired. Renew it to keep your listing at the top.',
       isRead: true,
-      createdAt: new Date(now - 1000 * 60 * 60 * 48),
+      createdAt: new Date(now - 1000 * 60 * 60 * 48).toISOString(),
     },
     {
       id: `hnotif-${userId.slice(0, 6)}-7`,
@@ -243,7 +243,7 @@ export const createHostMockNotifications = (userId: string): Notification[] => {
       title: 'Renter Confirmed',
       body: 'Jessica Park accepted your response. You can now finalize details.',
       isRead: false,
-      createdAt: new Date(now - 1000 * 60 * 60 * 12),
+      createdAt: new Date(now - 1000 * 60 * 60 * 12).toISOString(),
       data: { fromUserId: '5', fromUserName: 'Jessica Park' },
     },
     {
@@ -253,7 +253,7 @@ export const createHostMockNotifications = (userId: string): Notification[] => {
       title: 'Respond to Inquiries',
       body: 'You have 3 pending interest cards. Responding quickly improves your host rating.',
       isRead: false,
-      createdAt: new Date(now - 1000 * 60 * 60 * 16),
+      createdAt: new Date(now - 1000 * 60 * 60 * 16).toISOString(),
     },
   ];
 };
@@ -268,7 +268,7 @@ export const createAgentMockNotifications = (userId: string): Notification[] => 
       title: 'New Client Lead',
       body: 'Sarah Johnson is interested in your managed listing at 123 Main St.',
       isRead: false,
-      createdAt: new Date(now - 1000 * 60 * 30),
+      createdAt: new Date(now - 1000 * 60 * 30).toISOString(),
       data: { fromUserId: '1', fromUserName: 'Sarah Johnson', fromUserPhoto: 'https://picsum.photos/100/100?random=1', interestCardId: 'ic-1' },
     },
     {
@@ -278,7 +278,7 @@ export const createAgentMockNotifications = (userId: string): Notification[] => 
       title: 'Team Invitation',
       body: 'You\'ve been invited to join Metro Realty as a licensed agent.',
       isRead: false,
-      createdAt: new Date(now - 1000 * 60 * 60 * 2),
+      createdAt: new Date(now - 1000 * 60 * 60 * 2).toISOString(),
       data: { companyId: 'company1', companyName: 'Metro Realty' },
     },
     {
@@ -288,7 +288,7 @@ export const createAgentMockNotifications = (userId: string): Notification[] => 
       title: 'Client Message',
       body: 'Michael Chen: Can you arrange a viewing for this Friday?',
       isRead: true,
-      createdAt: new Date(now - 1000 * 60 * 60 * 5),
+      createdAt: new Date(now - 1000 * 60 * 60 * 5).toISOString(),
       data: { conversationId: '2', fromUserId: '2', fromUserName: 'Michael Chen' },
     },
     {
@@ -298,7 +298,7 @@ export const createAgentMockNotifications = (userId: string): Notification[] => 
       title: 'Pi Matched a Group',
       body: 'A group of renters has been assembled that fits one of your listings.',
       isRead: false,
-      createdAt: new Date(now - 1000 * 60 * 60 * 8),
+      createdAt: new Date(now - 1000 * 60 * 60 * 8).toISOString(),
       data: { groupId: '1' },
     },
     {
@@ -308,7 +308,7 @@ export const createAgentMockNotifications = (userId: string): Notification[] => 
       title: 'License Verified',
       body: 'Your real estate license has been verified. You now have access to agent tools.',
       isRead: true,
-      createdAt: new Date(now - 1000 * 60 * 60 * 24),
+      createdAt: new Date(now - 1000 * 60 * 60 * 24).toISOString(),
     },
     {
       id: `anotif-${userId.slice(0, 6)}-6`,
@@ -317,7 +317,7 @@ export const createAgentMockNotifications = (userId: string): Notification[] => 
       title: 'Pending Inquiries',
       body: 'You have 5 unresponded inquiries. Quick responses improve your agent ranking.',
       isRead: false,
-      createdAt: new Date(now - 1000 * 60 * 60 * 12),
+      createdAt: new Date(now - 1000 * 60 * 60 * 12).toISOString(),
     },
   ];
 };
@@ -332,7 +332,7 @@ export const createCompanyMockNotifications = (userId: string): Notification[] =
       title: 'Portfolio Inquiry',
       body: 'Emily Rodriguez is interested in your company listing at 456 Park Ave.',
       isRead: false,
-      createdAt: new Date(now - 1000 * 60 * 20),
+      createdAt: new Date(now - 1000 * 60 * 20).toISOString(),
       data: { fromUserId: '3', fromUserName: 'Emily Rodriguez', fromUserPhoto: 'https://picsum.photos/100/100?random=3', interestCardId: 'ic-3' },
     },
     {
@@ -342,7 +342,7 @@ export const createCompanyMockNotifications = (userId: string): Notification[] =
       title: 'Group Booking Request',
       body: 'A group of 4 renters wants to book your 4BR listing together.',
       isRead: false,
-      createdAt: new Date(now - 1000 * 60 * 60 * 3),
+      createdAt: new Date(now - 1000 * 60 * 60 * 3).toISOString(),
       data: { listingId: '5', groupId: '2' },
     },
     {
@@ -352,7 +352,7 @@ export const createCompanyMockNotifications = (userId: string): Notification[] =
       title: 'Team Update',
       body: 'Alex Kim (Agent): Just completed the showing at Williamsburg listing.',
       isRead: true,
-      createdAt: new Date(now - 1000 * 60 * 60 * 6),
+      createdAt: new Date(now - 1000 * 60 * 60 * 6).toISOString(),
       data: { conversationId: '4', fromUserId: '7', fromUserName: 'Alex Kim' },
     },
     {
@@ -362,7 +362,7 @@ export const createCompanyMockNotifications = (userId: string): Notification[] =
       title: 'Monthly Analytics',
       body: 'Your portfolio received 156 views this month. 12 new inquiries across 8 listings.',
       isRead: true,
-      createdAt: new Date(now - 1000 * 60 * 60 * 24),
+      createdAt: new Date(now - 1000 * 60 * 60 * 24).toISOString(),
     },
     {
       id: `cnotif-${userId.slice(0, 6)}-5`,
@@ -371,7 +371,7 @@ export const createCompanyMockNotifications = (userId: string): Notification[] =
       title: 'Listing Expiring Soon',
       body: 'Your listing at 789 Broadway expires in 3 days. Renew to keep it active.',
       isRead: false,
-      createdAt: new Date(now - 1000 * 60 * 60 * 36),
+      createdAt: new Date(now - 1000 * 60 * 60 * 36).toISOString(),
     },
     {
       id: `cnotif-${userId.slice(0, 6)}-6`,
@@ -380,7 +380,7 @@ export const createCompanyMockNotifications = (userId: string): Notification[] =
       title: 'Team Performance',
       body: 'Your team has 8 pending inquiries. Assign agents to maintain response times.',
       isRead: false,
-      createdAt: new Date(now - 1000 * 60 * 60 * 10),
+      createdAt: new Date(now - 1000 * 60 * 60 * 10).toISOString(),
     },
   ];
 };
