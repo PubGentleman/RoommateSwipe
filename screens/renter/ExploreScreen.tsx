@@ -1661,7 +1661,7 @@ export const ExploreScreen = () => {
         }}
       >
         <View style={styles.cardPhoto}>
-          <Image source={{ uri: item.photos[0] }} style={styles.photoBg} accessibilityLabel={`Photo of ${item.title}`} accessibilityRole="image" />
+          <Image source={{ uri: item.photos[0] }} style={styles.photoBg} resizeMode="cover" accessibilityLabel={`Photo of ${item.title}`} accessibilityRole="image" />
           <LinearGradient
             colors={['transparent', 'rgba(0,0,0,0.88)']}
             style={styles.photoGradient}
@@ -4618,7 +4618,6 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     width: '100%',
     height: '100%',
-    resizeMode: 'cover',
   },
   photoGradient: {
     ...StyleSheet.absoluteFillObject,

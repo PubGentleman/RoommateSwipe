@@ -1,9 +1,7 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { View, Pressable, StyleSheet, Text } from 'react-native';
-import { Audio } from 'expo-av';
-import Animated, { useSharedValue, useAnimatedStyle, withTiming, withRepeat, withSequence } from 'react-native-reanimated';
+import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { Feather } from './VectorIcons';
-import { createErrorHandler } from '../utils/errorLogger';
 
 type Props = {
   audioUrl: string;
@@ -39,55 +37,33 @@ function formatTime(ms: number): string {
 const BAR_COUNT = 24;
 
 export default function VoiceMessageBubble({ audioUrl, durationMs, isOwnMessage }: Props) {
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [position, setPosition] = useState(0);
-  const soundRef = useRef<Audio.Sound | null>(null);
+  const player = useAudioPlayer(audioUrl);
+  const status = useAudioPlayerStatus(player);
   const barHeights = useRef(generateBarHeights(audioUrl, BAR_COUNT)).current;
-  const playProgress = useSharedValue(0);
 
-  useEffect(() => {
-    return () => {
-      soundRef.current?.unloadAsync().catch(createErrorHandler('VoiceMessageBubble', 'unloadAsync'));
-    };
-  }, []);
+  const isPlaying = status.playing;
+  const positionMs = Math.round((status.currentTime ?? 0) * 1000);
 
-  const togglePlay = useCallback(async () => {
+  const togglePlay = useCallback(() => {
     try {
-      if (isPlaying && soundRef.current) {
-        await soundRef.current.pauseAsync();
-        setIsPlaying(false);
-        return;
-      }
-
-      if (!soundRef.current) {
-        const { sound } = await Audio.Sound.createAsync(
-          { uri: audioUrl },
-          { shouldPlay: true },
-          (status) => {
-            if (status.isLoaded) {
-              setPosition(status.positionMillis || 0);
-              playProgress.value = durationMs > 0 ? (status.positionMillis || 0) / durationMs : 0;
-              if (status.didJustFinish) {
-                setIsPlaying(false);
-                setPosition(0);
-                playProgress.value = 0;
-                soundRef.current?.setPositionAsync(0).catch(createErrorHandler('VoiceMessageBubble', 'setPositionAsync'));
-              }
-            }
-          }
-        );
-        soundRef.current = sound;
+      if (isPlaying) {
+        player.pause();
       } else {
-        await soundRef.current.playAsync();
+        player.play();
       }
-      setIsPlaying(true);
     } catch (err) {
       console.error('Voice playback error:', err);
     }
-  }, [isPlaying, audioUrl, durationMs]);
+  }, [isPlaying, player]);
 
-  const remaining = isPlaying ? Math.max(0, durationMs - position) : durationMs;
-  const progressRatio = durationMs > 0 ? position / durationMs : 0;
+  useEffect(() => {
+    if (status.didJustFinish) {
+      player.seekTo(0);
+    }
+  }, [status.didJustFinish]);
+
+  const progressRatio = durationMs > 0 ? positionMs / durationMs : 0;
+  const remaining = isPlaying ? Math.max(0, durationMs - positionMs) : durationMs;
 
   return (
     <View style={[localStyles.container, { backgroundColor: isOwnMessage ? 'rgba(255,107,91,0.15)' : 'rgba(255,255,255,0.06)' }]}>

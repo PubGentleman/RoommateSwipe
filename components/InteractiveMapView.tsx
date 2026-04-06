@@ -465,6 +465,7 @@ export default function InteractiveMapView({
           <Image
             source={{ uri: selectedProperty.photos[0] }}
             style={styles.previewImage}
+            resizeMode="cover"
           />
         ) : (
           <View style={[styles.previewImage, styles.previewImagePlaceholder]}>
@@ -713,7 +714,6 @@ const styles = StyleSheet.create({
   previewImage: {
     width: 110,
     height: 110,
-    resizeMode: 'cover',
   },
   previewImagePlaceholder: {
     alignItems: 'center',

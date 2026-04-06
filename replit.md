@@ -78,9 +78,10 @@ The architecture includes a Babel module resolver, platform-specific UI, perform
 *   @stripe/stripe-react-native
 *   react-native-purchases (RevenueCat)
 *   @react-native-async-storage/async-storage
-*   react-native-maps
+*   react-native-maps (v1.20.1 — Apple Maps on iOS, no Google Maps SDK)
 *   react-native-google-places-autocomplete
 *   react-native-webview
+*   expo-audio (replaced expo-av for voice recording/playback)
 *   expo-notifications
 *   expo-device
 *   Supabase (Auth, Database, Realtime, Storage, Edge Functions)

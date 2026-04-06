@@ -60,7 +60,8 @@
           "sounds": []
         }
       ],
-      "@sentry/react-native"
+      "@sentry/react-native",
+      "expo-audio"
     ],
     "experiments": {
       "reactCompiler": true

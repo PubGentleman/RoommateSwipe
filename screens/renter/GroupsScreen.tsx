@@ -2234,7 +2234,7 @@ export const GroupsScreen = () => {
             {selectedMember ? (
               <ScrollView style={styles.memberProfileContent} showsVerticalScrollIndicator={false}>
                 {selectedMember.photos && selectedMember.photos.length > 0 ? (
-                  <Image source={{ uri: selectedMember.photos[0] }} style={styles.memberProfileImage} />
+                  <Image source={{ uri: selectedMember.photos[0] }} style={styles.memberProfileImage} resizeMode="cover" />
                 ) : null}
                 
                 <View style={styles.memberProfileSection}>
@@ -3189,7 +3189,6 @@ const styles = StyleSheet.create({
   memberProfileImage: {
     width: '100%',
     height: 300,
-    resizeMode: 'cover',
   },
   memberProfileSection: {
     padding: Spacing.lg,

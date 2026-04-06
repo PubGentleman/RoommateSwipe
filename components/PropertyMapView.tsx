@@ -284,6 +284,7 @@ export const PropertyMapView = ({
       <Image
         source={{ uri: selectedProperty.photos[0] }}
         style={styles.previewImage}
+        resizeMode="cover"
       />
       <View style={styles.previewInfo}>
         <View style={styles.previewHeader}>
@@ -442,7 +443,6 @@ const styles = StyleSheet.create({
   previewImage: {
     width: 100,
     height: 100,
-    resizeMode: 'cover',
   },
   previewInfo: {
     flex: 1,

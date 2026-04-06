@@ -1,28 +1,29 @@
 import { useState, useRef, useCallback } from 'react';
-import { Audio } from 'expo-av';
+import { useAudioRecorder, RecordingPresets } from 'expo-audio';
 import * as Haptics from 'expo-haptics';
 
 export function useVoiceRecording() {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
-  const recordingRef = useRef<Audio.Recording | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
 
   const startRecording = useCallback(async () => {
     try {
-      const permission = await Audio.requestPermissionsAsync();
+      const { requestRecordingPermissionsAsync } = await import('expo-audio');
+      const permission = await requestRecordingPermissionsAsync();
       if (!permission.granted) return null;
 
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
+      const { setAudioModeAsync } = await import('expo-audio');
+      await setAudioModeAsync({
+        allowsRecording: true,
+        playsInSilentMode: true,
       });
 
-      const recording = new Audio.Recording();
-      await recording.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
-      await recording.startAsync();
+      await recorder.prepareToRecordAsync();
+      recorder.record();
 
-      recordingRef.current = recording;
       setIsRecording(true);
       setRecordingDuration(0);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -31,23 +32,20 @@ export function useVoiceRecording() {
         setRecordingDuration(prev => prev + 1);
       }, 1000);
 
-      return recording;
+      return recorder;
     } catch (err) {
       console.error('Failed to start recording:', err);
       return null;
     }
-  }, []);
+  }, [recorder]);
 
   const stopRecording = useCallback(async () => {
-    if (!recordingRef.current) return null;
-
     try {
-      await recordingRef.current.stopAndUnloadAsync();
-      const uri = recordingRef.current.getURI();
+      await recorder.stop();
+      const uri = recorder.uri;
       const duration = recordingDuration * 1000;
 
       if (timerRef.current) clearInterval(timerRef.current);
-      recordingRef.current = null;
       setIsRecording(false);
       setRecordingDuration(0);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -58,18 +56,16 @@ export function useVoiceRecording() {
       setIsRecording(false);
       return null;
     }
-  }, [recordingDuration]);
+  }, [recorder, recordingDuration]);
 
   const cancelRecording = useCallback(async () => {
-    if (!recordingRef.current) return;
     try {
-      await recordingRef.current.stopAndUnloadAsync();
+      await recorder.stop();
     } catch {}
     if (timerRef.current) clearInterval(timerRef.current);
-    recordingRef.current = null;
     setIsRecording(false);
     setRecordingDuration(0);
-  }, []);
+  }, [recorder]);
 
   return { isRecording, recordingDuration, startRecording, stopRecording, cancelRecording };
 }
