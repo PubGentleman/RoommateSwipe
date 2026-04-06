@@ -45,7 +45,6 @@ export function GroupMemberCard({ member, isLead, isCurrentUser, onRemove, showR
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           activeOpacity={0.6}
           onPress={() => {
-            console.log('[GroupMemberCard] Remove pressed for:', member.name);
             onRemove?.();
           }}
         >

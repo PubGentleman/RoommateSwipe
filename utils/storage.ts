@@ -1426,7 +1426,7 @@ export const StorageService = {
           },
         ];
         for (const ag of newAgentGroups) {
-          if (!existingAgentGroups.some((e: any) => e.id === ag.id)) {
+          if (!existingAgentGroups.some((e: { id: string }) => e.id === ag.id)) {
             existingAgentGroups.push(ag);
           }
         }
@@ -1444,7 +1444,7 @@ export const StorageService = {
           { id: `sl_${userId.slice(0,6)}_5`, agentId: userId, renterId: '7', createdAt: new Date(now - 1000 * 60 * 60 * 6).toISOString() },
         ];
         for (const sl of newShortlists) {
-          if (!existingShortlists.some((e: any) => e.id === sl.id)) {
+          if (!existingShortlists.some((e: { id: string }) => e.id === sl.id)) {
             existingShortlists.push(sl);
           }
         }
