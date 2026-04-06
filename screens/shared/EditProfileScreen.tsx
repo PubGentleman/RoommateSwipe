@@ -205,6 +205,24 @@ export const EditProfileScreen = () => {
       return;
     }
 
+    const parsedBudgetMin = budgetMin.trim() ? parseInt(budgetMin) : null;
+    const parsedBudgetMax = budgetMax.trim() ? parseInt(budgetMax) : null;
+
+    if (parsedBudgetMin !== null && (isNaN(parsedBudgetMin) || parsedBudgetMin < 0)) {
+      await alert({ title: 'Error', message: 'Minimum budget must be a positive number', variant: 'warning' });
+      return;
+    }
+
+    if (parsedBudgetMax !== null && (isNaN(parsedBudgetMax) || parsedBudgetMax < 0)) {
+      await alert({ title: 'Error', message: 'Maximum budget must be a positive number', variant: 'warning' });
+      return;
+    }
+
+    if (parsedBudgetMin !== null && parsedBudgetMax !== null && parsedBudgetMin > parsedBudgetMax) {
+      await alert({ title: 'Error', message: 'Minimum budget cannot exceed maximum budget', variant: 'warning' });
+      return;
+    }
+
     setIsSaving(true);
 
     const birthdayStorageFormat = birthday.trim() || user?.birthday;

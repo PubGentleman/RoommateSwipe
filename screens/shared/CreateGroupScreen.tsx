@@ -57,7 +57,7 @@ export const CreateGroupScreen = ({ navigation, route }: any) => {
   const addInvite = () => {
     const val = newInviteValue.trim();
     if (!val) return;
-    if (newInviteType === 'email' && !val.includes('@')) return;
+    if (newInviteType === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) return;
     if (invites.some(i => i.value === val)) return;
     setInvites(prev => [...prev, {
       id: `inv_${Date.now()}`,

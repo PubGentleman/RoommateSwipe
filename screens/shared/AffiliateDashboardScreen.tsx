@@ -92,7 +92,7 @@ export const AffiliateDashboardScreen = () => {
 
   const handleSaveEmail = async () => {
     if (!affiliate) return;
-    if (!emailDraft.trim() || !emailDraft.includes('@')) {
+    if (!emailDraft.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailDraft.trim())) {
       await alert({ title: 'Invalid Email', message: 'Please enter a valid PayPal email.', variant: 'warning' });
       return;
     }

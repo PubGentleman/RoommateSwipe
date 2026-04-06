@@ -21,7 +21,7 @@ export const ForgotPasswordScreen: React.FC<Props> = ({ onResetSent, onBackToLog
   const handleSendReset = async () => {
     setError('');
     const trimmed = email.trim().toLowerCase();
-    if (!trimmed || !trimmed.includes('@')) {
+    if (!trimmed || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
       setError('Please enter a valid email address.');
       return;
     }
