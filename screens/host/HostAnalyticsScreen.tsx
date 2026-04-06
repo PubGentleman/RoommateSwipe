@@ -93,12 +93,11 @@ export const HostAnalyticsScreen = () => {
     }
 
     if (isAdvanced) {
-      try {
-        const log = await getOutreachLogForHost(user.id);
-        setOutreachLog(log);
-      } catch {
-        setOutreachLog([]);
+      const result = await getOutreachLogForHost(user.id);
+      if (!result.success) {
+        console.warn('[HostAnalytics] Outreach log fetch failed:', result.error);
       }
+      setOutreachLog(result.success ? result.data : []);
     }
   };
 

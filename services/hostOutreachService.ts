@@ -2,6 +2,8 @@ import { supabase } from '../lib/supabase';
 import { getPlanLimits, canUseProactiveOutreach, type HostPlan } from '../constants/planLimits';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { isDev } from '../utils/logger';
+import { Result, ok, err } from '../types/result';
+import { logError } from '../utils/errorLogger';
 
 function getOutreachLimits(plan: HostPlan) {
   const limits = getPlanLimits(plan);
@@ -27,7 +29,7 @@ export interface OutreachQuotaStatus {
   reason?: string;
 }
 
-interface OutreachLogEntry {
+export interface OutreachLogEntry {
   id: string;
   hostId: string;
   groupId: string;
@@ -56,26 +58,33 @@ async function isSupabaseAvailable(): Promise<boolean> {
   }
 }
 
-async function getLocalLog(): Promise<OutreachLogEntry[]> {
+async function getLocalLog(): Promise<Result<OutreachLogEntry[]>> {
   try {
     const raw = await AsyncStorage.getItem(OUTREACH_LOG_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch { return []; }
+    return ok(raw ? JSON.parse(raw) : []);
+  } catch (e) {
+    logError(e, { service: 'hostOutreachService', method: 'getLocalLog' });
+    return err('Failed to read local outreach log');
+  }
 }
 
 async function saveLocalLog(log: OutreachLogEntry[]): Promise<void> {
   await AsyncStorage.setItem(OUTREACH_LOG_KEY, JSON.stringify(log));
 }
 
-async function getLocalQuota(hostId: string, dateKey: string): Promise<OutreachDayQuota> {
+async function getLocalQuota(hostId: string, dateKey: string): Promise<Result<OutreachDayQuota>> {
   try {
     const raw = await AsyncStorage.getItem(OUTREACH_QUOTA_KEY);
     const all: OutreachDayQuota[] = raw ? JSON.parse(raw) : [];
-    return all.find(q => q.hostId === hostId && q.dateKey === dateKey) || { hostId, dateKey, used: 0, paidExtra: 0 };
-  } catch { return { hostId, dateKey, used: 0, paidExtra: 0 }; }
+    const found = all.find(q => q.hostId === hostId && q.dateKey === dateKey);
+    return ok(found || { hostId, dateKey, used: 0, paidExtra: 0 });
+  } catch (e) {
+    logError(e, { service: 'hostOutreachService', method: 'getLocalQuota' });
+    return err('Failed to read local quota');
+  }
 }
 
-async function saveLocalQuota(quota: OutreachDayQuota): Promise<void> {
+async function saveLocalQuota(quota: OutreachDayQuota): Promise<Result<void>> {
   try {
     const raw = await AsyncStorage.getItem(OUTREACH_QUOTA_KEY);
     const all: OutreachDayQuota[] = raw ? JSON.parse(raw) : [];
@@ -83,7 +92,11 @@ async function saveLocalQuota(quota: OutreachDayQuota): Promise<void> {
     if (idx >= 0) all[idx] = quota;
     else all.push(quota);
     await AsyncStorage.setItem(OUTREACH_QUOTA_KEY, JSON.stringify(all));
-  } catch {}
+    return ok(undefined);
+  } catch (e) {
+    logError(e, { service: 'hostOutreachService', method: 'saveLocalQuota' });
+    return err('Failed to save local quota');
+  }
 }
 
 function buildQuotaResult(used: number, dailyCap: number, paidExtra: number, suspended: boolean): OutreachQuotaStatus {
@@ -136,7 +149,8 @@ export async function getOutreachQuotaStatus(
   }
 
   const dateKey = todayKey();
-  const quota = await getLocalQuota(hostId, dateKey);
+  const quotaResult = await getLocalQuota(hostId, dateKey);
+  const quota = quotaResult.success ? quotaResult.data : { hostId, dateKey, used: 0, paidExtra: 0 };
   return buildQuotaResult(quota.used, dailyCap, quota.paidExtra, false);
 }
 
@@ -155,7 +169,8 @@ export async function checkHourlyLimit(hostId: string, plan: string): Promise<bo
     if (!error) return (count ?? 0) < hourlyCap;
   }
 
-  const log = await getLocalLog();
+  const logResult = await getLocalLog();
+  const log = logResult.success ? logResult.data : [];
   const oneHourAgo = Date.now() - 60 * 60 * 1000;
   const recentCount = log.filter(e => e.hostId === hostId && new Date(e.sentAt).getTime() > oneHourAgo).length;
   return recentCount < hourlyCap;
@@ -176,7 +191,8 @@ export async function checkGroupCooldown(hostId: string, groupId: string, cooldo
     if (!error) return !data;
   }
 
-  const log = await getLocalLog();
+  const logResult = await getLocalLog();
+  const log = logResult.success ? logResult.data : [];
   const cutoffTs = Date.now() - cooldownMs;
   const recent = log.find(e => e.hostId === hostId && e.groupId === groupId && new Date(e.sentAt).getTime() > cutoffTs);
   return !recent;
@@ -227,24 +243,33 @@ export async function sendProactiveOutreach(
     message: message.trim(),
     sentAt: new Date().toISOString(),
   };
-  const log = await getLocalLog();
+  const logResult = await getLocalLog();
+  const log = logResult.success ? logResult.data : [];
   log.push(entry);
   await saveLocalLog(log);
 
   const dateKey = todayKey();
-  const q = await getLocalQuota(hostId, dateKey);
+  const qResult = await getLocalQuota(hostId, dateKey);
+  const q = qResult.success ? qResult.data : { hostId, dateKey, used: 0, paidExtra: 0 };
   q.used += 1;
-  await saveLocalQuota(q);
+  const saveResult = await saveLocalQuota(q);
+  if (!saveResult.success) {
+    logError(new Error(saveResult.error), { service: 'hostOutreachService', method: 'sendProactiveOutreach.saveQuota' });
+  }
 }
 
 export async function addPaidCreditsLocal(hostId: string, credits: number): Promise<void> {
   const dateKey = todayKey();
-  const q = await getLocalQuota(hostId, dateKey);
+  const qResult = await getLocalQuota(hostId, dateKey);
+  const q = qResult.success ? qResult.data : { hostId, dateKey, used: 0, paidExtra: 0 };
   q.paidExtra += credits;
-  await saveLocalQuota(q);
+  const saveResult = await saveLocalQuota(q);
+  if (!saveResult.success) {
+    logError(new Error(saveResult.error), { service: 'hostOutreachService', method: 'addPaidCreditsLocal.saveQuota' });
+  }
 }
 
-export async function getOutreachLogForHost(hostId: string): Promise<OutreachLogEntry[]> {
+export async function getOutreachLogForHost(hostId: string): Promise<Result<OutreachLogEntry[]>> {
   try {
     const { data } = await supabase
       .from('host_group_outreach')
@@ -253,16 +278,18 @@ export async function getOutreachLogForHost(hostId: string): Promise<OutreachLog
       .order('sent_at', { ascending: false })
       .limit(500);
     if (data) {
-      return data.map((r: any) => ({
+      return ok(data.map((r: any) => ({
         id: r.id,
         hostId: r.host_id,
         groupId: r.group_id,
         listingId: r.listing_id,
         message: r.message,
         sentAt: r.sent_at,
-      }));
+      })));
     }
-  } catch {}
+  } catch (e) {
+    logError(e, { service: 'hostOutreachService', method: 'getOutreachLogForHost' });
+  }
   return getLocalLog();
 }
 
@@ -278,7 +305,8 @@ export async function getRecentlySentGroupIds(hostId: string): Promise<string[]>
     if (!error && data) return data.map((r: any) => r.group_id);
   }
 
-  const log = await getLocalLog();
+  const logResult = await getLocalLog();
+  const log = logResult.success ? logResult.data : [];
   const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
   return log
     .filter(e => e.hostId === hostId && new Date(e.sentAt).getTime() > thirtyDaysAgo)
