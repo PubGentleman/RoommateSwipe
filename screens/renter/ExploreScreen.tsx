@@ -196,6 +196,10 @@ export const ExploreScreen = () => {
     return [];
   });
   const [leaseTypeFilter, setLeaseTypeFilter] = useState<string[]>([]);
+  const [listingsCursor, setListingsCursor] = useState<string | null>(null);
+  const [hasMoreListings, setHasMoreListings] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const LISTINGS_PAGE_SIZE = 20;
   const [showAISheet, setShowAISheet] = useState(false);
   const [interestNote, setInterestNote] = useState('');
   const [userGroups, setUserGroups] = useState<Group[]>([]);
@@ -345,37 +349,52 @@ export const ExploreScreen = () => {
     return () => { cancelled = true; };
   }, [showPropertyDetail, selectedProperty?.id]);
 
-  const loadProperties = async () => {
+  const loadProperties = async (cursor?: string | null) => {
     try {
-      setIsLoading(true);
-      setError(null);
+      if (!cursor) {
+        setIsLoading(true);
+        setError(null);
+      }
 
       let usedSupabase = false;
       try {
-        const supabaseListings = await Promise.race([
-          getListings({ ...(activeCity ? { city: activeCity } : {}) }),
+        const result = await Promise.race([
+          getListings({ ...(activeCity ? { city: activeCity } : {}), cursor: cursor || undefined, pageSize: LISTINGS_PAGE_SIZE }),
           new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000)),
         ]);
-        if (supabaseListings && supabaseListings.length > 0) {
-          const mapped: Property[] = supabaseListings
+        if (result && result.data && result.data.length > 0) {
+          const mapped: Property[] = result.data
             .map((l: any) => mapListingToProperty(l))
             .filter((p: Property) => p.hostId !== user?.id);
-          setProperties(mapped);
-          setFilteredProperties(mapped);
+
+          setHasMoreListings(result.hasMore);
+          if (result.data.length > 0) {
+            setListingsCursor(result.data[result.data.length - 1].created_at);
+          }
+
+          if (cursor) {
+            setProperties(prev => [...prev, ...mapped]);
+          } else {
+            setProperties(mapped);
+            setFilteredProperties(mapped);
+          }
           setIsLoading(false);
           usedSupabase = true;
-          loadDiscoverableGroups(mapped);
-          getAgentsWithCriticalStatus().then(setCriticalAgentIds).catch(createErrorHandler('ExploreScreen', 'getAgentsWithCriticalStatus'));
+          if (!cursor) {
+            loadDiscoverableGroups(mapped);
+            getAgentsWithCriticalStatus().then(setCriticalAgentIds).catch(createErrorHandler('ExploreScreen', 'getAgentsWithCriticalStatus'));
+          }
         }
       } catch (supabaseErr) {
         console.warn('Supabase getListings failed, using local data:', supabaseErr);
       }
 
-      if (!usedSupabase) {
+      if (!usedSupabase && !cursor) {
         const localProperties = (await StorageService.getProperties())
           .filter((p: Property) => p.hostId !== user?.id);
         setProperties(localProperties);
         setFilteredProperties(localProperties);
+        setHasMoreListings(false);
         setIsLoading(false);
       }
     } catch (err) {
@@ -1974,6 +1993,16 @@ export const ExploreScreen = () => {
     );
   }, [hostProfiles, user, saved, exploreTour, isBasic, discoverableGroups, criticalAgentIds, navigation, toggleSave, handleInterestPress, canViewListing, useListingView]);
 
+  const handleLoadMoreListings = useCallback(async () => {
+    if (loadingMore || !hasMoreListings || !listingsCursor) return;
+    setLoadingMore(true);
+    try {
+      await loadProperties(listingsCursor);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [loadingMore, hasMoreListings, listingsCursor]);
+
   if (error) {
     return (
       <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
@@ -2332,6 +2361,13 @@ export const ExploreScreen = () => {
           showsVerticalScrollIndicator={false}
           onScroll={exploreScrollHandler}
           scrollEventThrottle={16}
+          onEndReached={handleLoadMoreListings}
+          onEndReachedThreshold={0.5}
+          ListFooterComponent={loadingMore ? (
+            <View style={{ padding: 16, alignItems: 'center' }}>
+              <ActivityIndicator size="small" color={theme.primary} />
+            </View>
+          ) : null}
           ListHeaderComponent={() => {
             if (filterLoading) {
               return (

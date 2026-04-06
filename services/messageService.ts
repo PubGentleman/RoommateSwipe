@@ -94,8 +94,8 @@ export async function getConversations(userId: string) {
   );
 }
 
-export async function getMessages(matchId: string, limit = 50, offset = 0) {
-  const { data, error } = await supabase
+export async function getMessages(matchId: string, limit = 50, offset = 0, options?: { beforeCursor?: string }) {
+  let query = supabase
     .from('messages')
     .select(`
       *,
@@ -103,9 +103,15 @@ export async function getMessages(matchId: string, limit = 50, offset = 0) {
       reactions:message_reactions(id, emoji, user_id)
     `)
     .eq('match_id', matchId)
-    .order('created_at', { ascending: true })
-    .range(offset, offset + limit - 1);
+    .order('created_at', { ascending: true });
 
+  if (options?.beforeCursor) {
+    query = query.lt('created_at', options.beforeCursor).range(0, limit - 1);
+  } else {
+    query = query.range(offset, offset + limit - 1);
+  }
+
+  const { data, error } = await query;
   if (error) throw error;
   return data || [];
 }

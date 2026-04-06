@@ -663,8 +663,9 @@ export interface GroupMessage {
   createdAt: string;
 }
 
-export async function getGroupMessages(groupId: string): Promise<GroupMessage[]> {
-  const { data, error } = await supabase
+export async function getGroupMessages(groupId: string, options?: { limit?: number; beforeCursor?: string }): Promise<GroupMessage[]> {
+  const pageLimit = options?.limit || 50;
+  let query = supabase
     .from('group_messages')
     .select(`
       id, group_id, sender_id, content, created_at,
@@ -672,8 +673,13 @@ export async function getGroupMessages(groupId: string): Promise<GroupMessage[]>
     `)
     .eq('group_id', groupId)
     .order('created_at', { ascending: true })
-    .limit(100);
+    .limit(pageLimit);
 
+  if (options?.beforeCursor) {
+    query = query.lt('created_at', options.beforeCursor);
+  }
+
+  const { data, error } = await query;
   if (error) throw error;
 
   return (data || []).map((msg: any) => ({

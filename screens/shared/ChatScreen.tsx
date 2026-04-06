@@ -227,6 +227,10 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   const [showAISheet, setShowAISheet] = useState(false);
   const [aiSheetContext, setAiSheetContext] = useState<ScreenContext>('chat');
   const [otherUserPlan, setOtherUserPlan] = useState<string | undefined>();
+  const [messagesCursor, setMessagesCursor] = useState<string | null>(null);
+  const [hasOlderMessages, setHasOlderMessages] = useState(true);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const MESSAGES_PAGE_SIZE = 50;
   const [isColdMessage, setIsColdMessage] = useState(false);
   const [coldMessageResponded, setColdMessageResponded] = useState(false);
   const [coldMessagesRemaining, setColdMessagesRemaining] = useState<number>(3);
@@ -284,6 +288,60 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
     const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
     isNearBottom.current = contentOffset.y + layoutMeasurement.height >= contentSize.height - 100;
   }, []);
+
+  const handleLoadOlderMessages = useCallback(async () => {
+    if (loadingOlder || !hasOlderMessages || !messagesCursor) return;
+    setLoadingOlder(true);
+    try {
+      const isGroupChatLoad = conversationId.startsWith('group-');
+      let olderMsgs: Message[] = [];
+
+      if (isGroupChatLoad) {
+        const groupId = conversationId.replace('group-', '');
+        const groupMsgs = await getGroupMessages(groupId, { limit: MESSAGES_PAGE_SIZE, beforeCursor: messagesCursor });
+        olderMsgs = groupMsgs.map((msg: any) => ({
+          id: msg.id,
+          senderId: msg.senderId,
+          senderName: msg.senderName,
+          text: msg.content,
+          content: msg.content,
+          timestamp: new Date(msg.createdAt),
+          read: true,
+        }));
+      } else {
+        const supaMessages = await getSupabaseMessages(matchIdFromConversation, MESSAGES_PAGE_SIZE, 0, { beforeCursor: messagesCursor });
+        olderMsgs = supaMessages.map((msg: any) => ({
+          id: msg.id,
+          senderId: msg.is_system_message ? 'system' : msg.sender_id,
+          text: msg.content,
+          content: msg.content,
+          timestamp: new Date(msg.created_at),
+          read: msg.read || false,
+          readAt: msg.read_at ? new Date(msg.read_at) : undefined,
+          message_type: msg.message_type || 'text',
+          metadata: msg.metadata || undefined,
+          reply_to_id: msg.reply_to_id || undefined,
+          reply_to: msg.reply_to || undefined,
+          edited_at: msg.edited_at || undefined,
+          deleted_at: msg.deleted_at || undefined,
+        }));
+      }
+
+      if (olderMsgs.length > 0) {
+        const existingIds = new Set(messages.map(m => m.id));
+        const uniqueOlder = olderMsgs.filter(m => !existingIds.has(m.id));
+        setMessages(prev => [...uniqueOlder, ...prev]);
+        const oldest = olderMsgs[0];
+        const ts = oldest.timestamp instanceof Date ? oldest.timestamp.toISOString() : String(oldest.timestamp);
+        setMessagesCursor(ts);
+      }
+      setHasOlderMessages(olderMsgs.length >= MESSAGES_PAGE_SIZE);
+    } catch (err) {
+      console.warn('[Chat] Failed to load older messages:', err);
+    } finally {
+      setLoadingOlder(false);
+    }
+  }, [loadingOlder, hasOlderMessages, messagesCursor, conversationId, matchIdFromConversation, messages]);
 
   const hasMessagingAccess = canAccessMessages(user || null);
   const isConvUnlocked = canAccessConversation(user || null, conversationId);
@@ -1252,6 +1310,15 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
     }
 
     setMessages(loadedMessages);
+
+    if (loadedMessages.length > 0) {
+      const oldest = loadedMessages[0];
+      const ts = oldest.timestamp instanceof Date ? oldest.timestamp.toISOString() : String(oldest.timestamp);
+      setMessagesCursor(ts);
+      setHasOlderMessages(loadedMessages.length >= MESSAGES_PAGE_SIZE);
+    } else {
+      setHasOlderMessages(false);
+    }
 
     if (conversation?.propertyId && !conversationListingId) {
       setConversationListingId(conversation.propertyId);
@@ -2792,8 +2859,18 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
               flatListRef.current?.scrollToEnd({ animated: true });
             }
           }}
-          onScroll={handleScroll}
+          onScroll={(event) => {
+            handleScroll(event);
+            if (event.nativeEvent.contentOffset.y < 50 && hasOlderMessages && !loadingOlder) {
+              handleLoadOlderMessages();
+            }
+          }}
           scrollEventThrottle={100}
+          ListHeaderComponent={loadingOlder ? (
+            <View style={{ padding: 12, alignItems: 'center' }}>
+              <ActivityIndicator size="small" color={theme.primary} />
+            </View>
+          ) : null}
         />
       </View>
 

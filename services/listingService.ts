@@ -101,15 +101,20 @@ export async function getListings(filters?: {
   maxRent?: number;
   bedrooms?: number;
   roomType?: string;
-}) {
+  cursor?: string | null;
+  pageSize?: number;
+}): Promise<{ data: any[]; hasMore: boolean }> {
+  const limit = filters?.pageSize || 20;
   let query = supabase
     .from('listings')
     .select('*')
     .eq('is_active', true)
     .eq('is_rented', false)
     .eq('is_paused', false)
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .limit(limit + 1);
 
+  if (filters?.cursor) query = query.lt('created_at', filters.cursor);
   if (filters?.city) query = query.eq('city', filters.city);
   if (filters?.minRent) query = query.gte('rent', filters.minRent);
   if (filters?.maxRent) query = query.lte('rent', filters.maxRent);
@@ -118,7 +123,9 @@ export async function getListings(filters?: {
 
   const { data, error } = await query;
   if (error) throw error;
-  return data || [];
+  const rows = data || [];
+  const hasMore = rows.length > limit;
+  return { data: hasMore ? rows.slice(0, limit) : rows, hasMore };
 }
 
 export async function getListing(id: string) {
