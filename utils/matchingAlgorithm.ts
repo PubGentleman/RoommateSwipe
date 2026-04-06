@@ -922,7 +922,10 @@ export const calculateDetailedCompatibility = (
         }
         piBonus += countSoftPreferenceOverlap(userPiPrefs, roommatePiPrefs);
       } else {
-        const prefs = userPiPrefs || roommatePiPrefs!;
+        const prefs = userPiPrefs || roommatePiPrefs;
+        if (!prefs) {
+          return 0;
+        }
         const other = userPiPrefs ? roommateProfile : currentUser;
         if (prefs.vibe && matchesProfileVibe(prefs.vibe, other)) {
           piBonus += 1;
