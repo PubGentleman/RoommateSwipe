@@ -46,6 +46,11 @@ import { ComparativeInsightsScreen } from '../screens/host/ComparativeInsightsSc
 import { useTheme } from '../hooks/useTheme';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotificationContext } from '../contexts/NotificationContext';
+import { FeatureErrorBoundary } from '../components/FeatureErrorBoundary';
+
+const ChatScreenWithBoundary = (props: any) => (
+  <FeatureErrorBoundary featureName="Chat"><ChatScreen {...props} /></FeatureErrorBoundary>
+);
 
 export type HostListingsStackParamList = {
   MyListings: undefined;
@@ -149,7 +154,7 @@ function DashboardStackNavigator() {
       <DashboardStack.Screen name="PiMatchedGroups" component={PiMatchedGroupsScreen} />
       <DashboardStack.Screen name="PiClaimedGroupDetail" component={PiClaimedGroupDetailScreen} />
       <DashboardStack.Screen name="MyListings" component={MyListingsScreen} />
-      <DashboardStack.Screen name="Chat" component={ChatScreen} />
+      <DashboardStack.Screen name="Chat" component={ChatScreenWithBoundary} />
       <DashboardStack.Screen name="AgentGroupBuilder" component={AgentGroupBuilderScreen} />
       <DashboardStack.Screen name="ListingPerformance" component={ListingPerformanceScreen} />
       <DashboardStack.Screen name="InquiryTrends" component={InquiryTrendsScreen} />
@@ -195,7 +200,7 @@ function AgentBrowseStackNavigator() {
       <AgentBrowseStack.Screen name="AgentGroupBuilder" component={AgentGroupBuilderScreen} />
       <AgentBrowseStack.Screen name="PiMatchedGroups" component={PiMatchedGroupsScreen} />
       <AgentBrowseStack.Screen name="PiClaimedGroupDetail" component={PiClaimedGroupDetailScreen} />
-      <AgentBrowseStack.Screen name="Chat" component={ChatScreen} />
+      <AgentBrowseStack.Screen name="Chat" component={ChatScreenWithBoundary} />
     </AgentBrowseStack.Navigator>
   );
 }
@@ -206,7 +211,7 @@ function AgentGroupsStackNavigator() {
       <AgentGroupsStack.Screen name="AgentGroupsList" component={AgentGroupsScreen} />
       <AgentGroupsStack.Screen name="AgentGroupDetail" component={AgentGroupDetailScreen} />
       <AgentGroupsStack.Screen name="AgentGroupBuilder" component={AgentGroupBuilderScreen} />
-      <AgentGroupsStack.Screen name="Chat" component={ChatScreen} />
+      <AgentGroupsStack.Screen name="Chat" component={ChatScreenWithBoundary} />
     </AgentGroupsStack.Navigator>
   );
 }
@@ -351,11 +356,21 @@ export const HostTabNavigator = () => {
           freezeOnBlur: true,
         }}
       >
-        <Tab.Screen name="Dashboard" component={DashboardStackNavigator} />
-        <Tab.Screen name="BrowseRenters" component={AgentBrowseStackNavigator} />
-        <Tab.Screen name="AgentGroups" component={AgentGroupsStackNavigator} />
-        <Tab.Screen name="Messages" component={HostMessagesStackNavigator} initialParams={{ role: 'agent' }} />
-        <Tab.Screen name="Profile" component={ProfileStackNavigator} />
+        <Tab.Screen name="Dashboard">
+          {() => <FeatureErrorBoundary featureName="Dashboard"><DashboardStackNavigator /></FeatureErrorBoundary>}
+        </Tab.Screen>
+        <Tab.Screen name="BrowseRenters">
+          {() => <FeatureErrorBoundary featureName="Browse Renters"><AgentBrowseStackNavigator /></FeatureErrorBoundary>}
+        </Tab.Screen>
+        <Tab.Screen name="AgentGroups">
+          {() => <FeatureErrorBoundary featureName="Groups"><AgentGroupsStackNavigator /></FeatureErrorBoundary>}
+        </Tab.Screen>
+        <Tab.Screen name="Messages" initialParams={{ role: 'agent' }}>
+          {() => <FeatureErrorBoundary featureName="Messages"><HostMessagesStackNavigator /></FeatureErrorBoundary>}
+        </Tab.Screen>
+        <Tab.Screen name="Profile">
+          {() => <FeatureErrorBoundary featureName="Profile"><ProfileStackNavigator /></FeatureErrorBoundary>}
+        </Tab.Screen>
       </Tab.Navigator>
       </>
     );
@@ -375,11 +390,21 @@ export const HostTabNavigator = () => {
           freezeOnBlur: true,
         }}
       >
-        <Tab.Screen name="Dashboard" component={DashboardStackNavigator} />
-        <Tab.Screen name="BrowseRenters" component={AgentBrowseStackNavigator} />
-        <Tab.Screen name="AgentGroups" component={AgentGroupsStackNavigator} />
-        <Tab.Screen name="Messages" component={HostMessagesStackNavigator} initialParams={{ role: 'company' }} />
-        <Tab.Screen name="Profile" component={ProfileStackNavigator} />
+        <Tab.Screen name="Dashboard">
+          {() => <FeatureErrorBoundary featureName="Dashboard"><DashboardStackNavigator /></FeatureErrorBoundary>}
+        </Tab.Screen>
+        <Tab.Screen name="BrowseRenters">
+          {() => <FeatureErrorBoundary featureName="Browse Renters"><AgentBrowseStackNavigator /></FeatureErrorBoundary>}
+        </Tab.Screen>
+        <Tab.Screen name="AgentGroups">
+          {() => <FeatureErrorBoundary featureName="Groups"><AgentGroupsStackNavigator /></FeatureErrorBoundary>}
+        </Tab.Screen>
+        <Tab.Screen name="Messages" initialParams={{ role: 'company' }}>
+          {() => <FeatureErrorBoundary featureName="Messages"><HostMessagesStackNavigator /></FeatureErrorBoundary>}
+        </Tab.Screen>
+        <Tab.Screen name="Profile">
+          {() => <FeatureErrorBoundary featureName="Profile"><ProfileStackNavigator /></FeatureErrorBoundary>}
+        </Tab.Screen>
       </Tab.Navigator>
       </>
     );
@@ -398,12 +423,24 @@ export const HostTabNavigator = () => {
         freezeOnBlur: true,
       }}
     >
-      <Tab.Screen name="Dashboard" component={DashboardStackNavigator} />
-      <Tab.Screen name="Listings" component={ListingsStackNavigator} />
-      <Tab.Screen name="Roommates" component={RoommatesScreen} />
-      <Tab.Screen name="Groups" component={HostGroupsStackNavigator} />
-      <Tab.Screen name="Messages" component={HostMessagesStackNavigator} />
-      <Tab.Screen name="Profile" component={ProfileStackNavigator} />
+      <Tab.Screen name="Dashboard">
+        {() => <FeatureErrorBoundary featureName="Dashboard"><DashboardStackNavigator /></FeatureErrorBoundary>}
+      </Tab.Screen>
+      <Tab.Screen name="Listings">
+        {() => <FeatureErrorBoundary featureName="Listings"><ListingsStackNavigator /></FeatureErrorBoundary>}
+      </Tab.Screen>
+      <Tab.Screen name="Roommates">
+        {() => <FeatureErrorBoundary featureName="Roommates"><RoommatesScreen /></FeatureErrorBoundary>}
+      </Tab.Screen>
+      <Tab.Screen name="Groups">
+        {() => <FeatureErrorBoundary featureName="Groups"><HostGroupsStackNavigator /></FeatureErrorBoundary>}
+      </Tab.Screen>
+      <Tab.Screen name="Messages">
+        {() => <FeatureErrorBoundary featureName="Messages"><HostMessagesStackNavigator /></FeatureErrorBoundary>}
+      </Tab.Screen>
+      <Tab.Screen name="Profile">
+        {() => <FeatureErrorBoundary featureName="Profile"><ProfileStackNavigator /></FeatureErrorBoundary>}
+      </Tab.Screen>
     </Tab.Navigator>
     </>
   );

@@ -2,6 +2,11 @@ import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import MyGroupScreen from '../screens/renter/MyGroupScreen';
 import { ChatScreen } from '../screens/shared/ChatScreen';
+import { FeatureErrorBoundary } from '../components/FeatureErrorBoundary';
+
+const ChatScreenWithBoundary = (props: any) => (
+  <FeatureErrorBoundary featureName="Chat"><ChatScreen {...props} /></FeatureErrorBoundary>
+);
 import { GroupInviteScreen } from '../screens/shared/GroupInviteScreen';
 import { GroupInfoScreen } from '../screens/shared/GroupInfoScreen';
 import { InterestedUsersScreen } from '../screens/shared/InterestedUsersScreen';
@@ -67,7 +72,7 @@ export const MyGroupStackNavigator = () => {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="MyGroupHome" component={MyGroupScreen} />
-      <Stack.Screen name="Chat" component={ChatScreen} />
+      <Stack.Screen name="Chat" component={ChatScreenWithBoundary} />
       <Stack.Screen name="GroupInvite" component={GroupInviteScreen} />
       <Stack.Screen name="GroupInfo" component={GroupInfoScreen} />
       <Stack.Screen name="InterestedUsers" component={InterestedUsersScreen} />

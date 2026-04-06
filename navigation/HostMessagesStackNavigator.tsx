@@ -2,6 +2,11 @@ import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { MessagesScreen } from '../screens/shared/MessagesScreen';
 import { ChatScreen } from '../screens/shared/ChatScreen';
+import { FeatureErrorBoundary } from '../components/FeatureErrorBoundary';
+
+const ChatScreenWithBoundary = (props: any) => (
+  <FeatureErrorBoundary featureName="Chat"><ChatScreen {...props} /></FeatureErrorBoundary>
+);
 import { CreateGroupScreen } from '../screens/shared/CreateGroupScreen';
 import { GroupInviteScreen } from '../screens/shared/GroupInviteScreen';
 import { PromoteAdminScreen } from '../screens/shared/PromoteAdminScreen';
@@ -57,7 +62,7 @@ export const HostMessagesStackNavigator = ({ route }: any) => {
         component={MessagesScreen}
         initialParams={{ role: passedRole }}
       />
-      <Stack.Screen name="Chat" component={ChatScreen} />
+      <Stack.Screen name="Chat" component={ChatScreenWithBoundary} />
       <Stack.Screen name="CreateGroup" component={CreateGroupScreen} />
       <Stack.Screen name="GroupInvite" component={GroupInviteScreen} />
       <Stack.Screen name="PromoteAdmin" component={PromoteAdminScreen} />

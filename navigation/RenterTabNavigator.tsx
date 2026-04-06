@@ -19,6 +19,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNotificationContext } from '../contexts/NotificationContext';
 import { needsRoommates, isPreformedGroup, isFastLane } from '../utils/renterIntentUtils';
 import { VerificationBanner } from '../components/VerificationBanner';
+import { FeatureErrorBoundary } from '../components/FeatureErrorBoundary';
 
 export type RenterTabParamList = {
   Explore: { viewListingId?: string } | undefined;
@@ -313,24 +314,40 @@ export const RenterTabNavigator = () => {
         freezeOnBlur: true,
       }}
     >
-      <Tab.Screen name="Explore" component={ExploreStackNavigator} />
+      <Tab.Screen name="Explore">
+        {() => <FeatureErrorBoundary featureName="Explore"><ExploreStackNavigator /></FeatureErrorBoundary>}
+      </Tab.Screen>
       {showRoommates ? (
-        <Tab.Screen name="Roommates" component={RoommatesStackNavigator} />
+        <Tab.Screen name="Roommates">
+          {() => <FeatureErrorBoundary featureName="Roommates"><RoommatesStackNavigator /></FeatureErrorBoundary>}
+        </Tab.Screen>
       ) : null}
       {showRoommates ? (
-        <Tab.Screen name="Groups" component={GroupsStackNavigator} />
+        <Tab.Screen name="Groups">
+          {() => <FeatureErrorBoundary featureName="Groups"><GroupsStackNavigator /></FeatureErrorBoundary>}
+        </Tab.Screen>
       ) : null}
       {showMyGroup ? (
-        <Tab.Screen name="MyGroup" component={MyGroupStackNavigator} />
+        <Tab.Screen name="MyGroup">
+          {() => <FeatureErrorBoundary featureName="My Group"><MyGroupStackNavigator /></FeatureErrorBoundary>}
+        </Tab.Screen>
       ) : null}
       {showApartmentGroup && !showMyGroup ? (
-        <Tab.Screen name="MyGroup" component={ApartmentGroupStackNavigator} />
+        <Tab.Screen name="MyGroup">
+          {() => <FeatureErrorBoundary featureName="My Group"><ApartmentGroupStackNavigator /></FeatureErrorBoundary>}
+        </Tab.Screen>
       ) : null}
       {(showSaved || showMyGroup || showApartmentGroup) ? (
-        <Tab.Screen name="Saved" component={SavedListingsScreen} />
+        <Tab.Screen name="Saved">
+          {() => <FeatureErrorBoundary featureName="Saved Listings"><SavedListingsScreen /></FeatureErrorBoundary>}
+        </Tab.Screen>
       ) : null}
-      <Tab.Screen name="Messages" component={MessagesStackNavigator} />
-      <Tab.Screen name="Profile" component={ProfileStackNavigator} />
+      <Tab.Screen name="Messages">
+        {() => <FeatureErrorBoundary featureName="Messages"><MessagesStackNavigator /></FeatureErrorBoundary>}
+      </Tab.Screen>
+      <Tab.Screen name="Profile">
+        {() => <FeatureErrorBoundary featureName="Profile"><ProfileStackNavigator /></FeatureErrorBoundary>}
+      </Tab.Screen>
     </Tab.Navigator>
     <TypeOnboardingNudge />
     </>
