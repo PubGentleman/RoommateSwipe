@@ -8,6 +8,8 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import * as SplashScreen from "expo-splash-screen";
 import * as Linking from "expo-linking";
+import * as Sentry from "@sentry/react-native";
+import { initSentry } from "./lib/sentry";
 
 import { RootNavigator } from "./navigation/RootNavigator";
 import { ErrorBoundary } from "./components/ErrorBoundary";
@@ -30,14 +32,14 @@ import { addNotificationResponseListener } from "./services/pushNotificationServ
 import { joinGlobalPresence, leaveGlobalPresence, startPresenceHeartbeat, stopPresenceHeartbeat } from "./services/presenceService";
 
 SplashScreen.preventAutoHideAsync();
-
+initSentry();
 
 function ResponseTracker() {
   useResponseTracking();
   return null;
 }
 
-export default function App() {
+function App() {
   const appState = useRef(AppState.currentState);
 
   useEffect(() => {
@@ -234,6 +236,8 @@ export default function App() {
     </ErrorBoundary>
   );
 }
+
+export default Sentry.wrap(App);
 
 const styles = StyleSheet.create({
   root: {

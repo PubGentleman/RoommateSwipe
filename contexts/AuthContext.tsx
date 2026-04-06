@@ -9,6 +9,7 @@ import type { Session } from '@supabase/supabase-js';
 import { activateBoost as boostServiceActivateBoost, deactivateExpiredBoosts } from '../services/boostService';
 import { getAgentPlanLimits, getAgentListingLimitMessage, type AgentPlan } from '../constants/planLimits';
 import { identifyUser as rcIdentifyUser, logoutRevenueCat as rcLogout } from '../lib/revenueCat';
+import { setSentryUser, clearSentryUser } from '../lib/sentry';
 import { processReferralCommission } from '../services/affiliateService';
 import { registerForPushNotifications, removePushToken } from '../services/pushNotificationService';
 import { createErrorHandler } from '../utils/errorLogger';
@@ -704,6 +705,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (data.session) {
       await loadUserFromSupabase(data.session);
+      if (data.session.user?.id) {
+        setSentryUser(data.session.user.id);
+      }
     }
   };
 
@@ -1015,6 +1019,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     await StorageService.logoutAndReset();
     rcLogout().catch((e) => console.warn('[Auth] RevenueCat logout failed:', e));
+    clearSentryUser();
     setUser(null);
   };
 

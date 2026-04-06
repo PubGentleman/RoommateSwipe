@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import { captureError } from '../lib/sentry';
 
 type ErrorContext = {
   service: string;
@@ -9,18 +10,10 @@ type ErrorContext = {
 
 export function logError(error: unknown, context: ErrorContext): void {
   const errorMessage = error instanceof Error ? error.message : String(error);
-  const errorStack = error instanceof Error ? error.stack : undefined;
 
-  console.error(
-    `[${context.service}.${context.method}]`,
-    errorMessage,
-    {
-      ...context,
-      platform: Platform.OS,
-      timestamp: new Date().toISOString(),
-      stack: errorStack,
-    }
-  );
+  console.error(`[${context.service}.${context.method}]`, errorMessage);
+
+  captureError(error, context);
 }
 
 export function createErrorHandler(service: string, method: string) {

@@ -67,7 +67,8 @@
           "color": "#ff6b5b",
           "sounds": []
         }
-      ]
+      ],
+      "@sentry/react-native"
     ],
     "experiments": {
       "reactCompiler": true
