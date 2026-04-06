@@ -665,7 +665,7 @@ export const ExploreScreen = () => {
         id: selectedProperty.id,
         city: selectedProperty.city,
         neighborhood: selectedProperty.neighborhood,
-        zip_code: selectedProperty.zipCode,
+        zip_code: selectedProperty.zip_code,
         bedrooms: selectedProperty.bedrooms,
         rent: selectedProperty.price,
       });
@@ -763,7 +763,7 @@ export const ExploreScreen = () => {
       trackInterestSent({
         id: selectedProperty.id,
         city: selectedProperty.city,
-        zip_code: selectedProperty.zipCode,
+        zip_code: selectedProperty.zip_code,
         bedrooms: selectedProperty.bedrooms,
         rent: selectedProperty.price,
       });
@@ -1035,7 +1035,7 @@ export const ExploreScreen = () => {
     }
 
     const renterGender = (user?.profileData?.gender || '').toLowerCase();
-    const renterHouseholdPref = user?.profileData?.household_gender_preference;
+    const renterHouseholdPref = user?.household_gender_preference;
 
     filtered = filtered.filter(p => {
       const listingPref = p.preferred_tenant_gender || 'any';
@@ -1513,7 +1513,7 @@ export const ExploreScreen = () => {
           id: prop.id,
           city: prop.city,
           neighborhood: prop.neighborhood,
-          zip_code: prop.zipCode,
+          zip_code: prop.zip_code,
           bedrooms: prop.bedrooms,
           rent: prop.price,
         });
@@ -3561,7 +3561,7 @@ export const ExploreScreen = () => {
                       title: selectedProperty.title,
                       price: selectedProperty.price,
                       location: formatLocation(selectedProperty),
-                      zipCode: selectedProperty.zipCode,
+                      zipCode: selectedProperty.zip_code,
                       city: selectedProperty.city || user?.city,
                       bedrooms: selectedProperty.bedrooms,
                       bathrooms: selectedProperty.bathrooms,

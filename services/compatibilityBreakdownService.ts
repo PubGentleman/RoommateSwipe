@@ -156,8 +156,8 @@ function generateFactorDetail(
   try {
     switch (key) {
       case 'location': {
-        const userN = user.profileData?.preferred_neighborhoods || [];
-        const otherN = other.preferredNeighborhoods || other.profileData?.preferred_neighborhoods || [];
+        const userN = user.preferred_neighborhoods || [];
+        const otherN = other.preferred_neighborhoods || [];
         const overlap = userN.filter((n: string) => otherN.includes(n));
         if (overlap.length > 0) return `Both interested in ${overlap.slice(0, 2).join(', ')}`;
         return 'Different neighborhood preferences';

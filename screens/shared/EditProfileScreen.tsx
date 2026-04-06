@@ -63,10 +63,10 @@ export const EditProfileScreen = () => {
   const [selectedCity, setSelectedCity] = useState(user?.profileData?.city || '');
   const [selectedNeighborhood, setSelectedNeighborhood] = useState(user?.profileData?.neighborhood || '');
   const [preferredNeighborhoods, setPreferredNeighborhoods] = useState<string[]>(
-    user?.preferredNeighborhoods || user?.profileData?.preferred_neighborhoods || []
+    user?.preferred_neighborhoods || []
   );
   const [expandedEditBoroughs, setExpandedEditBoroughs] = useState<string[]>([]);
-  const [zipCode, setZipCode] = useState(user?.profileData?.zip_code || '');
+  const [zipCode, setZipCode] = useState(user?.zip_code || '');
   const [occupation, setOccupation] = useState(user?.profileData?.occupation || '');
   const [interests, setInterests] = useState<string[]>(
     Array.isArray(user?.profileData?.interests) ? user.profileData.interests : []
@@ -90,13 +90,13 @@ export const EditProfileScreen = () => {
   const [bedrooms, setBedrooms] = useState(user?.profileData?.preferences?.bedrooms?.toString() || '');
   
   const [profileNote, setProfileNote] = useState(user?.profileData?.profileNote || '');
-  const [idealRoommateText, setIdealRoommateText] = useState(user?.profileData?.ideal_roommate_text || user?.ideal_roommate_text || '');
+  const [idealRoommateText, setIdealRoommateText] = useState(user?.ideal_roommate_text || '');
   const [isSaving, setIsSaving] = useState(false);
 
-  const [desiredRoommateCount, setDesiredRoommateCount] = useState<number>(user?.profileData?.desired_roommate_count ?? user?.desired_roommate_count ?? 0);
-  const [desiredBedroomCount, setDesiredBedroomCount] = useState<number>(user?.profileData?.desired_bedroom_count ?? user?.desired_bedroom_count ?? 0);
-  const [householdGenderPref, setHouseholdGenderPref] = useState<'any' | 'male_only' | 'female_only' | 'same_gender'>(user?.profileData?.household_gender_preference ?? user?.household_gender_preference ?? 'any');
-  const [piAutoMatchEnabled, setPiAutoMatchEnabled] = useState<boolean>(user?.profileData?.pi_auto_match_enabled ?? user?.pi_auto_match_enabled ?? true);
+  const [desiredRoommateCount, setDesiredRoommateCount] = useState<number>(user?.desired_roommate_count ?? 0);
+  const [desiredBedroomCount, setDesiredBedroomCount] = useState<number>(user?.desired_bedroom_count ?? 0);
+  const [householdGenderPref, setHouseholdGenderPref] = useState<'any' | 'male_only' | 'female_only' | 'same_gender'>(user?.household_gender_preference ?? 'any');
+  const [piAutoMatchEnabled, setPiAutoMatchEnabled] = useState<boolean>(user?.pi_auto_match_enabled ?? true);
 
   const pickImage = async () => {
     if (photos.length >= 6) {
@@ -307,7 +307,13 @@ export const EditProfileScreen = () => {
         licenseState: licenseState.trim() || undefined,
         brokerageName: brokerageName.trim() || undefined,
       } : {}),
-      preferredNeighborhoods: preferredNeighborhoods.length > 0 ? preferredNeighborhoods : undefined,
+      preferred_neighborhoods: preferredNeighborhoods.length > 0 ? preferredNeighborhoods : undefined,
+      zip_code: zipCode.trim() || undefined,
+      ideal_roommate_text: idealRoommateText.trim() || undefined,
+      desired_roommate_count: desiredRoommateCount,
+      desired_bedroom_count: desiredBedroomCount,
+      household_gender_preference: householdGenderPref,
+      pi_auto_match_enabled: piAutoMatchEnabled,
       profileData: {
         bio: bio.trim() || undefined,
         budget: budgetMax.trim() ? parseInt(budgetMax) : (budget.trim() ? parseInt(budget) : undefined),
@@ -318,17 +324,10 @@ export const EditProfileScreen = () => {
         neighborhood: selectedNeighborhood || undefined,
         city: selectedCity || undefined,
         state: selectedState || undefined,
-        preferred_neighborhoods: preferredNeighborhoods.length > 0 ? preferredNeighborhoods : undefined,
-        zip_code: zipCode.trim() || undefined,
         occupation: occupation.trim() || undefined,
         interests: interests.length > 0 ? interests : undefined,
         gender,
         profileNote: profileNote.trim() || undefined,
-        ideal_roommate_text: idealRoommateText.trim() || undefined,
-        desired_roommate_count: desiredRoommateCount,
-        desired_bedroom_count: desiredBedroomCount,
-        household_gender_preference: householdGenderPref,
-        pi_auto_match_enabled: piAutoMatchEnabled,
         preferences: {
           sleepSchedule,
           cleanliness,
@@ -710,8 +709,8 @@ export const EditProfileScreen = () => {
                 Pi reads this to improve your match quality
               </ThemedText>
             </View>
-            {user?.profileData?.pi_parsed_preferences ? (() => {
-              const pp = user.profileData.pi_parsed_preferences;
+            {user?.pi_parsed_preferences ? (() => {
+              const pp = user.pi_parsed_preferences;
               const tags: string[] = [];
               if (pp.vibe) tags.push(pp.vibe);
               if (pp.social_style) tags.push(pp.social_style);

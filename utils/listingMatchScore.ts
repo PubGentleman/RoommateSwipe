@@ -73,9 +73,7 @@ function getMatchBreakdown(user: User, listing: ListingMatchInput): MatchScoreBr
   }
 
   const preferredNeighborhoods =
-    (user as any).preferredNeighborhoods ||
     (user as any).preferred_neighborhoods ||
-    (user as any).profileData?.preferred_neighborhoods ||
     [];
   const userCity = (user as any).profileData?.city || (user as any).city;
   const userNeighborhood = (user as any).profileData?.neighborhood || (user as any).neighborhood;

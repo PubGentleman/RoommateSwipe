@@ -80,8 +80,8 @@ export function generateAlgorithmicInsights(
     }
   }
 
-  const userNeighborhoods = currentUser.profileData?.preferred_neighborhoods || [];
-  const targetNeighborhoods = targetProfile.preferredNeighborhoods || targetProfile.profileData?.preferred_neighborhoods || [];
+  const userNeighborhoods = currentUser.preferred_neighborhoods || [];
+  const targetNeighborhoods = targetProfile.preferred_neighborhoods || [];
   const overlap = userNeighborhoods.filter((n: string) => targetNeighborhoods.includes(n));
   if (overlap.length > 0) {
     insights.push({
@@ -147,8 +147,8 @@ export function generateAlgorithmicInsights(
     }
   }
 
-  const userVibe = currentUser.profileData?.pi_parsed_preferences?.vibe;
-  const targetVibe = targetProfile.pi_parsed_preferences?.vibe || targetProfile.profileData?.pi_parsed_preferences?.vibe;
+  const userVibe = currentUser.pi_parsed_preferences?.vibe;
+  const targetVibe = targetProfile.pi_parsed_preferences?.vibe;
   if (userVibe && targetVibe && userVibe.toLowerCase() === targetVibe.toLowerCase()) {
     insights.push({ text: `Same vibe: "${userVibe}"`, type: 'shared', icon: 'music', source: 'algorithmic' });
   }

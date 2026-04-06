@@ -83,7 +83,7 @@ function suggestGroupName(members: AgentRenter[], listing?: Property | null): st
     if (hood) return `${hood} ${size}`;
     return `${listing.title?.split(' ')[0] || ''} ${size}`.trim();
   }
-  const hoods = members.map(m => m.neighborhood || m.preferredNeighborhoods?.[0]).filter(Boolean) as string[];
+  const hoods = members.map(m => m.neighborhood || m.preferred_neighborhoods?.[0]).filter(Boolean) as string[];
   if (hoods.length > 0) {
     const freq: Record<string, number> = {};
     hoods.forEach(h => { freq[h] = (freq[h] || 0) + 1; });
@@ -104,8 +104,8 @@ function getQuickTags(renter: AgentRenter) {
     if (renter.desiredBedrooms) {
       tags.push({ label: `${renter.desiredBedrooms}BR+`, color: '#3b82f6' });
     }
-    if (renter.preferredNeighborhoods && renter.preferredNeighborhoods.length > 0) {
-      renter.preferredNeighborhoods.slice(0, 2).forEach(n => {
+    if (renter.preferred_neighborhoods && renter.preferred_neighborhoods.length > 0) {
+      renter.preferred_neighborhoods.slice(0, 2).forEach(n => {
         tags.push({ label: n, color: '#888' });
       });
     }
@@ -284,7 +284,7 @@ export const BrowseRentersScreen = () => {
             occupation: u.occupation || '',
             photos: p?.photos || (u.avatar_url ? [u.avatar_url] : []),
             city: u.city,
-            preferredNeighborhoods: p?.preferred_neighborhoods || [],
+            preferred_neighborhoods: p?.preferred_neighborhoods || [],
             budgetMin: p?.budget_per_person_min ?? (p?.budget_max ? p.budget_max * 0.8 : undefined),
             budgetMax: p?.budget_per_person_max ?? p?.budget_max,
             moveInDate: p?.move_in_date,
@@ -322,7 +322,7 @@ export const BrowseRentersScreen = () => {
             lookingFor: p?.room_type || '',
             budget: p?.budget_max ?? 0,
             preferences: { location: u.city || '' },
-            preferredNeighborhoods: p?.preferred_neighborhoods || [],
+            preferred_neighborhoods: p?.preferred_neighborhoods || [],
             lifestyle: {
               cleanliness: p?.cleanliness,
               workSchedule: p?.sleep_schedule,
@@ -378,7 +378,7 @@ export const BrowseRentersScreen = () => {
           photos: p.photos || [],
           city: p.preferences?.location,
           neighborhood: p.preferences?.location,
-          preferredNeighborhoods: p.preferredNeighborhoods || p.profileData?.preferred_neighborhoods || [],
+          preferred_neighborhoods: p.preferred_neighborhoods || [],
           budgetMin: p.budget ? p.budget * 0.8 : undefined,
           budgetMax: p.budget,
           moveInDate: p.preferences?.moveInDate,
@@ -403,7 +403,7 @@ export const BrowseRentersScreen = () => {
         const agentCityLower = user.city.toLowerCase();
         mapped = mapped.filter(r =>
           r.city?.toLowerCase().includes(agentCityLower) ||
-          r.preferredNeighborhoods?.some(n => n.toLowerCase().includes(agentCityLower))
+          r.preferred_neighborhoods?.some(n => n.toLowerCase().includes(agentCityLower))
         );
       }
 
@@ -520,7 +520,7 @@ export const BrowseRentersScreen = () => {
       const nfLower = neighborhoodFilter.toLowerCase();
       filtered = filtered.filter(r =>
         r.neighborhood?.toLowerCase().includes(nfLower) ||
-        r.preferredNeighborhoods?.some(n => n.toLowerCase().includes(nfLower))
+        r.preferred_neighborhoods?.some(n => n.toLowerCase().includes(nfLower))
       );
     }
 
@@ -531,7 +531,7 @@ export const BrowseRentersScreen = () => {
         r.occupation?.toLowerCase().includes(q) ||
         r.neighborhood?.toLowerCase().includes(q) ||
         r.city?.toLowerCase().includes(q) ||
-        r.preferredNeighborhoods?.some(n => n.toLowerCase().includes(q))
+        r.preferred_neighborhoods?.some(n => n.toLowerCase().includes(q))
       );
     }
 
@@ -915,10 +915,10 @@ export const BrowseRentersScreen = () => {
                 <Text style={{ fontSize: 13, color: '#aaa' }}>{item.occupation}</Text>
               </View>
             ) : null}
-            {item.preferredNeighborhoods && item.preferredNeighborhoods.length > 0 ? (
+            {item.preferred_neighborhoods && item.preferred_neighborhoods.length > 0 ? (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
                 <Feather name="map-pin" size={12} color="#666" />
-                <Text style={{ fontSize: 13, color: '#aaa' }} numberOfLines={1}>{item.preferredNeighborhoods.slice(0, 2).join(', ')}</Text>
+                <Text style={{ fontSize: 13, color: '#aaa' }} numberOfLines={1}>{item.preferred_neighborhoods.slice(0, 2).join(', ')}</Text>
               </View>
             ) : item.city ? (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
@@ -1012,11 +1012,11 @@ export const BrowseRentersScreen = () => {
                     <Text style={st.detailText}>Bedrooms: {item.desiredBedrooms}+</Text>
                   </View>
                 ) : null}
-                {item.preferredNeighborhoods && item.preferredNeighborhoods.length > 0 ? (
+                {item.preferred_neighborhoods && item.preferred_neighborhoods.length > 0 ? (
                   <View style={st.detailItem}>
                     <Feather name="map-pin" size={13} color="#3b82f6" />
                     <Text style={st.detailText} numberOfLines={1}>
-                      {item.preferredNeighborhoods.join(', ')}
+                      {item.preferred_neighborhoods.join(', ')}
                     </Text>
                   </View>
                 ) : null}

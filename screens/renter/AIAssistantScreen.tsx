@@ -287,7 +287,7 @@ export const AIAssistantScreen = ({ navigation }: AIAssistantScreenProps) => {
           const analysis = await analyzePrice({
             listingPrice: listingContext.price || 0,
             bedrooms: listingContext.bedrooms || 1,
-            zipCode: listingContext.zipCode || '',
+            zipCode: listingContext.zip_code || '',
             city: listingContext.city || '',
           });
           priceAnalysisAddition = `\n\nPRICE ANALYSIS DATA:\n${analysis.summary}\n\nRaw data:\n- Listing price: $${listingContext.price}/month\n- Area median (Rhome): ${analysis.rhomeMedian ? '$' + analysis.rhomeMedian : 'Not enough data'}\n- Comparable listings: ${analysis.rhomeCount}\n- HUD Fair Market Rent: ${analysis.hudFairMarketRent ? '$' + analysis.hudFairMarketRent : 'Not available'}\n- Market position: ${analysis.comparedToMarket}`;

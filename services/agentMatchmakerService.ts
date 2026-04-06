@@ -21,7 +21,7 @@ export interface AgentRenter {
   photos: string[];
   city?: string;
   neighborhood?: string;
-  preferredNeighborhoods?: string[];
+  preferred_neighborhoods?: string[];
   budgetMin?: number;
   budgetMax?: number;
   moveInDate?: string;
@@ -979,7 +979,7 @@ export function scoreGroupForListing(
   else budgetFit = 30;
 
   const neighborhoodMatches = members.filter(m =>
-    m.preferredNeighborhoods?.includes(listing.neighborhood ?? '')
+    m.preferred_neighborhoods?.includes(listing.neighborhood ?? '')
   ).length;
   const locationFit = members.length > 0 ? Math.round((neighborhoodMatches / members.length) * 100) : 50;
 
@@ -1032,7 +1032,7 @@ export function calculateRenterRelevance(renter: AgentRenter, listing: Property)
     else if (daysDiff <= 60) score += 5;
   }
 
-  if (renter.preferredNeighborhoods?.includes(listing.neighborhood ?? '')) score += 20;
+  if (renter.preferred_neighborhoods?.includes(listing.neighborhood ?? '')) score += 20;
 
   if (listing.bedrooms === 1 && renter.roomType === 'entire') score += 15;
   else if ((listing.bedrooms ?? 0) > 1 && renter.roomType === 'room') score += 15;
@@ -1222,7 +1222,7 @@ export function mapToAgentRenter(user: any, profile: any): AgentRenter {
     occupation: user.occupation || '',
     photos: p?.photos || (user.avatar_url ? [user.avatar_url] : []),
     city: user.city,
-    preferredNeighborhoods: p?.preferred_neighborhoods || [],
+    preferred_neighborhoods: p?.preferred_neighborhoods || [],
     budgetMin: p?.budget_per_person_min ?? (p?.budget_max ? p.budget_max * 0.8 : undefined),
     budgetMax: p?.budget_per_person_max ?? p?.budget_max,
     moveInDate: p?.move_in_date,

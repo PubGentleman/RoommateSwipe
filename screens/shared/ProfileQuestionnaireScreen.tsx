@@ -465,11 +465,11 @@ export const ProfileQuestionnaireScreen = () => {
   const [selectedCity, setSelectedCity] = useState(user?.profileData?.city || '');
   const [selectedNeighborhood, setSelectedNeighborhood] = useState(user?.profileData?.neighborhood || '');
   const [preferredNeighborhoods, setPreferredNeighborhoods] = useState<string[]>(
-    user?.preferredNeighborhoods || user?.profileData?.preferred_neighborhoods || []
+    user?.preferred_neighborhoods || []
   );
   const [neighborhoodDropdownOpen, setNeighborhoodDropdownOpen] = useState(false);
   const [expandedBoroughs, setExpandedBoroughs] = useState<string[]>([]);
-  const [zipCode, setZipCode] = useState(user?.profileData?.zip_code || user?.zip_code || '');
+  const [zipCode, setZipCode] = useState(user?.zip_code || '');
   const [occupation, setOccupation] = useState(user?.profileData?.occupation || '');
   const [gender, setGender] = useState<'male' | 'female' | 'other' | undefined>(user?.profileData?.gender);
   const [sleepSchedule, setSleepSchedule] = useState<'early_sleeper' | 'late_sleeper' | 'flexible' | 'irregular' | undefined>(user?.profileData?.preferences?.sleepSchedule);
@@ -501,14 +501,14 @@ export const ProfileQuestionnaireScreen = () => {
   const [budgetMin, setBudgetMin] = useState(user?.profileData?.budgetMin?.toString() || '');
   const [profileNote, setProfileNote] = useState(user?.profileData?.profileNote || '');
   const profileNoteCharLimit = 500;
-  const [idealRoommateText, setIdealRoommateText] = useState(user?.profileData?.ideal_roommate_text || user?.ideal_roommate_text || '');
+  const [idealRoommateText, setIdealRoommateText] = useState(user?.ideal_roommate_text || '');
   const idealRoommateTextRef = React.useRef(idealRoommateText);
   React.useEffect(() => { idealRoommateTextRef.current = idealRoommateText; }, [idealRoommateText]);
   const idealRoommateCharLimit = 500;
-  const [desiredRoommateCount, setDesiredRoommateCount] = useState<number>(user?.profileData?.desired_roommate_count ?? user?.desired_roommate_count ?? 0);
-  const [desiredBedroomCount, setDesiredBedroomCount] = useState<number>(user?.profileData?.desired_bedroom_count ?? user?.desired_bedroom_count ?? 0);
-  const [householdGenderPref, setHouseholdGenderPref] = useState<'any' | 'male_only' | 'female_only' | 'same_gender'>(user?.profileData?.household_gender_preference || user?.household_gender_preference || 'any');
-  const [piAutoMatchEnabled, setPiAutoMatchEnabled] = useState<boolean>(user?.profileData?.pi_auto_match_enabled ?? user?.pi_auto_match_enabled ?? true);
+  const [desiredRoommateCount, setDesiredRoommateCount] = useState<number>(user?.desired_roommate_count ?? 0);
+  const [desiredBedroomCount, setDesiredBedroomCount] = useState<number>(user?.desired_bedroom_count ?? 0);
+  const [householdGenderPref, setHouseholdGenderPref] = useState<'any' | 'male_only' | 'female_only' | 'same_gender'>(user?.household_gender_preference || 'any');
+  const [piAutoMatchEnabled, setPiAutoMatchEnabled] = useState<boolean>(user?.pi_auto_match_enabled ?? true);
 
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
   useEffect(() => {
@@ -707,7 +707,13 @@ export const ProfileQuestionnaireScreen = () => {
         brokerageLicense: brokerageLicense.trim() || undefined,
         companyName: companyName.trim() || undefined,
       } : {}),
-      preferredNeighborhoods: preferredNeighborhoods.length > 0 ? preferredNeighborhoods : undefined,
+      preferred_neighborhoods: preferredNeighborhoods.length > 0 ? preferredNeighborhoods : undefined,
+      zip_code: zipCode.trim() || undefined,
+      ideal_roommate_text: idealRoommateTextRef.current.trim() || undefined,
+      desired_roommate_count: desiredRoommateCount,
+      desired_bedroom_count: desiredBedroomCount,
+      household_gender_preference: householdGenderPref,
+      pi_auto_match_enabled: piAutoMatchEnabled,
       profileData: {
         ...user?.profileData,
         bio: bio.trim() || undefined,
@@ -720,19 +726,12 @@ export const ProfileQuestionnaireScreen = () => {
         city: selectedCity || undefined,
         state: selectedState || undefined,
         coordinates: (selectedNeighborhood || preferredNeighborhoods[0]) ? getCoordinatesFromNeighborhood(selectedNeighborhood || preferredNeighborhoods[0]) || undefined : undefined,
-        preferred_neighborhoods: preferredNeighborhoods.length > 0 ? preferredNeighborhoods : undefined,
-        zip_code: zipCode.trim() || undefined,
         occupation: occupation.trim() || undefined,
         interests: interests.length > 0 ? interests : undefined,
         gender,
         dealbreakers,
         personalityAnswers: Object.keys(personalityAnswers).length > 0 ? personalityAnswers : undefined,
         profileNote: profileNote.trim() || undefined,
-        ideal_roommate_text: idealRoommateTextRef.current.trim() || undefined,
-        desired_roommate_count: desiredRoommateCount,
-        desired_bedroom_count: desiredBedroomCount,
-        household_gender_preference: householdGenderPref,
-        pi_auto_match_enabled: piAutoMatchEnabled,
         preferences: {
           sleepSchedule,
           cleanliness,

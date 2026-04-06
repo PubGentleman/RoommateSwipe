@@ -23,7 +23,7 @@ export async function generateRecommendations(
   const thirtyDaysOut = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
 
   const userBudget = user.profileData?.budget || 2000;
-  const userNeighborhoods = user.profileData?.preferred_neighborhoods || [];
+  const userNeighborhoods = user.preferred_neighborhoods || [];
 
   const scored = listings
     .filter(l => l.price && l.price <= userBudget * 1.15)
@@ -145,7 +145,7 @@ function computeListingMatchScore(listing: Property, user: User): number {
     else if (ratio <= 1.2) score += 10;
   }
 
-  const userNeighborhoods = user.profileData?.preferred_neighborhoods || [];
+  const userNeighborhoods = user.preferred_neighborhoods || [];
   if (listing.neighborhood && userNeighborhoods.some(
     (n: string) => n.toLowerCase() === listing.neighborhood?.toLowerCase()
   )) {

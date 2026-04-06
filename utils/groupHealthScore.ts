@@ -68,7 +68,7 @@ export async function getGroupHealth(
                 workSchedule: profile?.work_schedule,
                 socialLevel: profile?.social_level,
               },
-              preferredNeighborhoods: profile?.preferred_neighborhoods || [],
+              preferred_neighborhoods: profile?.preferred_neighborhoods || [],
               profileData: profile,
               apartmentPrefs: {
                 budgetPerPersonMin: profile?.budget_min || 0,
@@ -76,6 +76,7 @@ export async function getGroupHealth(
                 desiredBedrooms: profile?.desired_bedrooms,
                 moveInDate: profile?.move_in_date,
                 preferredTrains: profile?.preferred_trains || [],
+                preferredNeighborhoods: profile?.preferred_neighborhoods || [],
                 amenityMustHaves: profile?.amenity_must_haves || [],
                 locationFlexible: profile?.location_flexible || false,
                 wfh: profile?.work_schedule === 'wfh_fulltime',

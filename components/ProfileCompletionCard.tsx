@@ -113,7 +113,7 @@ const ROOMMATE_SEEKER_FIELDS: ProfileField[] = [
     icon: 'users',
     tip: 'Filter by gender compatibility',
     weight: 5,
-    check: (u) => !!(u.profileData?.household_gender_preference || u.household_gender_preference),
+    check: (u) => !!u.household_gender_preference,
   },
   {
     key: 'work',

@@ -16,7 +16,7 @@ export interface RoommateProfile {
     pets: boolean;
     smoking: boolean;
   };
-  preferredNeighborhoods?: string[];
+  preferred_neighborhoods?: string[];
   zip_code?: string;
   ideal_roommate_text?: string;
   pi_parsed_preferences?: PiParsedPreferences;
@@ -38,15 +38,6 @@ export interface RoommateProfile {
     interests?: string[];
     preferences?: Record<string, any>;
     profileNote?: string;
-    preferred_neighborhoods?: string[];
-    zip_code?: string;
-    ideal_roommate_text?: string;
-    pi_parsed_preferences?: PiParsedPreferences;
-    desired_roommate_count?: number;
-    desired_bedroom_count?: number;
-    household_gender_preference?: GenderPreference;
-    pi_auto_match_enabled?: boolean;
-    pi_last_match_attempt?: string;
     listing_type_preference?: 'room' | 'entire_apartment' | 'any';
     apartment_search_type?: 'solo' | 'with_partner' | 'with_roommates' | 'have_group' | null;
     [key: string]: any;
@@ -617,7 +608,7 @@ export interface User {
   freeMessageUnlockConversationId?: string;
   freeMessageUnlockUsedAt?: string;
   typeOnboardingComplete?: boolean;
-  preferredNeighborhoods?: string[];
+  preferred_neighborhoods?: string[];
   preferredBedrooms?: number | null;
   amenityPreferences?: string[];
   niceToHaveAmenities?: string[];
@@ -647,19 +638,10 @@ export interface User {
       lat: number;
       lng: number;
     };
-    preferred_neighborhoods?: string[];
-    zip_code?: string;
     occupation?: string;
     interests?: string[];
     gender?: 'male' | 'female' | 'other';
     personalityAnswers?: Record<string, string>;
-    ideal_roommate_text?: string;
-    pi_parsed_preferences?: PiParsedPreferences;
-    desired_roommate_count?: number;
-    desired_bedroom_count?: number;
-    household_gender_preference?: GenderPreference;
-    pi_auto_match_enabled?: boolean;
-    pi_last_match_attempt?: string;
     preferences?: {
       sleepSchedule?: 'early_sleeper' | 'late_sleeper' | 'flexible' | 'irregular';
       cleanliness?: 'very_tidy' | 'moderately_tidy' | 'relaxed';
@@ -682,10 +664,6 @@ export interface User {
       };
     };
     profileNote?: string;
-    desired_roommate_count?: number;
-    desired_bedroom_count?: number;
-    household_gender_preference?: GenderPreference;
-    pi_auto_match_enabled?: boolean;
   };
   personalityAnswers?: Record<string, string>;
   references?: Reference[];

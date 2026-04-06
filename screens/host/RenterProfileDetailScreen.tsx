@@ -165,11 +165,11 @@ export const RenterProfileDetailScreen = () => {
           </View>
         ) : null}
 
-        {renter.preferredNeighborhoods && renter.preferredNeighborhoods.length > 0 ? (
+        {renter.preferred_neighborhoods && renter.preferred_neighborhoods.length > 0 ? (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Preferred Neighborhoods</Text>
             <View style={styles.tagRow}>
-              {renter.preferredNeighborhoods.map((n, idx) => (
+              {renter.preferred_neighborhoods.map((n, idx) => (
                 <View key={idx} style={[styles.tag, { backgroundColor: 'rgba(59,130,246,0.15)' }]}>
                   <Text style={[styles.tagText, { color: BLUE }]}>{n}</Text>
                 </View>

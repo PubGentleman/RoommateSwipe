@@ -77,7 +77,7 @@ export default function ApartmentPreferencesScreen() {
     user?.amenityPreferences || []
   );
   const [neighborhoods, setNeighborhoods] = useState<string[]>(
-    user?.preferredNeighborhoods || pd.preferred_neighborhoods || []
+    user?.preferred_neighborhoods || pd.preferred_neighborhoods || []
   );
   const [zipCode, setZipCode] = useState(pd.zip_code || user?.zip_code || '');
   const [piIdealText, setPiIdealText] = useState(pd.ideal_roommate_text || '');

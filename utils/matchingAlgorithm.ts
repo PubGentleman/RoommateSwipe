@@ -402,14 +402,13 @@ export const calculateDetailedCompatibility = (
   // Uses multi-neighborhood overlap + coordinate distance + zip code proximity
   // ========================================
   const userNeighborhoods: string[] = [...new Set([
-    ...(currentUser.profileData?.preferred_neighborhoods || []),
+    ...(currentUser.preferred_neighborhoods || []),
     ...(currentUser.profileData?.neighborhood ? [currentUser.profileData.neighborhood] : []),
     ...(userProfile.neighborhood ? [userProfile.neighborhood] : []),
   ])].filter(Boolean);
 
   const roommateNeighborhoods: string[] = [...new Set([
-    ...(roommateProfile.preferredNeighborhoods || []),
-    ...(roommateProfile.profileData?.preferred_neighborhoods || []),
+    ...(roommateProfile.preferred_neighborhoods || []),
     ...(roommateProfile.preferences?.location ? [roommateProfile.preferences.location] : []),
   ])].filter(Boolean);
 
@@ -471,8 +470,8 @@ export const calculateDetailedCompatibility = (
           );
         }
       } else {
-        const userZip = currentUser.profileData?.zip_code || currentUser.zip_code;
-        const roommateZip = roommateProfile.zip_code || roommateProfile.profileData?.zip_code;
+        const userZip = currentUser.zip_code;
+        const roommateZip = roommateProfile.zip_code;
 
         if (userZip && roommateZip) {
           const zipDist = getZipCodeDistance(userZip, roommateZip);
@@ -499,8 +498,8 @@ export const calculateDetailedCompatibility = (
       }
     }
   } else {
-    const userZip = currentUser.profileData?.zip_code || currentUser.zip_code;
-    const roommateZip = roommateProfile.zip_code || roommateProfile.profileData?.zip_code;
+    const userZip = currentUser.zip_code;
+    const roommateZip = roommateProfile.zip_code;
 
     if (userZip && roommateZip) {
       const zipDist = getZipCodeDistance(userZip, roommateZip);
@@ -898,9 +897,9 @@ export const calculateDetailedCompatibility = (
   // Uses keyword matching — no AI calls at scoring time
   // ========================================
   const userPiPrefs: PiParsedPreferences | undefined =
-    currentUser.pi_parsed_preferences || currentUser.profileData?.pi_parsed_preferences;
+    currentUser.pi_parsed_preferences;
   const roommatePiPrefs: PiParsedPreferences | undefined =
-    roommateProfile.pi_parsed_preferences || roommateProfile.profileData?.pi_parsed_preferences;
+    roommateProfile.pi_parsed_preferences;
 
   if (userPiPrefs || roommatePiPrefs) {
     if (userPiPrefs && checkHardNoConflicts(userPiPrefs, roommateProfile)) {
@@ -1398,9 +1397,7 @@ function getMemberGenderPreference(m: User | RoommateProfile): string | undefine
   const user = m as User;
   const profile = m as RoommateProfile;
   return user.household_gender_preference ||
-    user.profileData?.household_gender_preference ||
-    profile.household_gender_preference ||
-    profile.profileData?.household_gender_preference;
+    profile.household_gender_preference;
 }
 
 function getMemberBudget(m: User | RoommateProfile): number | undefined {
@@ -1419,10 +1416,9 @@ function getMemberNeighborhoods(m: User | RoommateProfile): Set<string> {
   const user = m as User;
   const profile = m as RoommateProfile;
   return new Set<string>([
-    ...(user.profileData?.preferred_neighborhoods || []),
-    ...(profile.profileData?.preferred_neighborhoods || []),
+    ...(user.preferred_neighborhoods || []),
+    ...(profile.preferred_neighborhoods || []),
     ...(user.profileData?.neighborhood ? [user.profileData.neighborhood] : []),
-    ...(profile.preferredNeighborhoods || []),
   ].filter(Boolean).map((n: string) => n.toLowerCase()));
 }
 

@@ -39,7 +39,7 @@ export async function trackListingInteraction(
 
 interface UserBehaviorProfile {
   priceRange: { min: number; max: number; sweet_spot: number };
-  preferredNeighborhoods: string[];
+  preferred_neighborhoods: string[];
   preferredAmenities: string[];
   preferredListingTypes: string[];
   preferredBedrooms: number | null;
@@ -110,7 +110,7 @@ async function analyzeUserBehavior(userId: string): Promise<UserBehaviorProfile 
       max: prices.length > 0 ? prices[Math.floor(prices.length * 0.9)] : 0,
       sweet_spot: prices.length > 0 ? prices[Math.floor(prices.length * 0.5)] : 0,
     },
-    preferredNeighborhoods: topNeighborhoods,
+    preferred_neighborhoods: topNeighborhoods,
     preferredAmenities: topAmenities,
     preferredListingTypes: topListingTypes,
     preferredBedrooms: topBedroom ? parseInt(topBedroom[0]) : null,
@@ -214,7 +214,7 @@ export async function getForYouListings(
         }
       }
 
-      if (listing.neighborhood && behaviorProfile.preferredNeighborhoods.includes(listing.neighborhood)) {
+      if (listing.neighborhood && behaviorProfile.preferred_neighborhoods.includes(listing.neighborhood)) {
         behaviorBonus += 8;
         reasons.push({ type: 'preferred_area', text: `You browse ${listing.neighborhood} often`, icon: 'map-pin' });
       }

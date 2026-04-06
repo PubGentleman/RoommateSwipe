@@ -62,6 +62,12 @@ Supabase provides the complete backend infrastructure:
 
 The architecture includes a Babel module resolver, platform-specific UI, performance optimizations (React Native's New Architecture, React Compiler, Reanimated), robust error handling, separate stack navigators with history, and efficient data fetching.
 
+**Type Deduplication (completed):**
+- `preferred_neighborhoods` (snake_case) is canonical on `User` and `RoommateProfile` top-level. Removed from `profileData`. `ApartmentPreferences.preferredNeighborhoods` (camelCase) is separate UI type — kept as-is.
+- `zip_code`, `ideal_roommate_text`, `pi_parsed_preferences`, `desired_roommate_count`, `desired_bedroom_count`, `household_gender_preference`, `pi_auto_match_enabled`, `pi_last_match_attempt` — all canonical at top-level on `User`/`RoommateProfile`, removed from `profileData`.
+- `Property` uses `zip_code` (snake_case); all `property.zipCode` references fixed.
+- All date fields are `string` (ISO 8601). Never assign `new Date()` directly — always use `.toISOString()`.
+
 # External Dependencies
 
 *   Expo

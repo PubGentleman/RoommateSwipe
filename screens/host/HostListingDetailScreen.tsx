@@ -203,7 +203,7 @@ export function HostListingDetailScreen() {
             <Feather name="map-pin" size={13} color="#ff6b5b" />
             <Text style={[styles.location, { color: theme.textSecondary }]}>
               {property.neighborhood ? `${property.neighborhood}, ` : ''}{property.city}, {property.state}
-              {property.zipCode ? ` ${property.zipCode}` : ''}
+              {property.zip_code ? ` ${property.zip_code}` : ''}
             </Text>
           </View>
           {property.address ? (

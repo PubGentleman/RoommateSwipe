@@ -27,7 +27,7 @@ function profileToUser(profile: RoommateProfile): any {
         moveInDate: profile.apartmentPrefs?.moveInDate,
       },
       budget: profile.budget,
-      preferred_neighborhoods: profile.preferredNeighborhoods,
+      preferred_neighborhoods: profile.preferred_neighborhoods,
       dealbreakers: (profile as any).dealbreakers || [],
     },
   };

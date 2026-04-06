@@ -286,15 +286,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         roomType: profile.room_type,
         leaseDuration: profile.lease_duration,
         profileNote: profile.profile_note || undefined,
-        ideal_roommate_text: profile.ideal_roommate_text || undefined,
         max_roommates: profile.max_roommates ?? undefined,
-        pi_parsed_preferences: profile.pi_parsed_preferences || undefined,
         instagram_verified: profile.instagram_verified || false,
         instagram_handle: profile.instagram_handle || undefined,
-        desired_roommate_count: profile.desired_roommate_count ?? undefined,
-        desired_bedroom_count: profile.desired_bedroom_count ?? undefined,
-        household_gender_preference: profile.household_gender_preference || undefined,
-        pi_auto_match_enabled: profile.pi_auto_match_enabled ?? undefined,
         listing_type_preference: profile.listing_type_preference || supabaseUser.listing_type_preference || 'any',
         apartment_search_type: supabaseUser.apartment_search_type || profile.apartment_search_type || null,
       } : {
@@ -348,11 +342,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       freeMessageUnlockConversationId: supabaseUser.free_message_unlock_conversation_id || undefined,
       freeMessageUnlockUsedAt: supabaseUser.free_message_unlock_used_at || undefined,
       typeOnboardingComplete: supabaseUser.type_onboarding_complete || false,
-      preferredNeighborhoods: supabaseUser.preferred_neighborhoods || [],
+      preferred_neighborhoods: supabaseUser.preferred_neighborhoods || [],
       preferredBedrooms: supabaseUser.preferred_bedrooms ?? null,
       amenityPreferences: supabaseUser.amenity_preferences || [],
       niceToHaveAmenities: supabaseUser.nice_to_have_amenities || [],
       moveInTimeline: supabaseUser.move_in_timeline || undefined,
+      zip_code: profile?.zip_code || supabaseUser.zip_code || undefined,
+      ideal_roommate_text: profile?.ideal_roommate_text || undefined,
+      pi_parsed_preferences: profile?.pi_parsed_preferences || undefined,
       desired_roommate_count: profile?.desired_roommate_count ?? undefined,
       desired_bedroom_count: profile?.desired_bedroom_count ?? undefined,
       household_gender_preference: profile?.household_gender_preference || undefined,
@@ -1258,7 +1255,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     'hostType', 'hostTypeLockedAt', 'hostTypeChangeRequested',
     'licenseVerificationStatus', 'licenseVerified', 'licenseVerifiedAt',
     'licenseDocumentUrl',
-    'preferredNeighborhoods', 'interestTags', 'profileData',
+    'preferred_neighborhoods', 'interestTags', 'profileData',
+    'zip_code', 'ideal_roommate_text', 'pi_parsed_preferences',
+    'desired_roommate_count', 'desired_bedroom_count',
+    'household_gender_preference', 'pi_auto_match_enabled', 'pi_last_match_attempt',
     'notificationPreferences', 'privacySettings', 'verification', 'acceptAgentOffers',
     'searchPaused', 'searchPausedAt',
     'hostSubscription', 'subscription', 'agentPlan', 'companyPlan',
@@ -1383,9 +1383,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
 
-    if (updates.profileData?.ideal_roommate_text !== undefined) {
+    if (updates.ideal_roommate_text !== undefined) {
       try {
-        const textValue = updates.profileData.ideal_roommate_text?.trim() || null;
+        const textValue = updates.ideal_roommate_text?.trim() || null;
         await supabase
           .from('profiles')
           .update({ ideal_roommate_text: textValue })

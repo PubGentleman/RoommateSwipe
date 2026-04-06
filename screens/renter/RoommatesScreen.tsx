@@ -491,11 +491,11 @@ export const RoommatesScreen = () => {
             verified: p.profile?.verified || false,
             instagram_verified: p.profile?.instagram_verified || false,
             instagram_handle: p.profile?.instagram_handle || undefined,
-            preferredNeighborhoods: p.profile?.preferred_neighborhoods || [],
+            preferred_neighborhoods: p.profile?.preferred_neighborhoods || [],
+            ideal_roommate_text: p.profile?.ideal_roommate_text || undefined,
             profileData: {
               interests: Array.isArray(p.profile?.interests) ? p.profile.interests : [],
               profileNote: p.profile?.profile_note || undefined,
-              ideal_roommate_text: p.profile?.ideal_roommate_text || undefined,
             },
           })) as RoommateProfile[];
           usedSupabase = true;
@@ -673,11 +673,11 @@ export const RoommatesScreen = () => {
       return;
     }
 
-    const myNeighborhoods: string[] = user.profileData?.preferredNeighborhoods || user.preferred_neighborhoods || [];
+    const myNeighborhoods: string[] = user.preferred_neighborhoods || [];
     const myBudget = user.profileData?.budget || user.budget || 1500;
     const myTrains: string[] = user.profileData?.preferredTrains || user.required_train_lines || [];
 
-    const theirNeighborhoods: string[] = (currentProfile as any).preferredNeighborhoods || [];
+    const theirNeighborhoods: string[] = currentProfile.preferred_neighborhoods || [];
     const theirBudget = currentProfile.budget || 1500;
     const theirTrains: string[] = (currentProfile as any).requiredTrainLines || [];
 
@@ -2098,9 +2098,9 @@ export const RoommatesScreen = () => {
               <ThemedText style={styles.cardBio} numberOfLines={2}>
                 {currentProfile.bio}
               </ThemedText>
-              {currentProfile.profileData?.ideal_roommate_text ? (
+              {currentProfile.ideal_roommate_text ? (
                 <ThemedText style={styles.piLookingFor} numberOfLines={1}>
-                  {'\u03C0'} Looking for: {currentProfile.profileData.ideal_roommate_text}
+                  {'\u03C0'} Looking for: {currentProfile.ideal_roommate_text}
                 </ThemedText>
               ) : null}
               <View style={styles.cardTags}>
@@ -2116,10 +2116,10 @@ export const RoommatesScreen = () => {
                     <ThemedText style={styles.tagDarkText}>{getWorkStyleTag(currentProfile.profileData?.preferences?.workLocation)}</ThemedText>
                   </View>
                 ) : null}
-                {(currentProfile as any).preferredNeighborhoods?.length > 0 ? (
+                {currentProfile.preferred_neighborhoods?.length > 0 ? (
                   <View style={styles.tagDark}>
                     <Feather name="map-pin" size={12} color="rgba(255,255,255,0.85)" />
-                    <ThemedText style={styles.tagDarkText} numberOfLines={1}>{(currentProfile as any).preferredNeighborhoods.slice(0, 2).join(', ')}</ThemedText>
+                    <ThemedText style={styles.tagDarkText} numberOfLines={1}>{currentProfile.preferred_neighborhoods.slice(0, 2).join(', ')}</ThemedText>
                   </View>
                 ) : currentProfile.preferences?.location ? (
                   <View style={styles.tagDark}>
@@ -2922,7 +2922,7 @@ export const RoommatesScreen = () => {
                   <View style={styles.pdStatStrip}>
                     {[
                       { icon: 'dollar-sign' as const, label: 'Budget', value: `$${currentProfile.budget}/mo` },
-                      { icon: 'map-pin' as const, label: 'Location', value: (currentProfile as any).preferredNeighborhoods?.length > 0 ? (currentProfile as any).preferredNeighborhoods.join(', ') : (currentProfile.preferences?.location ?? 'Flexible') },
+                      { icon: 'map-pin' as const, label: 'Location', value: currentProfile.preferred_neighborhoods?.length > 0 ? currentProfile.preferred_neighborhoods.join(', ') : (currentProfile.preferences?.location ?? 'Flexible') },
                       { icon: 'calendar' as const, label: 'Move-in', value: currentProfile.preferences?.moveInDate ? formatMoveInDate(currentProfile.preferences.moveInDate) : 'ASAP' },
                       { icon: 'home' as const, label: 'Rooms', value: `${currentProfile.preferences?.bedrooms ?? 1} bd` },
                     ].map((stat, i) => (
@@ -2988,7 +2988,7 @@ export const RoommatesScreen = () => {
                     </View>
                   ) : null}
 
-                  {currentProfile.profileData?.ideal_roommate_text ? (
+                  {currentProfile.ideal_roommate_text ? (
                     <View style={styles.pdSection}>
                       <View style={{
                         padding: 14,
@@ -3014,7 +3014,7 @@ export const RoommatesScreen = () => {
                           lineHeight: 21,
                           fontStyle: 'italic',
                         }}>
-                          "{currentProfile.profileData.ideal_roommate_text}"
+                          "{currentProfile.ideal_roommate_text}"
                         </Text>
                       </View>
                     </View>
