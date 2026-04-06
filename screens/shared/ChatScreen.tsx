@@ -283,6 +283,13 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   const [groupOnlineCount, setGroupOnlineCount] = useState(0);
   const [groupChatSettings, setGroupChatSettings] = useState<Record<string, any>>({});
   const { isRecording, recordingDuration, startRecording, stopRecording, cancelRecording } = useVoiceRecording();
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
@@ -327,6 +334,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
         }));
       }
 
+      if (!isMountedRef.current) return;
       if (olderMsgs.length > 0) {
         const existingIds = new Set(messages.map(m => m.id));
         const uniqueOlder = olderMsgs.filter(m => !existingIds.has(m.id));
@@ -550,7 +558,6 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
       setGroupOnlineCount(0);
       return;
     }
-    let cancelled = false;
     const checkOnline = async () => {
       let count = 0;
       for (const m of groupMembers) {
@@ -558,13 +565,15 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
         try {
           const online = await isUserOnline(m.id);
           if (online) count++;
-        } catch {}
+        } catch (e) {
+          console.warn('[ChatScreen] Online check failed for', m.id, e);
+        }
       }
-      if (!cancelled) setGroupOnlineCount(count);
+      if (isMountedRef.current) setGroupOnlineCount(count);
     };
     checkOnline();
     const interval = setInterval(checkOnline, 30000);
-    return () => { cancelled = true; clearInterval(interval); };
+    return () => { clearInterval(interval); };
   }, [conversationId, isInquiryChat, groupMembers.length]);
 
   useEffect(() => {
@@ -643,9 +652,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   useEffect(() => {
     if (!conversationId.startsWith('group-')) return;
     const groupId = conversationId.replace('group-', '');
-    let isMounted = true;
     const subscription = subscribeToGroupMessages(groupId, (newMsg: any) => {
-      if (!isMounted) return;
+      if (!isMountedRef.current) return;
       if (newMsg.senderId !== user?.id) {
         const mapped: Message = {
           id: newMsg.id,
@@ -665,14 +673,13 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
         }
       }
     });
-    return () => { isMounted = false; subscription.unsubscribe(); };
+    return () => { subscription.unsubscribe(); };
   }, [conversationId, user?.id]);
 
   useEffect(() => {
     if (!matchIdFromConversation || conversationId.startsWith('group-') || conversationId.startsWith('conv-interest-')) return;
-    let isMounted = true;
     const unsubscribe = subscribeToMessages(matchIdFromConversation, (newMsg: any) => {
-      if (!isMounted) return;
+      if (!isMountedRef.current) return;
       const isOwnMsg = newMsg.sender_id === user?.id && !newMsg.is_system_message;
       setMessages(prev => {
         if (prev.some(m => m.id === newMsg.id)) return prev;
@@ -704,7 +711,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
         try { markSupabaseMessagesAsRead(user!.id, matchIdFromConversation); } catch (_e) {}
       }
     });
-    return () => { isMounted = false; unsubscribe(); };
+    return () => { unsubscribe(); };
   }, [matchIdFromConversation, user?.id]);
 
   useEffect(() => {
@@ -714,6 +721,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
     joinConversationTyping(matchIdForPresence, user.id);
 
     const unsub = subscribeToPresence(() => {
+      if (!isMountedRef.current) return;
       const typers = getTypingUsers(matchIdForPresence);
       setOtherUserTyping(typers.length > 0);
     });
@@ -1308,6 +1316,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
     } else {
       loadedMessages = localMessages;
     }
+
+    if (!isMountedRef.current) return;
 
     setMessages(loadedMessages);
 
