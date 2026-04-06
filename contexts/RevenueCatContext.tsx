@@ -22,7 +22,7 @@ interface RevenueCatContextType {
   hostOffering: PurchasesOffering | null;
   agentOffering: PurchasesOffering | null;
   companyOffering: PurchasesOffering | null;
-  purchase: (plan: string, billingCycle: 'monthly' | '3month' | 'annual', planType: 'renter' | 'host' | 'agent' | 'company') => Promise<{ success: boolean; error?: string }>;
+  purchase: (plan: string, billingCycle: 'monthly' | '3month' | 'annual', planType: 'renter' | 'host' | 'agent' | 'company') => Promise<{ success: boolean; error?: string; customerInfo?: CustomerInfo }>;
   restore: () => Promise<{ success: boolean; error?: string }>;
   refreshCustomerInfo: () => Promise<void>;
   identifyRevenueCatUser: (userId: string) => Promise<void>;
@@ -115,7 +115,7 @@ export const RevenueCatProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       if (result.success && result.customerInfo) {
         setCustomerInfo(result.customerInfo);
       }
-      return { success: result.success, error: result.error };
+      return { success: result.success, error: result.error, customerInfo: result.customerInfo };
     } catch (err: any) {
       return { success: false, error: err.message || 'Purchase failed. Please try again.' };
     }

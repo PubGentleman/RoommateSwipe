@@ -31,9 +31,26 @@ export function useStripePayment() {
           purchase(rcPlan, billingCycle, effectivePlanType as 'renter' | 'host'),
           timeoutPromise,
         ]);
+
+        let subscriptionId: string | undefined;
+        if (result.success) {
+          const ci = result.customerInfo;
+          const activeEntitlements = ci?.entitlements?.active;
+          const firstEntitlementKey = activeEntitlements ? Object.keys(activeEntitlements)[0] : undefined;
+          subscriptionId =
+            ci?.activeSubscriptions?.[0] ||
+            (firstEntitlementKey ? activeEntitlements![firstEntitlementKey]?.productIdentifier : undefined) ||
+            undefined;
+
+          if (!subscriptionId) {
+            console.warn('[useStripePayment] Could not extract real subscription ID from RevenueCat result, using fallback');
+            subscriptionId = `rc_${plan}_${billingCycle}`;
+          }
+        }
+
         return {
           success: result.success,
-          subscriptionId: result.success ? `rc_${plan}_${billingCycle}` : undefined,
+          subscriptionId,
           error: result.success ? undefined : (result.error || 'Purchase could not be completed.'),
         };
       } catch (err: any) {
