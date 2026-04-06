@@ -60,7 +60,7 @@
           "sounds": []
         }
       ],
-      "@sentry/react-native",
+      ["@sentry/react-native", { "organization": "rhome-app", "project": "rhome-app" }],
       "expo-audio"
     ],
     "experiments": {
