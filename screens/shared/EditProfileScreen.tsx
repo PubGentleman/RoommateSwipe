@@ -366,6 +366,8 @@ export const EditProfileScreen = () => {
         }
       ]}
       onPress={onPress}
+      accessibilityLabel={`${label}${isSelected ? ', selected' : ''}`}
+      accessibilityRole="button"
     >
       <ThemedText style={[
         Typography.small,
@@ -386,6 +388,8 @@ export const EditProfileScreen = () => {
         }
       ]}
       onPress={onPress}
+      accessibilityLabel={`${label}${value ? ', enabled' : ', disabled'}`}
+      accessibilityRole="button"
     >
       <Feather name={icon} size={20} color={value ? '#FFFFFF' : theme.textSecondary} />
       <ThemedText style={[
@@ -406,6 +410,8 @@ export const EditProfileScreen = () => {
         <Pressable 
           style={styles.backButton}
           onPress={() => navigation.goBack()}
+          accessibilityLabel="Go back"
+          accessibilityRole="button"
         >
           <Feather name="arrow-left" size={24} color={theme.text} />
         </Pressable>
@@ -443,7 +449,7 @@ export const EditProfileScreen = () => {
               if (photo) {
                 return (
                   <View key={index} style={styles.photoGridItem}>
-                    <Image source={{ uri: photo }} style={styles.photoGridImage} />
+                    <Image source={{ uri: photo }} style={styles.photoGridImage} accessibilityLabel={`Profile photo ${index + 1}`} />
                     {isFirst ? (
                       <View style={[styles.mainBadge, { backgroundColor: theme.primary }]}>
                         <ThemedText style={styles.mainBadgeText}>Main</ThemedText>
@@ -452,6 +458,8 @@ export const EditProfileScreen = () => {
                     <TouchableOpacity
                       style={[styles.removePhotoButton, { backgroundColor: theme.error }]}
                       onPress={() => removePhoto(index)}
+                      accessibilityLabel={`Remove photo ${index + 1}`}
+                      accessibilityRole="button"
                     >
                       <Feather name="x" size={14} color="#fff" />
                     </TouchableOpacity>
@@ -466,6 +474,8 @@ export const EditProfileScreen = () => {
                             newPhotos[index] = temp;
                             setPhotos(newPhotos);
                           }}
+                          accessibilityLabel={`Move photo ${index + 1} left`}
+                          accessibilityRole="button"
                         >
                           <Feather name="arrow-left" size={14} color="#fff" />
                         </TouchableOpacity>
@@ -480,6 +490,8 @@ export const EditProfileScreen = () => {
                             newPhotos[index] = temp;
                             setPhotos(newPhotos);
                           }}
+                          accessibilityLabel={`Move photo ${index + 1} right`}
+                          accessibilityRole="button"
                         >
                           <Feather name="arrow-right" size={14} color="#fff" />
                         </TouchableOpacity>
@@ -505,6 +517,8 @@ export const EditProfileScreen = () => {
                   ]}
                   onPress={isNextSlot ? pickImage : undefined}
                   activeOpacity={isNextSlot ? 0.7 : 1}
+                  accessibilityLabel={isNextSlot ? `Add photo ${index + 1}` : `Empty photo slot ${index + 1}`}
+                  accessibilityRole="button"
                 >
                   {isNextSlot ? (
                     <>
@@ -545,6 +559,8 @@ export const EditProfileScreen = () => {
                   await disconnectInstagram();
                   await alert({ title: 'Disconnected', message: 'Instagram has been unlinked from your profile.', variant: 'info' });
                 }}
+                accessibilityLabel="Disconnect Instagram"
+                accessibilityRole="button"
               >
                 <ThemedText style={[Typography.small, { color: theme.error }]}>Disconnect</ThemedText>
               </Pressable>
@@ -561,6 +577,8 @@ export const EditProfileScreen = () => {
                   await alert({ title: 'Error', message: result.error || 'Could not connect Instagram', variant: 'warning' });
                 }
               }}
+              accessibilityLabel="Connect Instagram"
+              accessibilityRole="button"
             >
               <Feather name="instagram" size={16} color="#FFFFFF" />
               <ThemedText style={[Typography.small, { color: '#FFFFFF', fontWeight: '600' }]}>Connect Instagram</ThemedText>
@@ -582,6 +600,7 @@ export const EditProfileScreen = () => {
               placeholderTextColor={theme.textSecondary}
               value={name}
               onChangeText={setName}
+              accessibilityLabel="Name"
             />
           </View>
 
@@ -597,6 +616,7 @@ export const EditProfileScreen = () => {
               onChangeText={setEmail}
               keyboardType="email-address"
               autoCapitalize="none"
+              accessibilityLabel="Email"
             />
           </View>
 
@@ -612,6 +632,8 @@ export const EditProfileScreen = () => {
                 justifyContent: 'center',
               }]}
               onPress={() => setShowDatePicker(true)}
+              accessibilityLabel="Select date of birth"
+              accessibilityRole="button"
             >
               <ThemedText style={{ color: birthday ? theme.text : theme.textSecondary }}>
                 {birthday ? formatDate(birthday) : 'Select your birthday'}
@@ -649,6 +671,7 @@ export const EditProfileScreen = () => {
               multiline
               numberOfLines={4}
               textAlignVertical="top"
+              accessibilityLabel="Bio"
             />
           </View>
 
@@ -671,6 +694,7 @@ export const EditProfileScreen = () => {
               maxLength={500}
               numberOfLines={4}
               textAlignVertical="top"
+              accessibilityLabel="In your own words"
             />
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
               <Feather name="eye" size={11} color={theme.textSecondary} />
@@ -702,6 +726,7 @@ export const EditProfileScreen = () => {
               maxLength={500}
               numberOfLines={4}
               textAlignVertical="top"
+              accessibilityLabel="Your ideal roommate"
             />
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
               <Feather name="cpu" size={11} color="#a855f7" />
@@ -769,7 +794,7 @@ export const EditProfileScreen = () => {
                 {preferredNeighborhoods.map(hood => (
                   <View key={hood} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,107,91,0.15)', borderRadius: 10, paddingVertical: 6, paddingHorizontal: 10, borderWidth: 1, borderColor: '#ff6b5b' }}>
                     <ThemedText style={{ fontSize: 12, color: '#ff6b5b', marginRight: 6 }}>{hood}</ThemedText>
-                    <Pressable onPress={() => setPreferredNeighborhoods(prev => prev.filter(x => x !== hood))} hitSlop={8}>
+                    <Pressable onPress={() => setPreferredNeighborhoods(prev => prev.filter(x => x !== hood))} hitSlop={8} accessibilityLabel={`Remove ${hood}`} accessibilityRole="button">
                       <Feather name="x" size={12} color="#ff6b5b" />
                     </Pressable>
                   </View>
@@ -784,6 +809,8 @@ export const EditProfileScreen = () => {
                   <Pressable
                     onPress={() => setExpandedEditBoroughs(prev => prev.includes(borough) ? prev.filter(b => b !== borough) : [...prev, borough])}
                     style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, paddingHorizontal: 16 }}
+                    accessibilityLabel={`${borough}${isExpanded ? ', collapse' : ', expand'}`}
+                    accessibilityRole="button"
                   >
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                       <ThemedText style={{ fontSize: 14, fontWeight: '700', color: '#ff6b5b' }}>{borough}</ThemedText>
@@ -818,6 +845,8 @@ export const EditProfileScreen = () => {
                               borderWidth: 1.5, borderColor: isSelected ? '#ff6b5b' : '#2a2a2a',
                               opacity: disabled ? 0.3 : 1,
                             }}
+                            accessibilityLabel={`${hood}${isSelected ? ', selected' : ''}${disabled ? ', maximum reached' : ''}`}
+                            accessibilityRole="button"
                           >
                             <ThemedText style={{ fontSize: 12, color: isSelected ? '#ff6b5b' : '#ccc' }}>{hood}</ThemedText>
                           </Pressable>
@@ -842,6 +871,7 @@ export const EditProfileScreen = () => {
               onChangeText={setZipCode}
               keyboardType="numeric"
               maxLength={10}
+              accessibilityLabel="Zip code"
             />
           </View>
 
@@ -895,6 +925,7 @@ export const EditProfileScreen = () => {
                 placeholderTextColor={theme.textSecondary}
                 value={licenseNumber}
                 onChangeText={setLicenseNumber}
+                accessibilityLabel="License number"
               />
             </View>
             <View style={styles.inputGroup}>
@@ -909,6 +940,7 @@ export const EditProfileScreen = () => {
                 onChangeText={setLicenseState}
                 autoCapitalize="characters"
                 maxLength={2}
+                accessibilityLabel="License state"
               />
             </View>
             <View style={styles.inputGroup}>
@@ -921,6 +953,7 @@ export const EditProfileScreen = () => {
                 placeholderTextColor={theme.textSecondary}
                 value={brokerageName}
                 onChangeText={setBrokerageName}
+                accessibilityLabel="Brokerage or agency name"
               />
             </View>
           </View>
@@ -1036,6 +1069,7 @@ export const EditProfileScreen = () => {
                   value={budgetMin}
                   onChangeText={setBudgetMin}
                   keyboardType="numeric"
+                  accessibilityLabel="Minimum budget"
                 />
               </View>
               <View style={{ flex: 1 }}>
@@ -1047,6 +1081,7 @@ export const EditProfileScreen = () => {
                   value={budgetMax}
                   onChangeText={setBudgetMax}
                   keyboardType="numeric"
+                  accessibilityLabel="Maximum budget"
                 />
               </View>
             </View>
@@ -1075,6 +1110,8 @@ export const EditProfileScreen = () => {
                 justifyContent: 'center',
               }]}
               onPress={() => setShowMoveInPicker(true)}
+              accessibilityLabel="Select move-in date"
+              accessibilityRole="button"
             >
               <ThemedText style={{ color: moveInDate ? theme.text : theme.textSecondary }}>
                 {moveInDate ? formatDate(moveInDate) : 'Select move-in date'}
@@ -1104,6 +1141,7 @@ export const EditProfileScreen = () => {
               value={bedrooms}
               onChangeText={setBedrooms}
               keyboardType="numeric"
+              accessibilityLabel="Number of bedrooms"
             />
           </View>
 
@@ -1181,6 +1219,8 @@ export const EditProfileScreen = () => {
                   borderColor: piAutoMatchEnabled ? '#a855f7' : theme.border,
                 }
               ]}
+              accessibilityLabel={`Pi Auto-Match${piAutoMatchEnabled ? ', enabled' : ', disabled'}`}
+              accessibilityRole="button"
             >
               <Feather name="cpu" size={20} color={piAutoMatchEnabled ? '#FFFFFF' : theme.textSecondary} />
               <View style={{ flex: 1, marginLeft: Spacing.md }}>
@@ -1254,6 +1294,8 @@ export const EditProfileScreen = () => {
           style={[styles.saveButton, { backgroundColor: theme.primary, opacity: isSaving ? 0.6 : 1 }]}
           onPress={handleSave}
           disabled={isSaving}
+          accessibilityLabel={isSaving ? 'Saving profile' : 'Save changes'}
+          accessibilityRole="button"
         >
           <ThemedText style={[Typography.body, { color: '#FFFFFF', fontWeight: '600' }]}>
             {isSaving ? 'Saving...' : 'Save Changes'}

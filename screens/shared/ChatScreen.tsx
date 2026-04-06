@@ -1917,7 +1917,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
       const imgMeta = (msg as any).metadata;
       const imagesList = [{ url: imgMeta.url, thumbnailUrl: imgMeta.thumbnailUrl }];
       return (
-        <Pressable onLongPress={() => handleLongPressMessage(msg)} style={{ paddingHorizontal: 12, marginBottom: 8 }}>
+        <Pressable onLongPress={() => handleLongPressMessage(msg)} style={{ paddingHorizontal: 12, marginBottom: 8 }} accessibilityLabel={`Image message from ${isOwnMsg ? 'you' : (msg.senderName || 'other user')}`} accessibilityRole="button">
           <ChatImageMessage
             images={imagesList}
             isMine={isOwnMsg}
@@ -1935,7 +1935,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
     if (msgType === 'images' && (msg as any).metadata?.images) {
       const imagesList = (msg as any).metadata.images as { url: string; thumbnailUrl?: string }[];
       return (
-        <Pressable onLongPress={() => handleLongPressMessage(msg)} style={{ paddingHorizontal: 12, marginBottom: 8 }}>
+        <Pressable onLongPress={() => handleLongPressMessage(msg)} style={{ paddingHorizontal: 12, marginBottom: 8 }} accessibilityLabel={`Images message from ${isOwnMsg ? 'you' : (msg.senderName || 'other user')}`} accessibilityRole="button">
           <ChatImageMessage
             images={imagesList}
             isMine={isOwnMsg}
@@ -2034,6 +2034,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
       <Pressable
         onLongPress={() => !isDeleted && handleLongPressMessage(msg)}
         delayLongPress={300}
+        accessibilityLabel={`Message from ${isOwnMessage ? 'you' : (msg.senderName || otherUser?.name || 'other user')}`}
+        accessibilityRole="button"
         style={[
           styles.messageContainer,
           isOwnMessage ? styles.ownMessage : styles.otherMessage,
@@ -2086,6 +2088,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
         {replyTo && !isDeleted ? (
           <Pressable
             style={styles.replyPreview}
+            accessibilityLabel="Jump to replied message"
+            accessibilityRole="button"
             onPress={() => {
               const idx = messages.findIndex(m => m.id === replyTo.id);
               if (idx >= 0) {
@@ -2113,12 +2117,14 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
               autoFocus
               multiline
               onSubmitEditing={handleSaveEdit}
+              accessibilityLabel="Edit message"
+              accessibilityRole="text"
             />
             <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 6 }}>
-              <Pressable onPress={() => setEditingMessageId(null)}>
+              <Pressable onPress={() => setEditingMessageId(null)} accessibilityLabel="Cancel editing" accessibilityRole="button">
                 <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12 }}>Cancel</Text>
               </Pressable>
-              <Pressable onPress={handleSaveEdit}>
+              <Pressable onPress={handleSaveEdit} accessibilityLabel="Save edit" accessibilityRole="button">
                 <Text style={{ color: '#ff6b5b', fontSize: 12, fontWeight: '600' }}>Save</Text>
               </Pressable>
             </View>
@@ -2180,6 +2186,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
                 key={emoji}
                 style={styles.reactionBarEmoji}
                 onPress={() => handleToggleReaction(msg.id, emoji)}
+                accessibilityLabel={`React with ${emoji}`}
+                accessibilityRole="button"
               >
                 <Text style={{ fontSize: 20 }}>{emoji}</Text>
               </Pressable>
@@ -2187,6 +2195,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
             <Pressable
               style={[styles.reactionBarEmoji, { backgroundColor: 'rgba(255,255,255,0.1)' }]}
               onPress={() => { setEmojiPickerTargetId(msg.id); setShowEmojiPicker(true); setShowReactionBar(null); }}
+              accessibilityLabel="More reactions"
+              accessibilityRole="button"
             >
               <Feather name="plus" size={16} color="rgba(255,255,255,0.6)" />
             </Pressable>
@@ -2202,6 +2212,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
                   key={r.emoji}
                   style={[styles.reactionPill, isMine ? styles.reactionPillActive : null]}
                   onPress={() => handleToggleReaction(msg.id, r.emoji)}
+                  accessibilityLabel={`${r.emoji} reaction, ${r.count} ${r.count > 1 ? 'reactions' : 'reaction'}`}
+                  accessibilityRole="button"
                 >
                   <Text style={styles.reactionEmoji}>{r.emoji}</Text>
                   {r.count > 1 ? <Text style={styles.reactionCount}>{r.count}</Text> : null}
@@ -2225,6 +2237,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
               <Pressable
                 style={styles.readReceiptContainer}
                 onPress={() => { setPaywallFeature('Read Receipts'); setShowPaywall(true); }}
+                accessibilityLabel="Upgrade for read receipts"
+                accessibilityRole="button"
               >
                 <Feather name="check" size={12} color="rgba(255,255,255,0.2)" />
                 <PlanBadgeInline plan="Elite" locked />
@@ -2271,7 +2285,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
       {isInquiryChat ? (
         <>
           <View style={[styles.header, { backgroundColor: inquiryGroup?.isSuperInterest ? 'rgba(255,215,0,0.06)' : 'rgba(255,107,91,0.06)', paddingTop: insets.top + Spacing.lg }]}>
-            <Pressable onPress={() => navigation.goBack()} style={styles.backButton}>
+            <Pressable onPress={() => navigation.goBack()} style={styles.backButton} accessibilityLabel="Go back" accessibilityRole="button">
               <Feather name="arrow-left" size={24} color={theme.text} />
             </Pressable>
             <View style={[styles.headerCenter, { flex: 1 }]}>
@@ -2287,7 +2301,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
                 </ThemedText>
               </View>
             </View>
-            <Pressable onPress={() => setShowInquiryOptionsMenu(true)} style={styles.moreButton}>
+            <Pressable onPress={() => setShowInquiryOptionsMenu(true)} style={styles.moreButton} accessibilityLabel="More options" accessibilityRole="button">
               <Feather name="more-vertical" size={24} color={theme.text} />
             </Pressable>
           </View>
@@ -2303,6 +2317,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
                   onPress={handleAcceptInquiry}
                   disabled={isAccepting}
                   style={styles.acceptButton}
+                  accessibilityLabel="Accept inquiry"
+                  accessibilityRole="button"
                 >
                   <Feather name="check" size={14} color="#fff" />
                   <ThemedText style={{ fontSize: 12, fontWeight: '700', color: '#fff', marginLeft: 4 }}>
@@ -2313,6 +2329,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
                   onPress={handleDeclineInquiry}
                   disabled={isDeclining}
                   style={styles.declineButton}
+                  accessibilityLabel="Decline inquiry"
+                  accessibilityRole="button"
                 >
                   <Feather name="x" size={14} color="rgba(255,255,255,0.7)" />
                   <ThemedText style={{ fontSize: 12, fontWeight: '600', color: 'rgba(255,255,255,0.7)', marginLeft: 4 }}>
@@ -2332,7 +2350,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
           {inquiryGroup?.listingAddress ? (
             <Animated.View style={[styles.pinnedListingCard, addressFlashStyle]}>
               {inquiryGroup.listingPhoto ? (
-                <Image source={{ uri: inquiryGroup.listingPhoto }} style={styles.pinnedListingThumb} />
+                <Image source={{ uri: inquiryGroup.listingPhoto }} style={styles.pinnedListingThumb} accessibilityLabel="Listing photo" accessibilityRole="image" />
               ) : (
                 <View style={styles.pinnedListingThumbWrap}>
                   <Feather name="home" size={20} color="#ff6b5b" />
@@ -2361,7 +2379,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
                   </ThemedText>
                 ) : null}
                 {addressRevealed ? (
-                  <Pressable onPress={openDirections} style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+                  <Pressable onPress={openDirections} style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }} accessibilityLabel="Get directions" accessibilityRole="button">
                     <ThemedText style={{ fontSize: 11, color: '#ff6b5b', fontWeight: '600' }}>Get Directions</ThemedText>
                     <Feather name="arrow-right" size={11} color="#ff6b5b" style={{ marginLeft: 2 }} />
                   </Pressable>
@@ -2374,7 +2392,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
                     tabNav.navigate('Explore', { screen: 'ExploreMain', params: { viewListingId: inquiryGroup.listingId } });
                   }
                 }
-              }} style={{ paddingLeft: 8 }}>
+              }} style={{ paddingLeft: 8 }} accessibilityLabel="View listing" accessibilityRole="button">
                 <ThemedText style={{ fontSize: 12, color: '#ff6b5b', fontWeight: '600' }}>View Listing</ThemedText>
               </Pressable>
             </Animated.View>
@@ -2384,6 +2402,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
               onPress={() => {
                 navigation.navigate('MyGroup' as never);
               }}
+              accessibilityLabel="Schedule a tour"
+              accessibilityRole="button"
               style={{
                 flexDirection: 'row',
                 alignItems: 'center',
@@ -2415,14 +2435,14 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
         </>
       ) : (
         <View style={[styles.header, { backgroundColor: theme.backgroundRoot, paddingTop: insets.top + Spacing.lg }]}>
-          <Pressable onPress={() => navigation.goBack()} style={styles.backButton}>
+          <Pressable onPress={() => navigation.goBack()} style={styles.backButton} accessibilityLabel="Go back" accessibilityRole="button">
             <Feather name="arrow-left" size={24} color={theme.text} />
           </Pressable>
           <View style={styles.headerCenter}>
             {otherUser ? (
               <>
                 <View style={styles.avatarWrapper}>
-                  <Image source={{ uri: otherUser.photos?.[0] }} style={styles.headerAvatar} />
+                  <Image source={{ uri: otherUser.photos?.[0] }} style={styles.headerAvatar} accessibilityLabel={`${otherUser.name} avatar`} accessibilityRole="image" />
                   {canSeeOnlineStatus() ? (
                     <OnlineDot userId={otherUser.id} size="md" />
                   ) : null}
@@ -2475,7 +2495,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
               </>
             ) : (
               <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                <Pressable onPress={() => setShowMembersOverlay(true)}>
+                <Pressable onPress={() => setShowMembersOverlay(true)} accessibilityLabel="View group members" accessibilityRole="button">
                   <View style={{ flexDirection: 'row', width: Math.min(groupMembers.length, 3) * 22 + 18, height: 40 }}>
                     {(groupMembers.length > 0 ? groupMembers.slice(0, 3) : [null]).map((member, idx) => (
                       <View key={member?.id || 'fallback'} style={{ position: 'absolute', left: idx * 22, zIndex: 3 - idx }}>
@@ -2515,6 +2535,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
                     const groupId = conversationId.replace('group-', '');
                     navigation.navigate('GroupInfo' as any, { groupId, groupName });
                   }}
+                  accessibilityLabel="View group info"
+                  accessibilityRole="button"
                 >
                   <ThemedText style={[Typography.h3]}>{groupName}</ThemedText>
                   <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>
@@ -2529,7 +2551,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
           <AIFloatingButton onPress={() => setShowAISheet(true)} position="inline" size="sm" />
           {conversationId.startsWith('group-') && !isInquiryChat ? (
             <>
-              <Pressable onPress={handleGroupMuteToggle} style={styles.moreButton}>
+              <Pressable onPress={handleGroupMuteToggle} style={styles.moreButton} accessibilityLabel={isGroupMuted ? 'Unmute group' : 'Mute group'} accessibilityRole="button">
                 <Feather name={isGroupMuted ? 'bell-off' : 'bell'} size={18} color={isGroupMuted ? '#ef4444' : theme.textSecondary} />
               </Pressable>
               <Pressable
@@ -2541,6 +2563,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
                   });
                 }}
                 style={styles.moreButton}
+                accessibilityLabel="Group settings"
+                accessibilityRole="button"
               >
                 <Feather name="settings" size={20} color={theme.textSecondary} />
               </Pressable>
@@ -2555,13 +2579,15 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
                 });
               }}
               style={styles.moreButton}
+              accessibilityLabel="Group settings"
+              accessibilityRole="button"
             >
               <Feather name="settings" size={20} color={theme.textSecondary} />
             </Pressable>
           ) : (
             <>
               {otherUser ? (
-                <Pressable onPress={() => setShowAskAbout(true)} style={styles.moreButton}>
+                <Pressable onPress={() => setShowAskAbout(true)} style={styles.moreButton} accessibilityLabel="Ask AI about this person" accessibilityRole="button">
                   <Feather name="cpu" size={20} color="#FF6B6B" />
                 </Pressable>
               ) : null}
@@ -2571,10 +2597,12 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
                   (navigation as any).navigate('ConversationMedia', { matchId: mid, title: otherUser?.name ? `Media with ${otherUser.name}` : 'Shared Media' });
                 }}
                 style={styles.moreButton}
+                accessibilityLabel="View shared media"
+                accessibilityRole="button"
               >
                 <Feather name="grid" size={18} color={theme.textSecondary} />
               </Pressable>
-              <Pressable onPress={() => setShowOptionsMenu(true)} style={styles.moreButton}>
+              <Pressable onPress={() => setShowOptionsMenu(true)} style={styles.moreButton} accessibilityLabel="More options" accessibilityRole="button">
                 <Feather name="more-vertical" size={24} color={theme.text} />
               </Pressable>
             </>
@@ -2598,6 +2626,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
         <Pressable
           style={styles.menuOverlay}
           onPress={() => setShowOptionsMenu(false)}
+          accessibilityLabel="Close options menu"
+          accessibilityRole="button"
         >
           <View style={[styles.menuSheet, { backgroundColor: theme.card }]}>
             <View style={[styles.menuHandle, { backgroundColor: theme.border }]} />
@@ -2608,6 +2638,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
             <Pressable
               style={[styles.menuItem, { borderBottomColor: theme.border }]}
               onPress={() => { setShowOptionsMenu(false); handleCreateGroup(); }}
+              accessibilityLabel="Create group"
+              accessibilityRole="button"
             >
               <View style={[styles.menuIconCircle, { backgroundColor: theme.primary + '15' }]}>
                 <Feather name="users" size={18} color={theme.primary} />
@@ -2619,6 +2651,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
             <Pressable
               style={[styles.menuItem, { borderBottomWidth: 0 }]}
               onPress={() => { setShowOptionsMenu(false); setShowReportBlockModal(true); }}
+              accessibilityLabel="Report or block"
+              accessibilityRole="button"
             >
               <View style={[styles.menuIconCircle, { backgroundColor: '#EF444415' }]}>
                 <Feather name="alert-triangle" size={18} color="#EF4444" />
@@ -2630,6 +2664,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
             <Pressable
               style={[styles.menuCancelBtn, { backgroundColor: theme.background }]}
               onPress={() => setShowOptionsMenu(false)}
+              accessibilityLabel="Cancel"
+              accessibilityRole="button"
             >
               <ThemedText style={[Typography.body, { fontWeight: '600', textAlign: 'center' }]}>Cancel</ThemedText>
             </Pressable>
@@ -2646,6 +2682,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
         <Pressable
           style={styles.menuOverlay}
           onPress={() => setShowInquiryOptionsMenu(false)}
+          accessibilityLabel="Close options menu"
+          accessibilityRole="button"
         >
           <View style={[styles.menuSheet, { backgroundColor: theme.card }]}>
             <View style={[styles.menuHandle, { backgroundColor: theme.border }]} />
@@ -2655,6 +2693,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
 
             <Pressable
               style={[styles.menuItem, { borderBottomColor: theme.border }]}
+              accessibilityLabel="Leave inquiry"
+              accessibilityRole="button"
               onPress={async () => {
                 setShowInquiryOptionsMenu(false);
                 const leaveConfirmed = await confirm({
@@ -2678,6 +2718,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
             <Pressable
               style={[styles.menuItem, { borderBottomWidth: 0 }]}
               onPress={() => { setShowInquiryOptionsMenu(false); setShowReportBlockModal(true); }}
+              accessibilityLabel="Report or block"
+              accessibilityRole="button"
             >
               <View style={[styles.menuIconCircle, { backgroundColor: '#EF444415' }]}>
                 <Feather name="alert-triangle" size={18} color="#EF4444" />
@@ -2689,6 +2731,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
             <Pressable
               style={[styles.menuCancelBtn, { backgroundColor: theme.background }]}
               onPress={() => setShowInquiryOptionsMenu(false)}
+              accessibilityLabel="Cancel"
+              accessibilityRole="button"
             >
               <ThemedText style={[Typography.body, { fontWeight: '600', textAlign: 'center' }]}>Cancel</ThemedText>
             </Pressable>
@@ -2700,6 +2744,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
         <Pressable
           style={[styles.premiumBanner, { backgroundColor: theme.backgroundSecondary }]}
           onPress={() => setShowPaywall(true)}
+          accessibilityLabel="Upgrade to see online status"
+          accessibilityRole="button"
         >
           <Feather name="zap" size={18} color={theme.primary} />
           <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginLeft: Spacing.sm, flex: 1 }]}>
@@ -2713,12 +2759,14 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
         <Pressable
           style={[styles.groupBanner, { backgroundColor: theme.primary }]}
           onPress={handleCreateGroup}
+          accessibilityLabel={`Create a group with ${otherUser.name.split(' ')[0]}`}
+          accessibilityRole="button"
         >
           <Feather name="users" size={20} color="#FFFFFF" />
           <ThemedText style={[Typography.body, { color: '#FFFFFF', marginLeft: Spacing.md }]}>
             Create a group with {otherUser.name.split(' ')[0]} to find more roommates
           </ThemedText>
-          <Pressable onPress={() => setShowGroupOption(false)} style={styles.dismissButton}>
+          <Pressable onPress={() => setShowGroupOption(false)} style={styles.dismissButton} accessibilityLabel="Dismiss" accessibilityRole="button">
             <Feather name="x" size={20} color="#FFFFFF" />
           </Pressable>
         </Pressable>
@@ -2728,6 +2776,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
         <Pressable
           style={[styles.addPropertyBtn, { borderColor: theme.border }]}
           onPress={() => setShowPropertySearch(true)}
+          accessibilityLabel={linkedListing ? 'Change linked property' : 'Link a property'}
+          accessibilityRole="button"
         >
           <Feather
             name={linkedListing ? 'edit-2' : 'home'}
@@ -2745,6 +2795,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
           style={[styles.pinnedListingCard, {
             borderColor: linkedListing.status === 'rented' ? '#EF4444' : theme.border,
           }]}
+          accessibilityLabel={`View linked property: ${linkedListing.title}`}
+          accessibilityRole="button"
           onPress={() => {
             const tabNav = navigation.getParent();
             if (tabNav && linkedListing.id) {
@@ -2759,7 +2811,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
           }}
         >
           {linkedListing.photos?.[0] ? (
-            <Image source={{ uri: linkedListing.photos[0] }} style={styles.pinnedListingThumb} />
+            <Image source={{ uri: linkedListing.photos[0] }} style={styles.pinnedListingThumb} accessibilityLabel={`Linked property: ${linkedListing.title}`} accessibilityRole="image" />
           ) : (
             <View style={[styles.pinnedListingThumbWrap, { backgroundColor: theme.backgroundSecondary }]}>
               <Feather name="home" size={20} color="#ff6b5b" />
@@ -2849,6 +2901,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
           <Pressable
             onPress={() => { setMessageLoadError(false); loadMessages(); }}
             style={{ marginTop: 12, paddingHorizontal: 20, paddingVertical: 10, backgroundColor: theme.primary, borderRadius: 8 }}
+            accessibilityLabel="Retry loading messages"
+            accessibilityRole="button"
           >
             <Text style={{ color: '#fff', fontWeight: '600' }}>Retry</Text>
           </Pressable>
@@ -2897,6 +2951,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
             backgroundColor: 'rgba(245,158,11,0.1)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.25)',
             marginHorizontal: 16, marginBottom: 8, padding: 12, borderRadius: 12,
           }}
+          accessibilityLabel="Response delayed, tap for options"
+          accessibilityRole="button"
           onPress={async () => {
             if (chatHostInfo.hostType === 'agent') {
               if (chatHostInfo.companyId) {
@@ -2982,6 +3038,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
             <Pressable
               style={styles.paywallFreeUnlockButton}
               onPress={() => setShowUnlockModal(true)}
+              accessibilityLabel="Use free unlock"
+              accessibilityRole="button"
             >
               <Feather name="gift" size={14} color="#F59E0B" />
               <Text style={styles.paywallFreeUnlockText}>Use Free Unlock</Text>
@@ -2990,6 +3048,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
           <Pressable
             style={styles.paywallUpgradeButton}
             onPress={() => navigation.navigate('Plans' as any)}
+            accessibilityLabel="Upgrade plan"
+            accessibilityRole="button"
           >
             <Text style={styles.paywallUpgradeText}>
               {upgradePlan.plan} — {upgradePlan.price}
@@ -3026,7 +3086,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
         <Animated.View entering={FadeIn.duration(150)} style={styles.recordingOverlay}>
           <Animated.View style={[styles.recordingDot, { opacity: recordingDuration % 2 === 0 ? 1 : 0.4 }]} />
           <Text style={styles.recordingTimer}>{formatRecordingTime(recordingDuration)}</Text>
-          <Pressable onPress={cancelRecording}>
+          <Pressable onPress={cancelRecording} accessibilityLabel="Cancel recording" accessibilityRole="button">
             <Text style={styles.slideCancel}>Cancel</Text>
           </Pressable>
         </Animated.View>
@@ -3041,7 +3101,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
               {replyToMessage.text || replyToMessage.content || ''}
             </Text>
           </View>
-          <Pressable onPress={() => setReplyToMessage(null)}>
+          <Pressable onPress={() => setReplyToMessage(null)} accessibilityLabel="Cancel reply" accessibilityRole="button">
             <Feather name="x" size={18} color="rgba(255,255,255,0.4)" />
           </Pressable>
         </View>
@@ -3065,6 +3125,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
               style={styles.attachBtn}
               onPress={() => setShowAttachmentPicker(true)}
               disabled={uploadingAttachment || messagingLocked}
+              accessibilityLabel="Add attachment"
+              accessibilityRole="button"
             >
               {uploadingAttachment ? (
                 <ActivityIndicator size="small" color="#ff6b5b" />
@@ -3076,6 +3138,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
               <Pressable
                 onPress={() => setShowChatActions(true)}
                 style={[styles.chatActionBtn, { backgroundColor: theme.backgroundSecondary }]}
+                accessibilityLabel="Chat actions"
+                accessibilityRole="button"
               >
                 <Feather name="plus" size={22} color="#ff6b5b" />
               </Pressable>
@@ -3118,6 +3182,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
                 multiline
                 maxLength={500}
                 editable={!inquiryGroup?.isArchived && canSendMessage()}
+                accessibilityLabel="Message input"
               />
             )}
             {inputText.trim() ? (
@@ -3128,6 +3193,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
                   { backgroundColor: canSendMessage() ? theme.primary : theme.backgroundSecondary },
                 ]}
                 disabled={!canSendMessage()}
+                accessibilityLabel="Send message"
+                accessibilityRole="button"
               >
                 <Feather name="send" size={20} color="#FFFFFF" />
               </Pressable>
@@ -3139,6 +3206,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
                   styles.sendButton,
                   { backgroundColor: isRecording ? '#EF4444' : theme.backgroundSecondary },
                 ]}
+                accessibilityLabel={isRecording ? 'Stop recording' : 'Record voice message'}
+                accessibilityRole="button"
               >
                 <Feather name="mic" size={20} color={isRecording ? '#FFF' : theme.text} />
               </Pressable>
@@ -3219,12 +3288,14 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
       ) : null}
 
       <Modal visible={showChatActions} transparent animationType="fade" onRequestClose={() => setShowChatActions(false)}>
-        <Pressable style={styles.menuOverlay} onPress={() => setShowChatActions(false)}>
+        <Pressable style={styles.menuOverlay} onPress={() => setShowChatActions(false)} accessibilityLabel="Close chat actions" accessibilityRole="button">
           <View style={[styles.menuSheet, { backgroundColor: theme.backgroundSecondary }]}>
             <View style={[styles.menuHandle, { backgroundColor: theme.border }]} />
             <Pressable
               style={[styles.menuItem, { borderBottomColor: theme.border }]}
               onPress={() => { setShowChatActions(false); setShowVisitModal(true); }}
+              accessibilityLabel="Schedule visit"
+              accessibilityRole="button"
             >
               <View style={[styles.menuIconCircle, { backgroundColor: 'rgba(255,107,91,0.15)' }]}>
                 <Feather name="home" size={18} color="#ff6b5b" />
@@ -3240,6 +3311,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
               <Pressable
                 style={[styles.menuItem, { borderBottomColor: theme.border }]}
                 onPress={() => { setShowChatActions(false); setShowBookingModal(true); }}
+                accessibilityLabel="Send booking offer"
+                accessibilityRole="button"
               >
                 <View style={[styles.menuIconCircle, { backgroundColor: 'rgba(255,215,0,0.15)' }]}>
                   <Feather name="key" size={18} color="#D4AF37" />
@@ -3255,6 +3328,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
             <Pressable
               style={styles.menuCancelBtn}
               onPress={() => setShowChatActions(false)}
+              accessibilityLabel="Cancel"
+              accessibilityRole="button"
             >
               <ThemedText style={[Typography.body, { color: theme.textSecondary, textAlign: 'center' }]}>Cancel</ThemedText>
             </Pressable>
@@ -3308,7 +3383,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
 
       {showEmojiPicker ? (
         <Modal transparent animationType="fade" onRequestClose={() => setShowEmojiPicker(false)}>
-          <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' }} onPress={() => setShowEmojiPicker(false)}>
+          <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' }} onPress={() => setShowEmojiPicker(false)} accessibilityLabel="Close emoji picker" accessibilityRole="button">
             <View style={{ backgroundColor: '#1a1a1a', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 40 }}>
               <Text style={{ color: '#fff', fontWeight: '600', fontSize: 16, marginBottom: 12 }}>Add Reaction</Text>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
@@ -3316,6 +3391,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
                   <Pressable
                     key={emoji}
                     style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.06)', alignItems: 'center', justifyContent: 'center' }}
+                    accessibilityLabel={`React with ${emoji}`}
+                    accessibilityRole="button"
                     onPress={() => {
                       if (emojiPickerTargetId) {
                         handleToggleReaction(emojiPickerTargetId, emoji);
@@ -3347,6 +3424,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
               <Pressable
                 style={styles.unlockModalButton}
                 onPress={handleUnlockConversation}
+                accessibilityLabel="Unlock this conversation"
+                accessibilityRole="button"
               >
                 <Feather name="unlock" size={16} color="#000" />
                 <Text style={styles.unlockModalButtonText}>Unlock This Conversation</Text>
@@ -3354,6 +3433,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
               <Pressable
                 style={styles.unlockModalSecondary}
                 onPress={() => setShowUnlockModal(false)}
+                accessibilityLabel="Save for later"
+                accessibilityRole="button"
               >
                 <Text style={styles.unlockModalSecondaryText}>Save For Later</Text>
               </Pressable>
@@ -3363,8 +3444,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
       ) : null}
 
       <Modal visible={showDailyLimitModal} transparent animationType="fade" onRequestClose={() => setShowDailyLimitModal(false)}>
-        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center' }} onPress={() => { setShowDailyLimitModal(false); setUpgradePromptData(null); }}>
-          <Pressable onPress={() => {}}>
+        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center' }} onPress={() => { setShowDailyLimitModal(false); setUpgradePromptData(null); }} accessibilityLabel="Close" accessibilityRole="button">
+          <Pressable onPress={() => {}} accessibilityRole="none">
             {upgradePromptData ? (
               <SmartUpgradePrompt
                 data={upgradePromptData}
@@ -3405,6 +3486,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
                 setShowChatLimitModal(false);
                 (navigation as any).navigate('Plans');
               }}
+              accessibilityLabel={userPlan === 'basic' ? 'Upgrade to Plus' : 'Upgrade to Elite'}
+              accessibilityRole="button"
             >
               <ThemedText style={[Typography.h3, { color: '#FFFFFF' }]}>
                 {userPlan === 'basic' ? 'Upgrade to Plus (10 chats)' : 'Upgrade to Elite (Unlimited)'}
@@ -3413,6 +3496,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
             <Pressable
               style={{ paddingVertical: 14, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: theme.border }}
               onPress={() => setShowChatLimitModal(false)}
+              accessibilityLabel="Maybe later"
+              accessibilityRole="button"
             >
               <ThemedText style={[Typography.h3, { color: theme.textSecondary }]}>Maybe Later</ThemedText>
             </Pressable>
@@ -3428,14 +3513,17 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
         <Pressable
           style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 24 }}
           onPress={() => setShowMembersOverlay(false)}
+          accessibilityLabel="Close members overlay"
+          accessibilityRole="button"
         >
           <Pressable
             style={{ backgroundColor: theme.card || theme.backgroundDefault, borderRadius: 20, width: '100%', maxWidth: 360, maxHeight: '70%', overflow: 'hidden' }}
             onPress={() => {}}
+            accessibilityRole="none"
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderBottomColor: theme.border }}>
               <ThemedText style={[Typography.h3]}>Group Members</ThemedText>
-              <Pressable onPress={() => setShowMembersOverlay(false)} hitSlop={8}>
+              <Pressable onPress={() => setShowMembersOverlay(false)} hitSlop={8} accessibilityLabel="Close" accessibilityRole="button">
                 <Feather name="x" size={20} color={theme.textSecondary} />
               </Pressable>
             </View>
@@ -3450,6 +3538,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
                     borderRadius: 14, borderWidth: 1, borderColor: theme.border,
                     marginBottom: 8, backgroundColor: theme.background || theme.backgroundRoot,
                   }}
+                  accessibilityLabel={`${item.name}${item.id === user?.id ? ', you' : ''}`}
+                  accessibilityRole="button"
                   onPress={() => {
                     setShowMembersOverlay(false);
                     if (item.id !== user?.id) {
@@ -3459,7 +3549,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
                   }}
                 >
                   {item.photo ? (
-                    <Image source={{ uri: item.photo }} style={{ width: 52, height: 52, borderRadius: 26 }} />
+                    <Image source={{ uri: item.photo }} style={{ width: 52, height: 52, borderRadius: 26 }} accessibilityLabel={`${item.name} photo`} accessibilityRole="image" />
                   ) : (
                     <View style={{
                       width: 52, height: 52, borderRadius: 26,

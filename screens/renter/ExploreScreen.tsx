@@ -1642,6 +1642,8 @@ export const ExploreScreen = () => {
               : 'rgba(96, 165, 250, 0.25)',
           } : null,
         ]}
+        accessibilityLabel={`${item.title}, $${item.price?.toLocaleString()} per month, ${item.bedrooms} bedroom${item.bedrooms !== 1 ? 's' : ''}`}
+        accessibilityRole="button"
         onPress={() => {
           const viewCheck = canViewListing();
           if (!viewCheck.canView) {
@@ -1659,7 +1661,7 @@ export const ExploreScreen = () => {
         }}
       >
         <View style={styles.cardPhoto}>
-          <Image source={{ uri: item.photos[0] }} style={styles.photoBg} />
+          <Image source={{ uri: item.photos[0] }} style={styles.photoBg} accessibilityLabel={`Photo of ${item.title}`} accessibilityRole="image" />
           <LinearGradient
             colors={['transparent', 'rgba(0,0,0,0.88)']}
             style={styles.photoGradient}
@@ -1731,6 +1733,8 @@ export const ExploreScreen = () => {
           <Pressable
             style={[styles.saveBtn, saved.has(item.id) ? styles.saveBtnActive : null]}
             onPress={() => toggleSave(item.id)}
+            accessibilityLabel={saved.has(item.id) ? 'Unsave listing' : 'Save listing'}
+            accessibilityRole="button"
           >
             <Feather
               name="heart"
@@ -1843,6 +1847,8 @@ export const ExploreScreen = () => {
                 setShowNeighborhoodSheet(true);
               }}
               style={styles.areaInfoPill}
+              accessibilityLabel="View area info"
+              accessibilityRole="button"
             >
               <Feather name="cpu" size={11} color="#ff6b5b" />
               <Text style={styles.areaInfoPillText}>Area info</Text>
@@ -1892,6 +1898,8 @@ export const ExploreScreen = () => {
                 });
               }
             }}
+            accessibilityLabel={`View host profile: ${itemHostType === 'company' && hostUser?.companyName ? hostUser.companyName : hostName}`}
+            accessibilityRole="button"
           >
             <View style={styles.hostRow}>
               <LinearGradient colors={avatarGradient} style={styles.hostAvatar}>
@@ -1964,6 +1972,8 @@ export const ExploreScreen = () => {
                   params: { listingId: item.id },
                 });
               }}
+              accessibilityLabel={`${discoverableGroups.get(item.id)} ${discoverableGroups.get(item.id) === 1 ? 'person' : 'people'} forming a group for this listing`}
+              accessibilityRole="button"
             >
               <Feather name="users" size={12} color="#ff6b5b" />
               <Text style={styles.groupDiscoveryText}>
@@ -1978,6 +1988,8 @@ export const ExploreScreen = () => {
                 e.stopPropagation?.();
                 handleInterestPress(item);
               }}
+              accessibilityLabel="I'm Interested in this listing"
+              accessibilityRole="button"
             >
               <Feather name="heart" size={14} color={ACCENT} />
               <Text style={styles.inquireTogetherText}>I'm Interested</Text>
@@ -2012,6 +2024,8 @@ export const ExploreScreen = () => {
           <Pressable
             style={[styles.retryButton, { backgroundColor: theme.primary, marginTop: Spacing.xl }]}
             onPress={loadProperties}
+            accessibilityLabel="Retry loading properties"
+            accessibilityRole="button"
           >
             <Feather name="refresh-cw" size={20} color="#FFFFFF" />
             <ThemedText style={[Typography.body, { color: '#FFFFFF', marginLeft: Spacing.sm, fontWeight: '600' }]}>
@@ -2112,7 +2126,7 @@ export const ExploreScreen = () => {
         }
         bottomContent={
           <View style={{ paddingHorizontal: 16 }}>
-            <Pressable style={styles.locationPickerBtn} onPress={() => setShowLocationSheet(true)}>
+            <Pressable style={styles.locationPickerBtn} onPress={() => setShowLocationSheet(true)} accessibilityLabel={`Location: ${activeCity || 'Select City'}${selectedNeighborhood ? ', ' + selectedNeighborhood : ''}`} accessibilityRole="button">
               <Feather name="map-pin" size={14} color={ACCENT} />
               <View style={styles.locationPickerText}>
                 <Text style={styles.locationCity} numberOfLines={1}>{activeCity || 'Select City'}</Text>
@@ -2132,6 +2146,8 @@ export const ExploreScreen = () => {
           <Pressable
             style={viewMode === 'all' ? styles.tabActive : styles.tabInactive}
             onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setViewMode('all'); }}
+            accessibilityLabel="All Listings"
+            accessibilityRole="button"
           >
             {viewMode === 'all' ? (
               <LinearGradient colors={[ACCENT, '#e83a2a']} style={styles.tabGradient}>
@@ -2148,6 +2164,8 @@ export const ExploreScreen = () => {
           <Pressable
             style={viewMode === 'saved' ? styles.tabActive : styles.tabInactive}
             onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setViewMode('saved'); }}
+            accessibilityLabel={`Saved${saved.size > 0 ? `, ${saved.size} items` : ''}`}
+            accessibilityRole="button"
           >
             {viewMode === 'saved' ? (
               <LinearGradient colors={[ACCENT, '#e83a2a']} style={styles.tabGradient}>
@@ -2176,6 +2194,8 @@ export const ExploreScreen = () => {
           <Pressable
             style={viewMode === 'forYou' ? styles.tabActive : styles.tabInactive}
             onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setViewMode('forYou'); }}
+            accessibilityLabel="For You"
+            accessibilityRole="button"
           >
             {viewMode === 'forYou' ? (
               <LinearGradient colors={['#6C5CE7', '#5a4bd6']} style={styles.tabGradient}>
@@ -2201,7 +2221,7 @@ export const ExploreScreen = () => {
             LEASE_TYPE_CHIPS.map(t => {
               const active = leaseTypeFilter.includes(t.key);
               return (
-                <Pressable key={t.key} style={active ? styles.chipSelected : styles.chipUnselected} onPress={() => handleLeaseTypeChip(t.key)}>
+                <Pressable key={t.key} style={active ? styles.chipSelected : styles.chipUnselected} onPress={() => handleLeaseTypeChip(t.key)} accessibilityLabel={`${t.label} filter${active ? ', selected' : ''}`} accessibilityRole="button">
                   <Feather name={t.icon} size={11} color={active ? '#fff' : 'rgba(255,255,255,0.45)'} />
                   <Text style={active ? styles.chipSelectedText : styles.chipUnselectedText}>{t.label}</Text>
                 </Pressable>
@@ -2211,7 +2231,7 @@ export const ExploreScreen = () => {
             LISTING_TYPE_CHIPS.map(t => {
               const active = listingTypeFilter.includes(t.key);
               return (
-                <Pressable key={t.key} style={active ? styles.chipSelected : styles.chipUnselected} onPress={() => handleListingTypeChip(t.key)}>
+                <Pressable key={t.key} style={active ? styles.chipSelected : styles.chipUnselected} onPress={() => handleListingTypeChip(t.key)} accessibilityLabel={`${t.label} filter${active ? ', selected' : ''}`} accessibilityRole="button">
                   <Feather name={t.icon} size={11} color={active ? '#fff' : 'rgba(255,255,255,0.45)'} />
                   <Text style={active ? styles.chipSelectedText : styles.chipUnselectedText}>{t.label}</Text>
                 </Pressable>
@@ -2221,7 +2241,7 @@ export const ExploreScreen = () => {
           {QUICK_FILTERS.map(f => {
             const active = activeQuickFilters.has(f.key);
             return (
-              <Pressable key={f.key} style={active ? styles.chipSelected : styles.chipUnselected} onPress={() => toggleQuickFilter(f.key)}>
+              <Pressable key={f.key} style={active ? styles.chipSelected : styles.chipUnselected} onPress={() => toggleQuickFilter(f.key)} accessibilityLabel={`${f.label} filter${active ? ', selected' : ''}`} accessibilityRole="button">
                 {f.icon ? <Feather name={f.icon} size={10} color={active ? '#fff' : 'rgba(255,255,255,0.45)'} /> : null}
                 <Text style={active ? styles.chipSelectedText : styles.chipUnselectedText}>{f.label}</Text>
               </Pressable>
@@ -2239,16 +2259,16 @@ export const ExploreScreen = () => {
           {advancedFilterChips.map((chip) => (
             <View key={chip.key} style={styles.activeChip}>
               <Text style={styles.activeChipText}>{chip.label}</Text>
-              <Pressable onPress={() => removeAdvancedFilter(chip.key)} hitSlop={6}>
+              <Pressable onPress={() => removeAdvancedFilter(chip.key)} hitSlop={6} accessibilityLabel={`Remove ${chip.label} filter`} accessibilityRole="button">
                 <Feather name="x-circle" size={14} color="#6C5CE7" />
               </Pressable>
             </View>
           ))}
-          <Pressable style={styles.saveSearchChip} onPress={() => setShowSaveSearchSheet(true)}>
+          <Pressable style={styles.saveSearchChip} onPress={() => setShowSaveSearchSheet(true)} accessibilityLabel="Save search" accessibilityRole="button">
             <Feather name="bookmark" size={12} color="#6C5CE7" />
             <Text style={styles.saveSearchChipText}>Save Search</Text>
           </Pressable>
-          <Pressable style={styles.clearAllChip} onPress={handleClearFilters}>
+          <Pressable style={styles.clearAllChip} onPress={handleClearFilters} accessibilityLabel="Clear all filters" accessibilityRole="button">
             <Text style={styles.clearAllText}>Clear all</Text>
           </Pressable>
         </ScrollView>
@@ -2277,6 +2297,8 @@ export const ExploreScreen = () => {
                       <Pressable
                         style={styles.forYouUpgradeButton}
                         onPress={() => { setPaywallFeature('Unlimited For You Recommendations'); setPaywallPlan('plus'); setShowPaywall(true); }}
+                        accessibilityLabel="View plans to unlock more recommendations"
+                        accessibilityRole="button"
                       >
                         <Text style={styles.forYouUpgradeText}>View Plans</Text>
                       </Pressable>
@@ -2397,6 +2419,8 @@ export const ExploreScreen = () => {
                       alignItems: 'center',
                       gap: 12,
                     }}
+                    accessibilityLabel={`Complete your profile, ${profileCompletion}% done`}
+                    accessibilityRole="button"
                   >
                     <View style={{
                       width: 44,
@@ -2430,6 +2454,8 @@ export const ExploreScreen = () => {
                         setProfileNudgeDismissed(true);
                       }}
                       hitSlop={8}
+                      accessibilityLabel="Dismiss profile completion nudge"
+                      accessibilityRole="button"
                     >
                       <Feather name="x" size={16} color="rgba(255,255,255,0.3)" />
                     </Pressable>
@@ -2526,6 +2552,8 @@ export const ExploreScreen = () => {
         <Pressable
           style={styles.inquireModalOverlay}
           onPress={() => { setShowUnifiedInterestSheet(false); setIsSuperInterest(false); }}
+          accessibilityLabel="Close interest sheet"
+          accessibilityRole="button"
         >
           <Pressable style={styles.inquireSheet} onPress={() => {}}>
             <View style={styles.inquireSheetHandle} />
@@ -2579,6 +2607,8 @@ export const ExploreScreen = () => {
               maxLength={150}
               blurOnSubmit
               returnKeyType="done"
+              accessibilityLabel="Add a note to the host"
+              accessibilityRole="text"
             />
             <Text style={styles.charCount}>{interestNote?.length || 0}/150</Text>
             <Pressable
@@ -2589,6 +2619,8 @@ export const ExploreScreen = () => {
               ]}
               onPress={() => handleSendUnifiedInterest(interestNote || '')}
               disabled={sendingInterest}
+              accessibilityLabel={sendingInterest ? 'Sending interest' : isSuperInterest ? 'Send Super Interest' : 'Send Interest'}
+              accessibilityRole="button"
             >
               <LinearGradient
                 colors={isSuperInterest ? ['#FFD700', '#FFA500'] : [ACCENT, '#e83a2a']}
@@ -2604,6 +2636,8 @@ export const ExploreScreen = () => {
             <Pressable
               style={styles.inquireCancelBtn}
               onPress={() => { setShowUnifiedInterestSheet(false); setIsSuperInterest(false); }}
+              accessibilityLabel="Cancel"
+              accessibilityRole="button"
             >
               <Text style={styles.inquireCancelText}>Cancel</Text>
             </Pressable>
@@ -2685,6 +2719,8 @@ export const ExploreScreen = () => {
                       style={styles.pdFlagBtn}
                       onPress={() => setShowListingReport(true)}
                       hitSlop={8}
+                      accessibilityLabel="Report listing"
+                      accessibilityRole="button"
                     >
                       <Feather name="flag" size={16} color="#fff" />
                     </Pressable>
@@ -2692,6 +2728,8 @@ export const ExploreScreen = () => {
                       style={[styles.pdFlagBtn, saved.has(selectedProperty.id) && { backgroundColor: 'rgba(255,107,91,0.85)' }]}
                       onPress={() => { if (selectedProperty) toggleSave(selectedProperty.id); }}
                       hitSlop={8}
+                      accessibilityLabel={saved.has(selectedProperty.id) ? 'Unsave listing' : 'Save listing'}
+                      accessibilityRole="button"
                     >
                       <Feather name="bookmark" size={16} color={saved.has(selectedProperty.id) ? '#fff' : '#fff'} />
                     </Pressable>
@@ -2699,6 +2737,8 @@ export const ExploreScreen = () => {
                       style={styles.pdCloseBtn}
                       onPress={() => setShowPropertyDetail(false)}
                       hitSlop={8}
+                      accessibilityLabel="Close listing detail"
+                      accessibilityRole="button"
                     >
                       <Feather name="x" size={18} color="#fff" />
                     </Pressable>
@@ -2782,6 +2822,8 @@ export const ExploreScreen = () => {
                             });
                           }
                         }}
+                        accessibilityLabel={`View host profile: ${detailHostType === 'company' && detailHostUser?.companyName ? detailHostUser.companyName : selectedProperty.hostName || 'Host'}`}
+                        accessibilityRole="button"
                       >
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                         {detailHostPhoto ? (
@@ -2827,6 +2869,8 @@ export const ExploreScreen = () => {
                                 if (hId) setHostReviewsTarget({ id: hId, name: selectedProperty.hostName || 'Host' });
                               }}
                               style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}
+                              accessibilityLabel={`Host reviews: ${detailHostUser?.hostAvgRating} rating, ${detailHostUser?.hostReviewCount} reviews`}
+                              accessibilityRole="button"
                             >
                               <Feather name="star" size={10} color="#a78bfa" />
                               <Text style={{ fontSize: 10, fontWeight: '700', color: '#a78bfa' }}>
@@ -2909,6 +2953,8 @@ export const ExploreScreen = () => {
                               }
                             }}
                             style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, marginTop: 4 }}
+                            accessibilityLabel="View full host profile"
+                            accessibilityRole="button"
                           >
                             <Text style={{ fontSize: 13, fontWeight: '600', color: '#3b82f6' }}>View Full Profile</Text>
                             <Feather name="chevron-right" size={13} color="#3b82f6" />
@@ -2933,6 +2979,8 @@ export const ExploreScreen = () => {
                               setShowMatchBreakdown(true);
                             }
                           }}
+                          accessibilityLabel={`${detailCompatibility}% match, tap for breakdown`}
+                          accessibilityRole="button"
                         >
                           <Feather name="heart" size={13} color="#ff6b5b" />
                           <Text style={styles.pdMatchPillText}>{detailCompatibility}% Match</Text>
@@ -3025,6 +3073,8 @@ export const ExploreScreen = () => {
                                 setPaywallPlan('plus');
                                 setShowPaywall(true);
                               }}
+                              accessibilityLabel="Unlock Walk Score, upgrade to Plus"
+                              accessibilityRole="button"
                             >
                               <Feather name="lock" size={16} color="rgba(255,255,255,0.3)" />
                               <View style={{ flex: 1, marginLeft: 10 }}>
@@ -3137,6 +3187,8 @@ export const ExploreScreen = () => {
                               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                               setAreaDetailModal({ visible: true, category: 'transit' });
                             }}
+                            accessibilityLabel={`Transit: ${areaInfo.transit.length > 0 ? `${areaInfo.transit.length} stops nearby` : 'None found nearby'}`}
+                            accessibilityRole="button"
                           >
                             <View style={styles.pdAreaInfoIconWrap}>
                               <Feather name="navigation" size={16} color={ACCENT} />
@@ -3157,6 +3209,8 @@ export const ExploreScreen = () => {
                               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                               setAreaDetailModal({ visible: true, category: 'restaurants' });
                             }}
+                            accessibilityLabel={`Restaurants: ${areaInfo.restaurants.length > 0 ? `${areaInfo.restaurants.length} nearby` : 'None found nearby'}`}
+                            accessibilityRole="button"
                           >
                             <View style={styles.pdAreaInfoIconWrap}>
                               <Feather name="coffee" size={16} color={ACCENT} />
@@ -3175,6 +3229,8 @@ export const ExploreScreen = () => {
                               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                               setAreaDetailModal({ visible: true, category: 'grocery' });
                             }}
+                            accessibilityLabel={`Grocery: ${formatNearestAmenity(areaInfo.grocery)}`}
+                            accessibilityRole="button"
                           >
                             <View style={styles.pdAreaInfoIconWrap}>
                               <Feather name="shopping-bag" size={16} color={ACCENT} />
@@ -3191,6 +3247,8 @@ export const ExploreScreen = () => {
                               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                               setAreaDetailModal({ visible: true, category: 'laundry' });
                             }}
+                            accessibilityLabel="Laundromat nearby"
+                            accessibilityRole="button"
                           >
                             <View style={styles.pdAreaInfoIconWrap}>
                               <Feather name="briefcase" size={16} color={ACCENT} />
@@ -3213,6 +3271,8 @@ export const ExploreScreen = () => {
                               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                               setAreaDetailModal({ visible: true, category: 'parks' });
                             }}
+                            accessibilityLabel={`Parks: ${formatNearestAmenity(areaInfo.parks)}`}
+                            accessibilityRole="button"
                           >
                             <View style={styles.pdAreaInfoIconWrap}>
                               <Feather name="sun" size={16} color={ACCENT} />
@@ -3230,6 +3290,8 @@ export const ExploreScreen = () => {
                     <Pressable
                       onPress={() => setShowNeighborhoodSheet(true)}
                       style={styles.pdNeighborhoodBtn}
+                      accessibilityLabel="Get detailed neighborhood insights"
+                      accessibilityRole="button"
                     >
                       <Feather name="cpu" size={16} color="#ff6b5b" />
                       <View style={{ flex: 1 }}>
@@ -3294,6 +3356,8 @@ export const ExploreScreen = () => {
                         <Pressable
                           style={styles.pdReviewsBtn}
                           onPress={() => setShowReviewsModal(true)}
+                          accessibilityLabel={`See all ${detailReviewSummary.reviewCount} reviews`}
+                          accessibilityRole="button"
                         >
                           <Feather name="message-square" size={16} color="#ff6b5b" />
                           <Text style={styles.pdReviewsBtnText}>
@@ -3308,6 +3372,8 @@ export const ExploreScreen = () => {
                           <Pressable
                             style={[styles.pdReviewsBtn, { marginTop: detailReviewSummary?.reviewCount ? 8 : 0 }]}
                             onPress={() => setShowWriteReview(true)}
+                            accessibilityLabel={detailReviewSummary && detailReviewSummary.reviewCount > 0 ? 'Write a review' : 'Be the first to review'}
+                            accessibilityRole="button"
                           >
                             <Feather name="edit-3" size={16} color="#ff6b5b" />
                             <Text style={styles.pdReviewsBtnText}>
@@ -3351,6 +3417,8 @@ export const ExploreScreen = () => {
                                   setAreaInfoListingId(null);
                                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                                 }}
+                                accessibilityLabel={`Similar listing: ${nl.title}, $${nl.price?.toLocaleString()} per month`}
+                                accessibilityRole="button"
                               >
                                 <Image
                                   source={{ uri: nl.photos?.[0] || 'https://via.placeholder.com/160x100' }}
@@ -3376,6 +3444,8 @@ export const ExploreScreen = () => {
                           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                           setShowTourModal(true);
                         }}
+                        accessibilityLabel="Schedule Tour"
+                        accessibilityRole="button"
                       >
                         <Feather name="calendar" size={16} color="#ff6b5b" />
                         <Text style={styles.pdQuickActionText}>Schedule Tour</Text>
@@ -3386,6 +3456,8 @@ export const ExploreScreen = () => {
                           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                           setShowInquiryModal(true);
                         }}
+                        accessibilityLabel="Send Inquiry"
+                        accessibilityRole="button"
                       >
                         <Feather name="mail" size={16} color="#ff6b5b" />
                         <Text style={styles.pdQuickActionText}>Send Inquiry</Text>
@@ -3437,6 +3509,8 @@ export const ExploreScreen = () => {
                     <Pressable
                       style={[styles.pdActionPrimary, { backgroundColor: '#22c55e' }]}
                       onPress={() => { setShowPropertyDetail(false); navigation.navigate('Messages' as never); }}
+                      accessibilityLabel="Accepted, chat now"
+                      accessibilityRole="button"
                     >
                       <Feather name="message-circle" size={18} color="#fff" />
                       <Text style={styles.pdActionPrimaryText}>Accepted — Chat Now</Text>
@@ -3460,6 +3534,8 @@ export const ExploreScreen = () => {
                   <Pressable
                     style={[styles.pdActionPrimary, { backgroundColor: isSuperInterest ? '#FFD700' : '#ff6b5b', flex: eligibleGroups.length > 0 ? 1.4 : 1 }]}
                     onPress={handleInterestPress}
+                    accessibilityLabel={isSuperInterest ? 'Send Super Interest' : "I'm Interested"}
+                    accessibilityRole="button"
                   >
                     <Feather name={isSuperInterest ? 'star' : 'heart'} size={18} color={isSuperInterest ? '#000' : '#fff'} />
                     <Text style={[styles.pdActionPrimaryText, { color: isSuperInterest ? '#000' : '#fff' }]}>
@@ -3473,6 +3549,8 @@ export const ExploreScreen = () => {
                           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                         }}
                         style={[styles.pdSuperToggle, isSuperInterest ? { backgroundColor: 'rgba(0,0,0,0.15)' } : { backgroundColor: 'rgba(255,255,255,0.2)' }]}
+                        accessibilityLabel={isSuperInterest ? 'Disable Super Interest' : 'Enable Super Interest'}
+                        accessibilityRole="button"
                       >
                         <Feather name="star" size={13} color={isSuperInterest ? '#000' : '#fff'} />
                       </Pressable>
@@ -3492,6 +3570,8 @@ export const ExploreScreen = () => {
                     return (
                       <Pressable
                         style={[styles.pdActionSecondary, blocked ? { opacity: 0.45 } : undefined]}
+                        accessibilityLabel="Send group inquiry"
+                        accessibilityRole="button"
                         onPress={() => {
                           if (!genderCheck.compatible) {
                             showAlert({
@@ -3539,6 +3619,8 @@ export const ExploreScreen = () => {
                   setPaywallPlan('plus');
                   setShowPaywall(true);
                 }}
+                accessibilityLabel="Upgrade to Plus to message host and schedule a tour"
+                accessibilityRole="button"
               >
                 <Feather name="lock" size={14} color="#fff" />
                 <Text style={styles.pdUpgradeBannerText}>
@@ -3550,6 +3632,8 @@ export const ExploreScreen = () => {
 
             <Pressable
               style={styles.askPiFab}
+              accessibilityLabel="Ask Pi about this listing"
+              accessibilityRole="button"
               onPress={() => {
                 if (!selectedProperty) return;
                 setShowPropertyDetail(false);
@@ -3680,7 +3764,7 @@ export const ExploreScreen = () => {
         transparent
         onRequestClose={() => { setShowLocationSheet(false); setLocationSearchQuery(''); setLocationSearchResults([]); }}
       >
-        <Pressable style={styles.locSheetOverlay} onPress={() => { setShowLocationSheet(false); setLocationSearchQuery(''); setLocationSearchResults([]); }} />
+        <Pressable style={styles.locSheetOverlay} onPress={() => { setShowLocationSheet(false); setLocationSearchQuery(''); setLocationSearchResults([]); }} accessibilityLabel="Close location picker" accessibilityRole="button" />
         <View style={styles.locSheet}>
           <View style={styles.locSheetHandle} />
           <Text style={styles.locSheetTitle}>Search Location</Text>
@@ -3695,9 +3779,11 @@ export const ExploreScreen = () => {
               onChangeText={handleLocationSearch}
               autoFocus
               returnKeyType="search"
+              accessibilityLabel="Search by city, neighborhood, or zip code"
+              accessibilityRole="search"
             />
             {locationSearchQuery.length > 0 ? (
-              <Pressable onPress={() => { setLocationSearchQuery(''); setLocationSearchResults([]); }}>
+              <Pressable onPress={() => { setLocationSearchQuery(''); setLocationSearchResults([]); }} accessibilityLabel="Clear search" accessibilityRole="button">
                 <Feather name="x" size={16} color="rgba(255,255,255,0.4)" />
               </Pressable>
             ) : null}
@@ -3713,7 +3799,7 @@ export const ExploreScreen = () => {
           {locationSearchResults.length > 0 ? (
             <ScrollView style={{ maxHeight: 320 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
               {locationSearchResults.map((result, idx) => (
-                <Pressable key={`${result.label}-${idx}`} style={styles.locSearchResult} onPress={() => selectLocationResult(result)}>
+                <Pressable key={`${result.label}-${idx}`} style={styles.locSearchResult} onPress={() => selectLocationResult(result)} accessibilityLabel={`${result.label}, ${result.type === 'city' ? 'City' : result.type === 'zip' ? 'Zip Code' : 'Neighborhood'}`} accessibilityRole="button">
                   <Feather
                     name={result.type === 'city' ? 'map' : result.type === 'zip' ? 'hash' : 'map-pin'}
                     size={16}
@@ -3738,6 +3824,8 @@ export const ExploreScreen = () => {
                     key={city}
                     style={[styles.locCityChip, activeCity === city && styles.locCityChipActive]}
                     onPress={() => selectLocationResult({ label: city, city, neighborhood: null, type: 'city' })}
+                    accessibilityLabel={`${city}${activeCity === city ? ', selected' : ''}`}
+                    accessibilityRole="button"
                   >
                     <Text style={[styles.locCityText, activeCity === city && styles.locCityTextActive]}>{city}</Text>
                   </Pressable>
@@ -3753,6 +3841,8 @@ export const ExploreScreen = () => {
                     setActiveSubArea(null);
                     setShowLocationSheet(false);
                   }}
+                  accessibilityLabel="Clear location filter"
+                  accessibilityRole="button"
                 >
                   <Feather name="x-circle" size={14} color={ACCENT} />
                   <Text style={styles.locClearBtnText}>Clear location filter</Text>
@@ -3807,6 +3897,8 @@ export const ExploreScreen = () => {
             <Pressable
               style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)' }}
               onPress={() => setAreaDetailModal({ visible: false, category: null })}
+              accessibilityLabel="Close area details"
+              accessibilityRole="button"
             />
             <View style={{
               backgroundColor: '#1e1e1e',
@@ -3922,7 +4014,7 @@ export const ExploreScreen = () => {
         animationType="fade"
         onRequestClose={() => setShowGroupPickerModal(false)}
       >
-        <Pressable style={styles.groupPickerOverlay} onPress={() => setShowGroupPickerModal(false)}>
+        <Pressable style={styles.groupPickerOverlay} onPress={() => setShowGroupPickerModal(false)} accessibilityLabel="Close group picker" accessibilityRole="button">
           <Pressable style={[styles.groupPickerSheet, { backgroundColor: theme.card }]} onPress={() => {}}>
             <View style={styles.groupPickerHandle} />
             <ThemedText style={styles.groupPickerTitle}>Choose a Group</ThemedText>
@@ -3945,6 +4037,8 @@ export const ExploreScreen = () => {
                   <Pressable
                     key={g.id}
                     style={[styles.groupPickerItem, { borderColor: theme.border }, isBlocked ? { opacity: 0.45 } : undefined]}
+                    accessibilityLabel={`${g.name}, ${memberCount} ${memberCount === 1 ? 'member' : 'members'}${isBlocked ? ', unavailable' : ''}`}
+                    accessibilityRole="button"
                     onPress={() => {
                       if (!gCheck.compatible) {
                         showAlert({
@@ -4001,6 +4095,8 @@ export const ExploreScreen = () => {
             <Pressable
               style={[styles.groupPickerCancel, { borderColor: theme.border }]}
               onPress={() => setShowGroupPickerModal(false)}
+              accessibilityLabel="Cancel"
+              accessibilityRole="button"
             >
               <ThemedText style={{ color: theme.textSecondary, fontWeight: '600', fontSize: 15 }}>Cancel</ThemedText>
             </Pressable>

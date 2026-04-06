@@ -68,6 +68,8 @@ function Section({ label, children, action, theme }: {
           <Pressable
             style={[styles.sectionActionBtn, { backgroundColor: theme.primary }]}
             onPress={action.onPress}
+            accessibilityLabel={action.label}
+            accessibilityRole="button"
           >
             <Feather name={(action.icon || 'user-plus') as any} size={13} color="#fff" />
             <ThemedText style={{ fontSize: 13, color: '#fff', fontWeight: '700', marginLeft: 5 }}>
@@ -99,6 +101,8 @@ function SettingRow({ icon, label, description, value, onChange, theme }: {
         onValueChange={onChange}
         trackColor={{ false: theme.border, true: theme.primary }}
         thumbColor="#fff"
+        accessibilityLabel={`${label}${value ? ', enabled' : ', disabled'}`}
+        accessibilityRole="switch"
       />
     </View>
   );
@@ -670,6 +674,8 @@ export function GroupInfoScreen({ route, navigation }: Props) {
             onPress={() => navigation.goBack()}
             hitSlop={12}
             style={[styles.backBtn, { backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border, borderRadius: 20 }]}
+            accessibilityLabel="Go back"
+            accessibilityRole="button"
           >
             <Feather name="arrow-left" size={20} color={theme.text} />
           </Pressable>
@@ -699,6 +705,8 @@ export function GroupInfoScreen({ route, navigation }: Props) {
             onPress={() => navigation.goBack()}
             hitSlop={12}
             style={[styles.heroBackBtn, { backgroundColor: theme.card, borderColor: theme.border, top: insets.top + 16 }]}
+            accessibilityLabel="Go back"
+            accessibilityRole="button"
           >
             <Feather name="arrow-left" size={20} color={theme.text} />
           </Pressable>
@@ -707,6 +715,8 @@ export function GroupInfoScreen({ route, navigation }: Props) {
             onPress={() => setShowGroupReport(true)}
             hitSlop={12}
             style={[styles.heroBackBtn, { backgroundColor: theme.card, borderColor: theme.border, top: insets.top + 16, left: undefined, right: 16, position: 'absolute' }]}
+            accessibilityLabel="Group options"
+            accessibilityRole="button"
           >
             <Feather name="more-vertical" size={18} color={theme.textSecondary} />
           </Pressable>
@@ -725,7 +735,7 @@ export function GroupInfoScreen({ route, navigation }: Props) {
             if (memberPhotos.length === 1) {
               const p = memberPhotos[0];
               return p.uri ? (
-                <Image source={{ uri: p.uri }} style={[styles.heroAvatar, { borderWidth: 3, borderColor: '#fff' }]} />
+                <Image source={{ uri: p.uri }} style={[styles.heroAvatar, { borderWidth: 3, borderColor: '#fff' }]} accessibilityLabel="Group avatar" accessibilityRole="image" />
               ) : (
                 <View style={[styles.heroAvatar, { backgroundColor: theme.primary }]}>
                   <ThemedText style={{ fontSize: 32, fontWeight: '800', color: '#fff' }}>{p.initial}</ThemedText>
@@ -748,6 +758,8 @@ export function GroupInfoScreen({ route, navigation }: Props) {
                           borderWidth: 2, borderColor: '#fff',
                           position: 'absolute', left: i * (sz - overlap), zIndex: memberPhotos.length - i,
                         }}
+                        accessibilityLabel="Group member photo"
+                        accessibilityRole="image"
                       />
                     ) : (
                       <View
@@ -798,7 +810,7 @@ export function GroupInfoScreen({ route, navigation }: Props) {
           </View>
 
           <View style={styles.quickActions}>
-            <Pressable style={[styles.quickAction, { backgroundColor: theme.card, borderColor: theme.border }]} onPress={handleShareCode}>
+            <Pressable style={[styles.quickAction, { backgroundColor: theme.card, borderColor: theme.border }]} onPress={handleShareCode} accessibilityLabel="Share group" accessibilityRole="button">
               <Feather name="share-2" size={18} color={theme.primary} />
               <ThemedText style={[Typography.small, { marginTop: 4 }]}>Share</ThemedText>
             </Pressable>
@@ -817,6 +829,8 @@ export function GroupInfoScreen({ route, navigation }: Props) {
                   Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                 } catch {}
               }}
+              accessibilityLabel={muted ? 'Unmute group' : 'Mute group'}
+              accessibilityRole="button"
             >
               <Feather name={muted ? 'bell-off' : 'bell'} size={18} color={muted ? '#ef4444' : theme.primary} />
               <ThemedText style={[Typography.small, { marginTop: 4 }]}>{muted ? 'Unmute' : 'Mute'}</ThemedText>
@@ -826,6 +840,8 @@ export function GroupInfoScreen({ route, navigation }: Props) {
               onPress={() => {
                 navigation.goBack();
               }}
+              accessibilityLabel="Open chat"
+              accessibilityRole="button"
             >
               <Feather name="message-circle" size={18} color={theme.primary} />
               <ThemedText style={[Typography.small, { marginTop: 4 }]}>Chat</ThemedText>
@@ -833,6 +849,8 @@ export function GroupInfoScreen({ route, navigation }: Props) {
             <Pressable
               style={[styles.quickAction, { backgroundColor: theme.card, borderColor: theme.border }]}
               onPress={() => setShowPropertySearch(true)}
+              accessibilityLabel="Search properties"
+              accessibilityRole="button"
             >
               <Feather name="search" size={18} color={theme.primary} />
               <ThemedText style={[Typography.small, { marginTop: 4 }]}>Search</ThemedText>
@@ -859,7 +877,7 @@ export function GroupInfoScreen({ route, navigation }: Props) {
                 ) : null}
               </View>
               {isAdmin ? (
-                <Pressable onPress={handleRemoveProperty} hitSlop={8}>
+                <Pressable onPress={handleRemoveProperty} hitSlop={8} accessibilityLabel="Remove linked property" accessibilityRole="button">
                   <ThemedText style={[Typography.small, { color: '#FF6B6B' }]}>Remove</ThemedText>
                 </Pressable>
               ) : null}
@@ -868,6 +886,8 @@ export function GroupInfoScreen({ route, navigation }: Props) {
             <Pressable
               style={[styles.dashedCard, { borderColor: theme.primary }]}
               onPress={() => setShowPropertySearch(true)}
+              accessibilityLabel="Link a property"
+              accessibilityRole="button"
             >
               <Feather name="plus" size={16} color={theme.primary} />
               <ThemedText style={[Typography.body, { color: theme.primary, marginLeft: 8, fontWeight: '600' }]}>
@@ -908,7 +928,7 @@ export function GroupInfoScreen({ route, navigation }: Props) {
                 </View>
               </View>
             ) : (
-              <Pressable onPress={() => navigation.navigate('Plans' as never)} style={[styles.healthSummary, { opacity: 0.5 }]}>
+              <Pressable onPress={() => navigation.navigate('Plans' as never)} style={[styles.healthSummary, { opacity: 0.5 }]} accessibilityLabel="Upgrade to see compatibility scores" accessibilityRole="button">
                 <View style={styles.healthScoreBlock}>
                   <Feather name="lock" size={22} color="rgba(255,255,255,0.3)" />
                 </View>
@@ -936,7 +956,7 @@ export function GroupInfoScreen({ route, navigation }: Props) {
                   ))}
                 </View>
               ) : (
-                <Pressable onPress={() => navigation.navigate('Plans' as never)} style={[styles.conflictsBlock, { opacity: 0.5 }]}>
+                <Pressable onPress={() => navigation.navigate('Plans' as never)} style={[styles.conflictsBlock, { opacity: 0.5 }]} accessibilityLabel="Upgrade to see group conflicts" accessibilityRole="button">
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                     <ThemedText style={[styles.conflictsTitle, { color: 'rgba(255,255,255,0.4)' }]}>Conflicts to resolve</ThemedText>
                     <PlanBadgeInline plan="Elite" locked />
@@ -961,6 +981,8 @@ export function GroupInfoScreen({ route, navigation }: Props) {
               <Pressable
                 style={styles.prefsCTA}
                 onPress={() => navigation.navigate('ApartmentPreferences' as never)}
+                accessibilityLabel="Set your apartment preferences"
+                accessibilityRole="button"
               >
                 <ThemedText style={styles.prefsCTAText}>
                   Set your apartment preferences
@@ -973,6 +995,8 @@ export function GroupInfoScreen({ route, navigation }: Props) {
                 <Pressable
                   style={styles.searchCTA}
                   onPress={() => navigation.navigate('GroupApartmentSuggestions' as never, { groupId } as never)}
+                  accessibilityLabel="See AI apartment suggestions"
+                  accessibilityRole="button"
                 >
                   <Feather name="search" size={15} color="#fff" />
                   <ThemedText style={styles.searchCTAText}>See AI Apartment Suggestions</ThemedText>
@@ -981,6 +1005,8 @@ export function GroupInfoScreen({ route, navigation }: Props) {
                 <Pressable
                   style={[styles.searchCTA, { backgroundColor: 'rgba(168,85,247,0.12)', borderWidth: 1, borderColor: 'rgba(168,85,247,0.25)' }]}
                   onPress={() => navigation.navigate('Plans' as never)}
+                  accessibilityLabel="Upgrade for AI apartment suggestions"
+                  accessibilityRole="button"
                 >
                   <Feather name="lock" size={14} color="#a855f7" />
                   <ThemedText style={[styles.searchCTAText, { color: '#a855f7' }]}>AI Apartment Suggestions</ThemedText>
@@ -1030,7 +1056,7 @@ export function GroupInfoScreen({ route, navigation }: Props) {
                 style={[styles.memberRow, { backgroundColor: theme.card, borderColor: theme.border }]}
               >
                 {member.photo ? (
-                  <Image source={{ uri: member.photo }} style={styles.memberAvatar} />
+                  <Image source={{ uri: member.photo }} style={styles.memberAvatar} accessibilityLabel={`${member.name} photo`} accessibilityRole="image" />
                 ) : (
                   <View style={[styles.memberAvatar, { backgroundColor: theme.primary + '25', alignItems: 'center', justifyContent: 'center' }]}>
                     <ThemedText style={[Typography.body, { fontWeight: '800', color: theme.primary }]}>
@@ -1093,12 +1119,16 @@ export function GroupInfoScreen({ route, navigation }: Props) {
                           }
                         }
                       }}
+                      accessibilityLabel={`${member.isCouple ? 'Unmark' : 'Mark'} ${member.name} as couple`}
+                      accessibilityRole="button"
                     >
                       <Feather name="heart" size={13} color={member.isCouple ? '#ec4899' : theme.textSecondary} />
                     </Pressable>
                     <Pressable
                       style={[styles.iconBtn, { borderColor: theme.primary }]}
                       onPress={() => handlePromoteMember(member.id, member.name)}
+                      accessibilityLabel={`Promote ${member.name} to admin`}
+                      accessibilityRole="button"
                     >
                       <Feather name="arrow-up" size={13} color={theme.primary} />
                     </Pressable>
@@ -1106,6 +1136,8 @@ export function GroupInfoScreen({ route, navigation }: Props) {
                       style={[styles.iconBtn, { borderColor: '#FF6B6B' }]}
                       onPress={() => handleRemoveMember(member.id, member.name)}
                       disabled={isRemoving}
+                      accessibilityLabel={`Remove ${member.name} from group`}
+                      accessibilityRole="button"
                     >
                       {isRemoving ? (
                         <ActivityIndicator size="small" color="#FF6B6B" />
@@ -1121,6 +1153,8 @@ export function GroupInfoScreen({ route, navigation }: Props) {
                     onPress={() => { setReportMemberTarget({ id: member.id, name: member.name }); setShowMemberReport(true); }}
                     hitSlop={8}
                     style={styles.iconBtn}
+                    accessibilityLabel={`Options for ${member.name}`}
+                    accessibilityRole="button"
                   >
                     <Feather name="more-vertical" size={14} color={theme.textSecondary} />
                   </Pressable>
@@ -1134,7 +1168,7 @@ export function GroupInfoScreen({ route, navigation }: Props) {
               INVITE CODE
             </ThemedText>
 
-            <Pressable onPress={handleCopyCode}>
+            <Pressable onPress={handleCopyCode} accessibilityLabel="Copy invite code" accessibilityRole="button">
               <View style={styles.codeBoxRow}>
                 {inviteCodeChars.map((char: string, i: number) => (
                   <View
@@ -1153,6 +1187,8 @@ export function GroupInfoScreen({ route, navigation }: Props) {
               <Pressable
                 style={[styles.codeActionBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
                 onPress={handleCopyCode}
+                accessibilityLabel={codeCopied ? 'Code copied' : 'Copy invite code'}
+                accessibilityRole="button"
               >
                 <Feather
                   name={codeCopied ? 'check' : 'copy'}
@@ -1167,6 +1203,8 @@ export function GroupInfoScreen({ route, navigation }: Props) {
               <Pressable
                 style={[styles.codeActionBtn, { backgroundColor: theme.primary, borderColor: theme.primary }]}
                 onPress={handleShareCode}
+                accessibilityLabel="Share invite link"
+                accessibilityRole="button"
               >
                 <Feather name="share-2" size={14} color="#fff" />
                 <ThemedText style={[Typography.small, { marginLeft: 6, color: '#fff', fontWeight: '700' }]}>
@@ -1176,7 +1214,7 @@ export function GroupInfoScreen({ route, navigation }: Props) {
             </View>
 
             {isAdmin ? (
-              <Pressable onPress={handleRegenerateCode} style={{ alignItems: 'center', marginTop: 10 }}>
+              <Pressable onPress={handleRegenerateCode} style={{ alignItems: 'center', marginTop: 10 }} accessibilityLabel="Regenerate invite code" accessibilityRole="button">
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                   <Feather name="refresh-cw" size={12} color={theme.textSecondary} />
                   <ThemedText style={[Typography.small, { color: theme.textSecondary, marginLeft: 4 }]}>
@@ -1196,6 +1234,8 @@ export function GroupInfoScreen({ route, navigation }: Props) {
                 listingId: group.linkedListing?.id || null,
                 defaultTab: 'matches',
               })}
+              accessibilityLabel="Invite from matches"
+              accessibilityRole="button"
             >
               <View style={[styles.inviteIcon, { backgroundColor: theme.primary + '20' }]}>
                 <Feather name="heart" size={15} color={theme.primary} />
@@ -1210,6 +1250,8 @@ export function GroupInfoScreen({ route, navigation }: Props) {
           <Pressable
             style={[styles.inviteRow, { backgroundColor: theme.card, borderColor: theme.border }]}
             onPress={handleInviteViaText}
+            accessibilityLabel="Invite via text message"
+            accessibilityRole="button"
           >
             <View style={[styles.inviteIcon, { backgroundColor: '#10B98120' }]}>
               <Feather name="message-circle" size={15} color="#10B981" />
@@ -1238,7 +1280,7 @@ export function GroupInfoScreen({ route, navigation }: Props) {
                   style={[styles.memberRow, { backgroundColor: theme.card, borderColor: theme.border }]}
                 >
                   {liker.photo ? (
-                    <Image source={{ uri: liker.photo }} style={styles.memberAvatar} />
+                    <Image source={{ uri: liker.photo }} style={styles.memberAvatar} accessibilityLabel={`${liker.name} photo`} accessibilityRole="image" />
                   ) : (
                     <View style={[styles.memberAvatar, { backgroundColor: theme.primary + '25', alignItems: 'center', justifyContent: 'center' }]}>
                       <ThemedText style={[Typography.body, { fontWeight: '800', color: theme.primary }]}>
@@ -1258,12 +1300,16 @@ export function GroupInfoScreen({ route, navigation }: Props) {
                     <Pressable
                       style={[styles.iconBtn, { borderColor: theme.primary }]}
                       onPress={() => handleInviteLiker(liker.userId)}
+                      accessibilityLabel={`Invite ${liker.name}`}
+                      accessibilityRole="button"
                     >
                       <Feather name="user-plus" size={13} color={theme.primary} />
                     </Pressable>
                     <Pressable
                       style={[styles.iconBtn, { borderColor: theme.textSecondary }]}
                       onPress={() => handleDismissLiker(liker.userId)}
+                      accessibilityLabel={`Dismiss ${liker.name}`}
+                      accessibilityRole="button"
                     >
                       <Feather name="x" size={13} color={theme.textSecondary} />
                     </Pressable>
@@ -1395,7 +1441,7 @@ export function GroupInfoScreen({ route, navigation }: Props) {
                     const photo = p?.photos?.[0] || profile.avatar_url;
                     return (
                       <View key={profile.id} style={[styles.suggestionCard, { borderColor: theme.border }]}>
-                        <Image source={{ uri: photo }} style={styles.suggestionAvatar} />
+                        <Image source={{ uri: photo }} style={styles.suggestionAvatar} accessibilityLabel={`${profile.full_name} photo`} accessibilityRole="image" />
                         <View style={{ flex: 1 }}>
                           <ThemedText style={styles.suggestionName}>
                             {profile.full_name}{profile.age ? `, ${profile.age}` : ''}
@@ -1409,6 +1455,8 @@ export function GroupInfoScreen({ route, navigation }: Props) {
                             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                             navigation.navigate('GroupInvite' as never, { groupId, suggestedUserId: profile.id } as never);
                           }}
+                          accessibilityLabel={`Invite ${profile.full_name}`}
+                          accessibilityRole="button"
                         >
                           <ThemedText style={styles.suggestionInviteBtnText}>Invite</ThemedText>
                         </Pressable>
@@ -1429,7 +1477,7 @@ export function GroupInfoScreen({ route, navigation }: Props) {
               <ThemedText style={styles.lockedText}>
                 Upgrade to Plus to see AI member suggestions
               </ThemedText>
-              <Pressable onPress={() => navigation.navigate('Plans' as never)}>
+              <Pressable onPress={() => navigation.navigate('Plans' as never)} accessibilityLabel="Upgrade plan" accessibilityRole="button">
                 <ThemedText style={styles.lockedUpgradeText}>Upgrade</ThemedText>
               </Pressable>
             </View>
@@ -1441,6 +1489,8 @@ export function GroupInfoScreen({ route, navigation }: Props) {
             <Pressable
               style={[styles.dangerBtn, { borderColor: '#FF6B6B', marginBottom: 10 }]}
               onPress={handleDeleteGroup}
+              accessibilityLabel="Delete group"
+              accessibilityRole="button"
             >
               <Feather name="trash-2" size={16} color="#FF6B6B" />
               <ThemedText style={[Typography.body, { color: '#FF6B6B', fontWeight: '600', marginLeft: 8 }]}>
@@ -1452,6 +1502,8 @@ export function GroupInfoScreen({ route, navigation }: Props) {
           <Pressable
             style={[styles.dangerBtn, { borderColor: '#FF6B6B' }]}
             onPress={handleLeaveGroup}
+            accessibilityLabel="Leave group"
+            accessibilityRole="button"
           >
             <Feather name="log-out" size={16} color="#FF6B6B" />
             <ThemedText style={[Typography.body, { color: '#FF6B6B', fontWeight: '600', marginLeft: 8 }]}>
@@ -1462,7 +1514,7 @@ export function GroupInfoScreen({ route, navigation }: Props) {
           {!isAdmin ? (
             <Pressable style={styles.reportBtn} onPress={async () => {
               await alert({ title: 'Report', message: 'This group has been reported.', variant: 'info' });
-            }}>
+            }} accessibilityLabel="Report this group" accessibilityRole="button">
               <Feather name="flag" size={13} color={theme.textSecondary} />
               <ThemedText style={[Typography.small, { color: theme.textSecondary, marginLeft: 6 }]}>
                 Report this group
