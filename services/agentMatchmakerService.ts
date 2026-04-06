@@ -4,6 +4,7 @@ import { calculateCompatibility } from '../utils/matchingAlgorithm';
 import { AgentPlan, getAgentPlanLimits, canAgentShortlist, canAgentCreateGroup, canAgentPlace } from '../constants/planLimits';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { shouldLoadMockData } from '../utils/dataUtils';
+import { withTimeout } from '../utils/asyncHelpers';
 
 const useLocalData = () => shouldLoadMockData() || !isSupabaseConfigured;
 
@@ -604,9 +605,13 @@ export async function chargeAgentPlacementFee(
   }
 
   try {
-    const { data, error } = await supabase.functions.invoke('charge-placement-fee', {
+    const { data, error } = await withTimeout(
+    supabase.functions.invoke('charge-placement-fee', {
       body: { placementId, groupId, listingId, agentId },
-    });
+    }),
+    30000,
+    'charge-placement-fee'
+  );
 
     if (error) {
       return { success: false, error: error.message };

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { withTimeout } from '../utils/asyncHelpers';
 
 export interface PairingResult {
   recommendedGroup: string[];
@@ -24,10 +25,14 @@ export function useAgentPairing() {
     setPairingResult(null);
 
     try {
-      const { data, error: fnError } = await supabase.functions.invoke(
+      const { data, error: fnError } = await withTimeout(
+    supabase.functions.invoke(
         'agent-pair-group',
         { body: { renterIds, listingId } }
-      );
+      ),
+    30000,
+    'agent-pair-group'
+  );
 
       if (fnError) {
         setError(fnError.message ?? 'Pairing failed');

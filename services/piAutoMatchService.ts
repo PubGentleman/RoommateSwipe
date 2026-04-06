@@ -2,6 +2,7 @@ import { supabase } from '../lib/supabase';
 import { PiAutoGroup, PiAutoGroupMember, PiGroupClaim } from '../types/models';
 import { getAutoClaimLimits } from '../constants/planLimits';
 import { RENTER_PLAN_LIMITS, RenterPlan } from '../constants/renterPlanLimits';
+import { withTimeout } from '../utils/asyncHelpers';
 
 export async function triggerAutoMatch(userId: string): Promise<{ success: boolean; groupId?: string }> {
   try {
@@ -153,7 +154,8 @@ export async function handleMemberDecline(groupId: string, userId: string): Prom
     .eq('id', groupId);
 
   try {
-    await supabase.functions.invoke('pi-auto-assemble', {
+    await withTimeout(
+    supabase.functions.invoke('pi-auto-assemble', {
       body: {
         city: group.city,
         replacement_for_group: groupId,
@@ -161,7 +163,10 @@ export async function handleMemberDecline(groupId: string, userId: string): Prom
         exclude_users: members.map(m => m.user_id),
         propose_as_replacement: true,
       },
-    });
+    }),
+    30000,
+    'pi-auto-assemble'
+  );
   } catch {
     // assembly may fail; group stays partial
   }
@@ -258,9 +263,13 @@ export async function getMyAutoGroup(userId: string): Promise<PiAutoGroup | null
 
 export async function convertToRealGroup(autoGroupId: string): Promise<string | null> {
   try {
-    const { data, error } = await supabase.functions.invoke('pi-convert-group', {
+    const { data, error } = await withTimeout(
+    supabase.functions.invoke('pi-convert-group', {
       body: { auto_group_id: autoGroupId },
-    });
+    }),
+    30000,
+    'pi-convert-group'
+  );
 
     if (error || !data?.group_id) return null;
     return data.group_id as string;

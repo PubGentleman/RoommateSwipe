@@ -1,5 +1,6 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { StorageService } from '../utils/storage';
+import { withTimeout } from '../utils/asyncHelpers';
 
 export interface CompanyShortlistedRenter {
   id: string;
@@ -243,9 +244,13 @@ export async function sendAutoInvite(
   aiReason?: string
 ): Promise<void> {
   if (isSupabaseConfigured) {
-    const { error } = await supabase.functions.invoke('company-auto-invite', {
+    const { error } = await withTimeout(
+    supabase.functions.invoke('company-auto-invite', {
       body: { listingId, groupId, companyHostId, matchScore, aiReason },
-    });
+    }),
+    30000,
+    'company-auto-invite'
+  );
     if (error) throw error;
   }
 }
@@ -255,9 +260,13 @@ export async function runAIPairing(
   listingId: string
 ): Promise<any> {
   if (isSupabaseConfigured) {
-    const { data, error } = await supabase.functions.invoke('company-pair-group', {
+    const { data, error } = await withTimeout(
+    supabase.functions.invoke('company-pair-group', {
       body: { listingId, companyHostId },
-    });
+    }),
+    30000,
+    'company-pair-group'
+  );
     if (error) throw error;
     return data;
   }

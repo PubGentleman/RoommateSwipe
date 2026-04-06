@@ -22,6 +22,7 @@ import * as Haptics from 'expo-haptics';
 import { GroupsStackParamList } from '../../navigation/GroupsStackNavigator';
 import { ReportBlockModal } from '../../components/ReportBlockModal';
 import { reportUser, blockUser as blockUserRemote } from '../../services/moderationService';
+import { withTimeout } from '../../utils/asyncHelpers';
 
 type ScreenNavProp = NativeStackNavigationProp<GroupsStackParamList, 'PiGroupInvite'>;
 
@@ -265,9 +266,13 @@ export const PiGroupInviteScreen = () => {
   const handleExtendTime = async () => {
     if (!invite || extendedTime) return;
     try {
-      const { data, error } = await supabase.functions.invoke('pi-extend-deadline', {
+      const { data, error } = await withTimeout(
+    supabase.functions.invoke('pi-extend-deadline', {
         body: { auto_group_id: invite.group_id },
-      });
+      }),
+    30000,
+    'pi-extend-deadline'
+  );
 
       if (error) {
         Alert.alert('Error', 'Could not extend time. Please try again.');

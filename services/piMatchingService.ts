@@ -39,9 +39,13 @@ export async function getCachedOrGenerateInsight(
     const quotaOk = await checkAIQuota(userId, 'match_insight');
     if (!quotaOk) return cached as PiMatchInsight | null;
 
-    const { data, error } = await supabase.functions.invoke('pi-match-insight', {
+    const { data, error } = await withTimeout(
+    supabase.functions.invoke('pi-match-insight', {
       body: { user_id: userId, target_user_id: targetUserId, match_score: matchScore },
-    });
+    }),
+    30000,
+    'pi-match-insight'
+  );
 
     if (error || !data) return cached as PiMatchInsight | null;
     logAIUsage(userId, 'match_insight', 0, data.model_used).catch(createErrorHandler('piMatchingService', 'logAIUsage'));
@@ -84,9 +88,13 @@ export async function generateDeckReranking(
     const quotaOk = await checkAIQuota(userId, 'deck_rerank');
     if (!quotaOk) return null;
 
-    const { data, error } = await supabase.functions.invoke('pi-rerank-deck', {
+    const { data, error } = await withTimeout(
+    supabase.functions.invoke('pi-rerank-deck', {
       body: { user_id: userId, candidate_ids: candidateIds.slice(0, 30) },
-    });
+    }),
+    30000,
+    'pi-rerank-deck'
+  );
 
     if (error || !data) return null;
     logAIUsage(userId, 'deck_rerank', 0, data.model_used).catch(createErrorHandler('piMatchingService', 'logAIUsage'));
@@ -150,9 +158,13 @@ export async function parseIdealRoommateText(
     const quotaOk = await checkAIQuota(userId, 'parse_preferences');
     if (!quotaOk) return null;
 
-    const { data, error } = await supabase.functions.invoke('pi-parse-preferences', {
+    const { data, error } = await withTimeout(
+    supabase.functions.invoke('pi-parse-preferences', {
       body: { user_id: userId, text: text.trim().slice(0, 500) },
-    });
+    }),
+    30000,
+    'pi-parse-preferences'
+  );
 
     if (error || !data) return null;
     logAIUsage(userId, 'parse_preferences').catch(createErrorHandler('piMatchingService', 'logAIUsage'));
@@ -183,9 +195,13 @@ export async function getHostRecommendations(
     const quotaOk = await checkAIQuota(userId, 'host_matchmaker');
     if (!quotaOk) return cached as PiHostRecommendation | null;
 
-    const { data, error } = await supabase.functions.invoke('pi-host-matchmaker', {
+    const { data, error } = await withTimeout(
+    supabase.functions.invoke('pi-host-matchmaker', {
       body: { host_id: userId, listing_id: listingId },
-    });
+    }),
+    30000,
+    'pi-host-matchmaker'
+  );
 
     if (error || !data) return cached as PiHostRecommendation | null;
     logAIUsage(userId, 'host_matchmaker', 0, data.model_used).catch(createErrorHandler('piMatchingService', 'logAIUsage'));
@@ -400,3 +416,4 @@ export {
   canJoinAutoGroup,
 } from './piAutoMatchService';
 import { createErrorHandler } from '../utils/errorLogger';
+import { withTimeout } from '../utils/asyncHelpers';

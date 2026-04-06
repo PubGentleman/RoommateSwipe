@@ -19,6 +19,7 @@ import { submitSelfieVerification } from '../../services/backgroundCheckService'
 import { createVerificationSession } from '../../services/paymentService';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { ProfileStackParamList } from '../../navigation/ProfileStackNavigator';
+import { withTimeout } from '../../utils/asyncHelpers';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'Verification'>;
 
@@ -275,9 +276,13 @@ export function VerificationScreen({ navigation, route }: Props) {
         return;
       }
 
-      const { data, error } = await supabase.functions.invoke('initiate-background-check', {
+      const { data, error } = await withTimeout(
+    supabase.functions.invoke('initiate-background-check', {
         body: { userId: user.id, email: user.email },
-      });
+      }),
+    30000,
+    'initiate-background-check'
+  );
 
       if (error) throw error;
 

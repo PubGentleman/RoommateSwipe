@@ -9,6 +9,7 @@ import { Spacing, BorderRadius } from '../constants/theme';
 import { getCachedOrGenerateInsight } from '../services/piMatchingService';
 import { normalizeRenterPlan, getRenterPlanLimits } from '../constants/renterPlanLimits';
 import type { PiMatchInsight } from '../types/models';
+import { withTimeout } from '../utils/asyncHelpers';
 
 interface Props {
   visible: boolean;
@@ -48,9 +49,13 @@ export const WhyThisMatchModal: React.FC<Props> = ({
     setError(null);
     try {
       const [explainResult, piResult] = await Promise.allSettled([
-        supabase.functions.invoke('explain-match', {
+        withTimeout(
+    supabase.functions.invoke('explain-match', {
           body: { matchedProfileId: profileId, targetProfileId: profileId },
         }),
+    30000,
+    'explain-match'
+  ),
         getCachedOrGenerateInsight(profileId, compatibilityScore),
       ]);
 

@@ -3,6 +3,7 @@ import { useStripe } from '@stripe/stripe-react-native';
 import { supabase } from '../lib/supabase';
 import { getPriceId } from '../constants/stripePrices';
 import { useRevenueCat } from '../contexts/RevenueCatContext';
+import { withTimeout } from '../utils/asyncHelpers';
 
 export function useStripePayment() {
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
@@ -48,9 +49,13 @@ export function useStripePayment() {
 
     try {
       const stripeFlow = async () => {
-        const { data, error } = await supabase.functions.invoke('create-subscription', {
+        const { data, error } = await withTimeout(
+    supabase.functions.invoke('create-subscription', {
           body: { priceId, plan, billingCycle, planType },
-        });
+        }),
+    30000,
+    'create-subscription'
+  );
 
         if (error || !data?.clientSecret) {
           throw new Error(error?.message || 'Failed to initialize payment');

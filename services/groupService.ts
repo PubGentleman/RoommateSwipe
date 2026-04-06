@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GroupType, GroupMember } from '../types/models';
 import { isWithinActivityCutoff, getRecencyMultiplier } from '../utils/activityDecay';
 import { shouldLoadMockData } from '../utils/dataUtils';
+import { withTimeout } from '../utils/asyncHelpers';
 
 interface SupabaseGroupMessageRow {
   id: string;
@@ -1406,9 +1407,13 @@ export async function createOutreachPayment(
   groupIds: string[],
   message: string
 ): Promise<{ clientSecret: string; paymentIntentId: string; amountCents: number }> {
-  const { data, error } = await supabase.functions.invoke('create-outreach-payment', {
+  const { data, error } = await withTimeout(
+    supabase.functions.invoke('create-outreach-payment', {
     body: { listingId, packageId, groupIds },
-  });
+  }),
+    30000,
+    'create-outreach-payment'
+  );
 
   if (error) throw error;
 
@@ -1569,7 +1574,8 @@ export async function sendGroupInvites(groupId: string, invites: GroupInviteInpu
 
   for (const row of rows) {
     try {
-      await supabase.functions.invoke('send-group-invite', {
+      await withTimeout(
+    supabase.functions.invoke('send-group-invite', {
         body: {
           groupId,
           inviteCode: row.invite_code,
@@ -1577,7 +1583,10 @@ export async function sendGroupInvites(groupId: string, invites: GroupInviteInpu
           phone: row.invite_phone,
           isCouple: row.is_couple,
         },
-      });
+      }),
+    30000,
+    'send-group-invite'
+  );
     } catch (e) {
       console.warn('[sendGroupInvites] Edge function failed for invite:', e);
     }
@@ -1603,7 +1612,8 @@ export async function resendGroupInvite(inviteId: string): Promise<void> {
     .single();
   if (error || !invite) throw error || new Error('Invite not found');
 
-  await supabase.functions.invoke('send-group-invite', {
+  await withTimeout(
+    supabase.functions.invoke('send-group-invite', {
     body: {
       groupId: invite.group_id,
       inviteCode: invite.invite_code,
@@ -1611,7 +1621,10 @@ export async function resendGroupInvite(inviteId: string): Promise<void> {
       phone: invite.invite_phone,
       isCouple: invite.is_couple,
     },
-  });
+  }),
+    30000,
+    'send-group-invite'
+  );
 
   await supabase
     .from('group_invites')

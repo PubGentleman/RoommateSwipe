@@ -74,6 +74,7 @@ import LinkPreviewCard from '../../components/LinkPreviewCard';
 import MessageActionsSheet from '../../components/MessageActionsSheet';
 import { extractUrls } from '../../utils/linkPreview';
 import { createErrorHandler } from '../../utils/errorLogger';
+import { withTimeout } from '../../utils/asyncHelpers';
 
 const QUICK_REACTIONS = ['\uD83D\uDC4D', '\u2764\uFE0F', '\uD83D\uDE02', '\uD83D\uDE2E', '\uD83D\uDE22', '\uD83D\uDD25'];
 const EXTENDED_EMOJIS = [
@@ -1148,7 +1149,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
 
     try {
       const sortedIds = [otherUser.id, user!.id].sort();
-      const response = await supabase.functions.invoke('analyze-chat-intent', {
+      const response = await withTimeout(
+    supabase.functions.invoke('analyze-chat-intent', {
         body: {
           conversationId,
           userId1: sortedIds[0],
@@ -1158,7 +1160,10 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
             senderName: m.senderId === user!.id ? 'Me' : (otherUser.name || 'Them'),
           })),
         },
-      });
+      }),
+    30000,
+    'analyze-chat-intent'
+  );
       if (response?.data?.leakageDetected) {
         setLeakageDetected(true);
       }

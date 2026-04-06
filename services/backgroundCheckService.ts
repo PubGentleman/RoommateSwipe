@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase'
+import { withTimeout } from '../utils/asyncHelpers';
 
 export interface BackgroundCheckBadge {
   status: 'approved' | 'pending' | 'processing' | 'declined' | 'none'
@@ -12,9 +13,13 @@ export interface BackgroundCheckBadge {
 export const startBackgroundCheck = async (
   checkType: 'standard' | 'premium' = 'standard'
 ): Promise<{ sessionToken: string; inquiryId: string; checkId: string }> => {
-  const { data, error } = await supabase.functions.invoke('create-background-check', {
+  const { data, error } = await withTimeout(
+    supabase.functions.invoke('create-background-check', {
     body: { checkType },
-  })
+  }),
+    30000,
+    'create-background-check'
+  )
 
   if (error) throw new Error(error.message || 'Failed to start background check')
   if (data?.error) throw new Error(data.error)
@@ -59,9 +64,13 @@ export async function submitSelfieVerification(
 
   if (uploadError) return { success: false, match: false, confidence: 0, error: uploadError.message };
 
-  const { data, error } = await supabase.functions.invoke('verify-selfie', {
+  const { data, error } = await withTimeout(
+    supabase.functions.invoke('verify-selfie', {
     body: { userId, selfieStoragePath: filename },
-  });
+  }),
+    30000,
+    'verify-selfie'
+  );
 
   if (error) return { success: false, match: false, confidence: 0, error: error.message };
   if (!data || typeof data.match !== 'boolean') {

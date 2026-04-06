@@ -31,6 +31,7 @@ import OnboardingHeader from '../../components/OnboardingHeader';
 import { getStateNameFromCode } from '../../utils/locationData';
 import { saveReferralCode } from '../../services/affiliateService';
 import { isPersonalEmail } from '../../constants/blockedEmailDomains';
+import { withTimeout } from '../../utils/asyncHelpers';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const SWIPE_THRESHOLD = 80;
@@ -988,9 +989,13 @@ async function scanLicenseExpiration(
         });
       } catch {}
 
-      const { data, error } = await supabase.functions.invoke('scan-license-expiration', {
+      const { data, error } = await withTimeout(
+    supabase.functions.invoke('scan-license-expiration', {
         body: { imageBase64: base64Data },
-      });
+      }),
+    30000,
+    'scan-license-expiration'
+  );
       if (!error && data?.expirationDate) {
         const expDate = new Date(data.expirationDate);
         const now = new Date();

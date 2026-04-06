@@ -9,6 +9,7 @@ import { useRoute, useNavigation } from '@react-navigation/native';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { StorageService } from '../../utils/storage';
+import { withTimeout } from '../../utils/asyncHelpers';
 
 const BG = '#111';
 const ACCENT = '#ff6b5b';
@@ -111,9 +112,13 @@ export function AIGroupInviteScreen() {
           .eq('status', 'pending');
 
         if (!pendingInvites || pendingInvites.length === 0) {
-          supabase.functions.invoke('match-groups-to-listings', {
+          withTimeout(
+    supabase.functions.invoke('match-groups-to-listings', {
             body: { groupId },
-          });
+          }),
+    30000,
+    'match-groups-to-listings'
+  );
 
           const { data: allMembers } = await supabase
             .from('group_members')

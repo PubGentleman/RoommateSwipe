@@ -13,6 +13,7 @@ import { processReferralCommission } from '../services/affiliateService';
 import { registerForPushNotifications, removePushToken } from '../services/pushNotificationService';
 import { createErrorHandler } from '../utils/errorLogger';
 import { navigationRef } from '../navigation/navigationRef';
+import { withTimeout } from '../utils/asyncHelpers';
 
 export type UserRole = 'renter' | 'host';
 
@@ -2790,9 +2791,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const sendTeamInviteEmail = async (teamMemberId: string) => {
     if (!user || !isSupabaseConfigured) return;
     try {
-      const { error } = await supabase.functions.invoke('send-team-invite', {
+      const { error } = await withTimeout(
+    supabase.functions.invoke('send-team-invite', {
         body: { teamMemberId },
-      });
+      }),
+    30000,
+    'send-team-invite'
+  );
       if (error) console.warn('Team invite email error:', error);
     } catch (e) {
       console.warn('Team invite email failed (invite still saved):', e);

@@ -7,6 +7,7 @@ import { RENTER_PLAN_LIMITS, normalizeRenterPlan } from '../constants/renterPlan
 import { getWeightProfile, recordSwipeWithScores, recalculateLearnedWeights } from './matchWeightService';
 import { calculateWeightedCompatibility } from '../utils/matchingAlgorithm';
 import { createErrorHandler } from '../utils/errorLogger';
+import { withTimeout } from '../utils/asyncHelpers';
 
 export async function getSwipeDeck(userId: string, city?: string, filters?: {
   budgetMin?: number;
@@ -252,11 +253,16 @@ export async function sendLike(
 
   incrementUsage(userId, 'interest_cards_today').catch(createErrorHandler('discoverService', 'incrementUsage'));
 
-  supabase.functions.invoke('calculate-match-scores', {
+  withTimeout(
+    supabase.functions.invoke('calculate-match-scores', {
     body: { userId },
-  }).catch(createErrorHandler('discoverService', 'calculateMatchScores'));
+  }),
+    30000,
+    'calculate-match-scores'
+  ).catch(createErrorHandler('discoverService', 'calculateMatchScores'));
 
-  supabase.functions.invoke('send-push-notification', {
+  withTimeout(
+    supabase.functions.invoke('send-push-notification', {
     body: {
       userId: recipientId,
       type: 'interest_received',
@@ -264,7 +270,10 @@ export async function sendLike(
       body: 'Open Rhome to see who sent you interest',
       data: {},
     },
-  }).catch(createErrorHandler('discoverService', 'sendInterestNotification'));
+  }),
+    30000,
+    'send-push-notification'
+  ).catch(createErrorHandler('discoverService', 'sendInterestNotification'));
 
   if (matchBreakdown && matchScore !== undefined) {
     recordSwipeWithScores(userId, recipientId, 'like', matchScore, matchBreakdown).catch(createErrorHandler('discoverService', 'recordSwipeWithScores'));
@@ -376,7 +385,8 @@ export async function acceptInterestCard(userId: string, cardId: string, senderI
 
   if (matchError) throw matchError;
 
-  supabase.functions.invoke('send-push-notification', {
+  withTimeout(
+    supabase.functions.invoke('send-push-notification', {
     body: {
       userId: senderId,
       type: 'interest_accepted',
@@ -384,7 +394,10 @@ export async function acceptInterestCard(userId: string, cardId: string, senderI
       body: 'Someone accepted your interest. Start chatting!',
       data: { matchId: match?.id },
     },
-  }).catch(createErrorHandler('discoverService', 'sendMatchNotification'));
+  }),
+    30000,
+    'send-push-notification'
+  ).catch(createErrorHandler('discoverService', 'sendMatchNotification'));
 
   return { match };
 }
