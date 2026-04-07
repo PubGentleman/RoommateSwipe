@@ -60,7 +60,7 @@ Supabase provides the complete backend infrastructure:
 
 ## Beta Mode
 
-**`constants/betaConfig.ts`** contains `BETA_MODE = true` — when enabled, all users get top-tier plan access (Elite for renters, Business for hosts) without needing a subscription. This unlocks all features for beta testers at no cost. To disable after beta, set `BETA_MODE = false` in `constants/betaConfig.ts`. The flag is checked in:
+**`constants/betaConfig.ts`** contains `BETA_MODE = true` — when enabled, all users get top-tier plan access (Elite for renters, Business for hosts) without needing a subscription, and mock data loads in TestFlight/production builds so testers have profiles to interact with. To disable after beta, set `BETA_MODE = false` in `constants/betaConfig.ts`. The flag is checked in:
 - `constants/renterPlanLimits.ts` — `getRenterPlanLimits()`
 - `constants/planLimits.ts` — `getPlanLimits()`, `getAgentPlanLimits()`
 - `utils/agentPlanGates.ts` — `getAgentLimits()`
@@ -69,6 +69,7 @@ Supabase provides the complete backend infrastructure:
 - `contexts/AuthContext.tsx` — `betaPlan()` helper for all inline plan checks
 - `utils/messagingUtils.ts`, `utils/dateUtils.ts`, `services/messageService.ts`
 - Key screens: `RoommatesScreen.tsx`, `GroupInfoScreen.tsx`
+- `utils/dataUtils.ts` — `shouldLoadMockData()`, `getMockFallback()` (loads mock profiles in beta builds)
 
 ## Technical Decisions
 
