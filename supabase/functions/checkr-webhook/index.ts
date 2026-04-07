@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { createHmac } from 'https://deno.land/std@0.203.0/node/crypto.ts';
+import { crypto } from 'https://deno.land/std@0.203.0/crypto/mod.ts';
+import { encode } from 'https://deno.land/std@0.203.0/encoding/hex.ts';
 
 const supabase = createClient(
   Deno.env.get('SUPABASE_URL')!,
@@ -8,11 +9,17 @@ const supabase = createClient(
 
 const CHECKR_WEBHOOK_SECRET = Deno.env.get('CHECKR_WEBHOOK_SECRET');
 
-function verifyCheckrSignature(body: string, signature: string | null): boolean {
+async function verifyCheckrSignature(body: string, signature: string | null): Promise<boolean> {
   if (!CHECKR_WEBHOOK_SECRET || !signature) return false;
-  const hmac = createHmac('sha256', CHECKR_WEBHOOK_SECRET);
-  hmac.update(body);
-  const computed = hmac.digest('hex');
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(CHECKR_WEBHOOK_SECRET),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  );
+  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(body));
+  const computed = new TextDecoder().decode(encode(new Uint8Array(sig)));
   return computed === signature;
 }
 
