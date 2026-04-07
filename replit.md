@@ -82,6 +82,9 @@ The architecture includes a Babel module resolver, platform-specific UI, perform
 *   react-native-google-places-autocomplete
 *   react-native-webview
 *   expo-audio (replaced expo-av for voice recording/playback)
+*   expo-apple-authentication (native Apple Sign In on iOS)
+*   expo-auth-session (OAuth flows for Google Sign In)
+*   expo-crypto (nonce hashing for Apple Sign In)
 *   expo-notifications
 *   expo-device
 *   Supabase (Auth, Database, Realtime, Storage, Edge Functions)

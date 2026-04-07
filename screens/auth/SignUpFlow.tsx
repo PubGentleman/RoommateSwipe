@@ -32,6 +32,7 @@ import { getStateNameFromCode } from '../../utils/locationData';
 import { saveReferralCode } from '../../services/affiliateService';
 import { isPersonalEmail } from '../../constants/blockedEmailDomains';
 import { withTimeout } from '../../utils/asyncHelpers';
+import { signInWithGoogle, signInWithApple } from '../../services/socialAuthService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const SWIPE_THRESHOLD = 80;
@@ -661,11 +662,17 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
                 <View style={styles.orLine} />
               </View>
               <View style={styles.socialRow}>
-                <Pressable style={styles.socialIconBtn} onPress={() => showAlert({ title: 'Google Sign In', message: 'Google authentication will be available in a future update.', variant: 'info' })}>
+                <Pressable style={styles.socialIconBtn} onPress={async () => {
+                  const result = await signInWithGoogle();
+                  if (result.error) showAlert({ title: 'Sign Up Failed', message: result.error, variant: 'error' });
+                }}>
                   <Image source={require('../../assets/icons/google.png')} style={styles.googleIcon} resizeMode="contain" />
                 </Pressable>
                 {Platform.OS !== 'android' ? (
-                  <Pressable style={styles.socialIconBtn} onPress={() => showAlert({ title: 'Apple Sign In', message: 'Apple authentication will be available in a future update.', variant: 'info' })}>
+                  <Pressable style={styles.socialIconBtn} onPress={async () => {
+                    const result = await signInWithApple();
+                    if (result.error) showAlert({ title: 'Sign Up Failed', message: result.error, variant: 'error' });
+                  }}>
                     <Svg width={24} height={24} viewBox="0 0 24 24" fill="#FFFFFF">
                       <Path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.32 2.32-2.11 4.45-3.74 4.25z" />
                     </Svg>
