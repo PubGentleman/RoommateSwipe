@@ -142,6 +142,8 @@ export function normalizeRenterPlan(plan: string | null | undefined): RenterPlan
 }
 
 export function getRenterPlanLimits(plan: RenterPlan): RenterPlanLimits {
+  const { BETA_MODE } = require('./betaConfig');
+  if (BETA_MODE) return { ...RENTER_PLAN_LIMITS.elite, plan, label: RENTER_PLAN_LIMITS[plan]?.label ?? 'Free', price: '$0 (Beta)' };
   return RENTER_PLAN_LIMITS[plan] ?? RENTER_PLAN_LIMITS.free;
 }
 

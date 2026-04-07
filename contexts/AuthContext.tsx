@@ -15,6 +15,12 @@ import { registerForPushNotifications, removePushToken } from '../services/pushN
 import { createErrorHandler } from '../utils/errorLogger';
 import { navigationRef } from '../navigation/navigationRef';
 import { withTimeout } from '../utils/asyncHelpers';
+import { BETA_MODE } from '../constants/betaConfig';
+
+function betaPlan(plan: string): string {
+  if (BETA_MODE) return 'elite';
+  return plan;
+}
 
 export type UserRole = 'renter' | 'host';
 
@@ -1450,7 +1456,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const canSendMessage = (): boolean => {
     if (!user) return false;
 
-    const plan = user.subscription?.plan || 'basic';
+    const plan = betaPlan(user.subscription?.plan || 'basic');
     if (plan === 'elite') return true;
 
     const today = new Date().toISOString().split('T')[0];
@@ -1464,7 +1470,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const canBoost = (): { canBoost: boolean; reason?: string; requiresPayment?: boolean; nextAvailableAt?: string; hasFreeBoost?: boolean } => {
     if (!user) return { canBoost: false, reason: 'Not logged in' };
 
-    const plan = user.subscription?.plan || 'basic';
+    const plan = betaPlan(user.subscription?.plan || 'basic');
 
     if (user.boostData?.isBoosted && user.boostData.boostExpiresAt) {
       if (new Date().getTime() < new Date(user.boostData.boostExpiresAt).getTime()) {
@@ -2137,7 +2143,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const canViewListing = (): { canView: boolean; remaining: number; limit: number; message?: string } => {
     if (!user) return { canView: false, remaining: 0, limit: 0, message: 'Not logged in' };
 
-    const plan = user.subscription?.plan || 'basic';
+    const plan = betaPlan(user.subscription?.plan || 'basic');
     if (plan === 'plus' || plan === 'elite' || isPlaceSeeker()) {
       return { canView: true, remaining: Infinity, limit: Infinity };
     }
@@ -2170,7 +2176,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const useListingView = async (): Promise<void> => {
     if (!user) return;
 
-    const plan = user.subscription?.plan || 'basic';
+    const plan = betaPlan(user.subscription?.plan || 'basic');
     if (plan === 'plus' || plan === 'elite' || isPlaceSeeker()) return;
 
     const now = new Date();
@@ -2199,7 +2205,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const canSendInterest = async (): Promise<{ canSend: boolean; remaining: number; reason?: string }> => {
     if (!user) return { canSend: false, remaining: 0, reason: 'Not logged in' };
 
-    const plan = user.subscription?.plan || 'basic';
+    const plan = betaPlan(user.subscription?.plan || 'basic');
     const status = user.subscription?.status || 'active';
 
     if ((plan === 'plus' || plan === 'elite') && status === 'active') {
@@ -2240,7 +2246,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const canSendSuperInterest = (): { canSend: boolean; remaining: number; reason?: string } => {
     if (!user) return { canSend: false, remaining: 0, reason: 'Not logged in' };
-    const plan = user.subscription?.plan || 'basic';
+    const plan = betaPlan(user.subscription?.plan || 'basic');
     if (plan === 'elite') {
       return { canSend: true, remaining: 999 };
     }
@@ -2259,7 +2265,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const getSuperInterestCount = (): number => {
     if (!user) return 0;
-    const plan = user.subscription?.plan || 'basic';
+    const plan = betaPlan(user.subscription?.plan || 'basic');
     if (plan === 'elite') return 999;
     if (plan === 'plus') {
       const monthData = resetSuperInterestMonthly();
@@ -2271,7 +2277,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const useSuperInterestCredit = async (): Promise<void> => {
     if (!user) return;
-    const plan = user.subscription?.plan || 'basic';
+    const plan = betaPlan(user.subscription?.plan || 'basic');
     const prevTotal = user.superInterestData?.totalSent || 0;
     if (plan === 'elite') {
       const updated = {
@@ -2346,7 +2352,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const canAskPi = (mode: 'general' | 'listing_advisor' | 'price_analysis' | 'photo_analysis' | 'compatibility'): { canAsk: boolean; remaining: number; limit: number; message?: string } => {
     if (!user) return { canAsk: false, remaining: 0, limit: 0, message: 'Not logged in' };
 
-    const plan = user.subscription?.plan || 'basic';
+    const plan = betaPlan(user.subscription?.plan || 'basic');
 
     if (plan === 'plus' || plan === 'elite') {
       return { canAsk: true, remaining: Infinity, limit: Infinity };

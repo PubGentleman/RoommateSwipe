@@ -13,6 +13,7 @@ import { ThemedText } from '../../components/ThemedText';
 import { Feather } from '../../components/VectorIcons';
 import { useTheme } from '../../hooks/useTheme';
 import { Typography, Spacing } from '../../constants/theme';
+import { BETA_MODE } from '../../constants/betaConfig';
 import { useAuth } from '../../contexts/AuthContext';
 import { Image } from 'expo-image';
 import { getSuggestedGroupMembers } from '../../utils/groupSuggestions';
@@ -140,7 +141,7 @@ export function GroupInfoScreen({ route, navigation }: Props) {
   const memberCount = group?.members?.length || 0;
   const memberLimit = group?.memberLimit ?? 4;
   const isRenter = user?.role === 'renter';
-  const canSeeAI = user?.plan === 'plus' || user?.plan === 'elite';
+  const canSeeAI = BETA_MODE || user?.plan === 'plus' || user?.plan === 'elite';
   const desiredBedrooms = group?.desiredBedrooms ?? group?.memberLimit ?? 4;
   const spotsNeeded = Math.max(0, desiredBedrooms - memberCount);
 

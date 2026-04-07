@@ -6,15 +6,19 @@ export const formatDate = (iso: string): string => {
 };
 
 export const getMaxSearchDate = (plan: 'basic' | 'plus' | 'elite'): string => {
-  const days = plan === 'elite' ? 180 : plan === 'plus' ? 90 : 30;
+  const { BETA_MODE } = require('../constants/betaConfig');
+  const p = BETA_MODE ? 'elite' : plan;
+  const days = p === 'elite' ? 180 : p === 'plus' ? 90 : 30;
   const date = new Date();
   date.setDate(date.getDate() + days);
   return date.toISOString().split('T')[0];
 };
 
 export const getTierLimit = (plan: 'basic' | 'plus' | 'elite'): 30 | 90 | 180 => {
-  if (plan === 'elite') return 180;
-  if (plan === 'plus') return 90;
+  const { BETA_MODE } = require('../constants/betaConfig');
+  const p = BETA_MODE ? 'elite' : plan;
+  if (p === 'elite') return 180;
+  if (p === 'plus') return 90;
   return 30;
 };
 

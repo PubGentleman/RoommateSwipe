@@ -14,6 +14,7 @@ import {
   RC_ENTITLEMENTS,
 } from '../lib/revenueCat';
 import type { PurchasesOffering, PurchasesPackage, CustomerInfo } from 'react-native-purchases';
+import { BETA_MODE } from '../constants/betaConfig';
 
 interface RevenueCatContextType {
   isReady: boolean;
@@ -139,6 +140,7 @@ export const RevenueCatProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   }, []);
 
   const getActiveRenterPlan = useCallback((): 'free' | 'plus' | 'elite' => {
+    if (BETA_MODE) return 'elite';
     if (!customerInfo) return 'free';
     const active = getActivePlanFromEntitlements(customerInfo);
     if (active && active.planType === 'renter') {
@@ -148,6 +150,7 @@ export const RevenueCatProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   }, [customerInfo]);
 
   const getActiveHostPlan = useCallback((): string => {
+    if (BETA_MODE) return 'business';
     if (!customerInfo) return 'free';
     const active = getActivePlanFromEntitlements(customerInfo);
     if (active && active.planType === 'host') {

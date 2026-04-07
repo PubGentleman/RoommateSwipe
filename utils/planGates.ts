@@ -1,5 +1,6 @@
 import { getPlanLimits, type HostPlan } from '../constants/planLimits';
 import { getAgentLimits, isAgentPlan } from './agentPlanGates';
+import { BETA_MODE } from '../constants/betaConfig';
 
 type ExtendedPlan = HostPlan | 'agent_starter' | 'agent_pro' | 'agent_business'
   | 'company_starter' | 'company_pro' | 'company_enterprise' | 'pay_per_use';
@@ -49,6 +50,7 @@ export function hasVerifiedBadge(plan: string): boolean {
 }
 
 export function isHostFreePlan(plan: string): boolean {
+  if (BETA_MODE) return false;
   return plan === 'free' || plan === 'none' || plan === 'pay_per_use';
 }
 

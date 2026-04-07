@@ -136,7 +136,8 @@ export async function sendMessage(userId: string, matchId: string, content: stri
     .eq('user_id', userId)
     .maybeSingle();
 
-  const plan = sub?.plan || 'basic';
+  const { BETA_MODE } = require('../constants/betaConfig');
+  const plan = BETA_MODE ? 'elite' : (sub?.plan || 'basic');
 
   if (plan !== 'elite') {
     const DAILY_LIMITS: Record<string, number> = { basic: 20, plus: 200 };

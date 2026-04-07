@@ -58,6 +58,18 @@ Supabase provides the complete backend infrastructure:
 *   **Edge Functions:** Used for webhooks, verification, payments, AI operations, and match calculations.
 *   **Neighborhood Knowledge Base:** A PostgreSQL table with pre-seeded data for NYC/NJ neighborhoods.
 
+## Beta Mode
+
+**`constants/betaConfig.ts`** contains `BETA_MODE = true` — when enabled, all users get top-tier plan access (Elite for renters, Business for hosts) without needing a subscription. This unlocks all features for beta testers at no cost. To disable after beta, set `BETA_MODE = false` in `constants/betaConfig.ts`. The flag is checked in:
+- `constants/renterPlanLimits.ts` — `getRenterPlanLimits()`
+- `constants/planLimits.ts` — `getPlanLimits()`, `getAgentPlanLimits()`
+- `utils/agentPlanGates.ts` — `getAgentLimits()`
+- `utils/planGates.ts` — `isHostFreePlan()`
+- `contexts/RevenueCatContext.tsx` — `getActiveRenterPlan()`, `getActiveHostPlan()`
+- `contexts/AuthContext.tsx` — `betaPlan()` helper for all inline plan checks
+- `utils/messagingUtils.ts`, `utils/dateUtils.ts`, `services/messageService.ts`
+- Key screens: `RoommatesScreen.tsx`, `GroupInfoScreen.tsx`
+
 ## Technical Decisions
 
 The architecture includes a Babel module resolver, platform-specific UI, performance optimizations (React Native's New Architecture, React Compiler, Reanimated), robust error handling, separate stack navigators with history, and efficient data fetching.

@@ -283,6 +283,11 @@ export const PLAN_LIMITS: Record<string, PlanLimits> = {
 };
 
 export function getPlanLimits(plan: HostPlan | string): PlanLimits {
+  const { BETA_MODE } = require('./betaConfig');
+  if (BETA_MODE) {
+    const original = PLAN_LIMITS[plan] ?? PLAN_LIMITS.free;
+    return { ...PLAN_LIMITS.business, plan: original.plan, label: original.label, price: '$0 (Beta)' };
+  }
   if (PLAN_LIMITS[plan]) return PLAN_LIMITS[plan];
   const base = (plan || '').replace(/^(agent_|company_)/, '');
   return PLAN_LIMITS[base] ?? PLAN_LIMITS.free;
@@ -422,6 +427,11 @@ export const AGENT_PLAN_LIMITS: Record<string, AgentPlanLimits> = {
 };
 
 export function getAgentPlanLimits(plan: string): AgentPlanLimits {
+  const { BETA_MODE } = require('./betaConfig');
+  if (BETA_MODE) {
+    const original = AGENT_PLAN_LIMITS[plan] ?? AGENT_PLAN_LIMITS.pay_per_use;
+    return { ...AGENT_PLAN_LIMITS.agent_business, plan: original.plan, label: original.label, monthlyPrice: '$0 (Beta)' };
+  }
   return AGENT_PLAN_LIMITS[plan] ?? AGENT_PLAN_LIMITS.pay_per_use;
 }
 

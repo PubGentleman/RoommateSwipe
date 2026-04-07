@@ -73,6 +73,7 @@ import { generateAlgorithmicInsights, selectCardInsight, getEnhancedInsight, Qui
 import { getCachedOrGenerateInsight, getCachedDeckRanking } from '../../services/piMatchingService';
 import { DailyQuestionCard } from '../../components/DailyQuestionCard';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { BETA_MODE } from '../../constants/betaConfig';
 import { getCompletionPercentage } from '../../utils/profileReminderUtils';
 import { createErrorHandler } from '../../utils/errorLogger';
 
@@ -321,7 +322,7 @@ export const RoommatesScreen = () => {
     startSession();
   }, []);
 
-  const canSeeAIMatch = user?.plan === 'plus' || user?.plan === 'elite';
+  const canSeeAIMatch = BETA_MODE || user?.plan === 'plus' || user?.plan === 'elite';
   useEffect(() => {
     if (canSeeAIMatch && user) {
       getBestMatchToday(user.id).then(result => {
@@ -2291,12 +2292,12 @@ export const RoommatesScreen = () => {
         </Pressable>
         <Animated.View style={superInterestBtnStyle} ref={roommatesTour.setRef('superLike')} collapsable={false}>
           <Pressable
-            style={[styles.actionBtnSuperInterest, getSuperInterestCount() === 0 && user?.subscription?.plan !== 'elite' ? { opacity: 0.4 } : null]}
+            style={[styles.actionBtnSuperInterest, getSuperInterestCount() === 0 && !BETA_MODE && user?.subscription?.plan !== 'elite' ? { opacity: 0.4 } : null]}
             onPress={handleSuperInterest}
           >
             <LinearGradient colors={['#4A90E2', '#1a5fc4']} style={styles.actionBtnSuperInterestGradient}>
               <Feather name="star" size={24} color="#fff" />
-              {getSuperInterestCount() === 0 && user?.subscription?.plan !== 'elite' ? (
+              {getSuperInterestCount() === 0 && !BETA_MODE && user?.subscription?.plan !== 'elite' ? (
                 <View style={styles.superInterestLockBadge}>
                   <Feather name="lock" size={10} color="#fff" />
                 </View>
@@ -2329,7 +2330,7 @@ export const RoommatesScreen = () => {
         compatibility={matchedProfileData?.compatibility}
         matchedUserInstagramVerified={matchedProfileData?.profile?.instagram_verified}
         matchedUserInstagramHandle={matchedProfileData?.profile?.instagram_handle}
-        viewerHasPremium={user?.subscription?.plan === 'plus' || user?.subscription?.plan === 'elite'}
+        viewerHasPremium={BETA_MODE || user?.subscription?.plan === 'plus' || user?.subscription?.plan === 'elite'}
         onUpgradePress={() => setShowPaywall(true)}
         onSendMessage={async () => {
           const profile = matchedProfileData?.profile;
@@ -3153,7 +3154,7 @@ export const RoommatesScreen = () => {
                     );
                   })()}
 
-                  {user && currentProfile.zodiacSign && user.zodiacSign && (user.subscription?.plan === 'plus' || user.subscription?.plan === 'elite') ? (
+                  {user && currentProfile.zodiacSign && user.zodiacSign && (BETA_MODE || user.subscription?.plan === 'plus' || user.subscription?.plan === 'elite') ? (
                     <View style={styles.pdSection}>
                       <Text style={styles.pdSectionLabel}>Zodiac Compatibility</Text>
                       <View style={styles.pdCard}>

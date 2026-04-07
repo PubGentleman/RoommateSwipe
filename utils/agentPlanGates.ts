@@ -62,6 +62,11 @@ const AGENT_PLAN_LIMITS: Record<string, AgentPlanLimits> = {
 };
 
 export function getAgentLimits(plan: string): AgentPlanLimits {
+  const { BETA_MODE } = require('../constants/betaConfig');
+  if (BETA_MODE) {
+    const original = AGENT_PLAN_LIMITS[plan] || AGENT_PLAN_LIMITS.pay_per_use;
+    return { ...AGENT_PLAN_LIMITS.agent_business, plan: original.plan as AgentPlan, label: original.label };
+  }
   return AGENT_PLAN_LIMITS[plan] || AGENT_PLAN_LIMITS.pay_per_use;
 }
 

@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { User } from '../types/models';
+import { BETA_MODE } from '../constants/betaConfig';
 
 export const COLD_MESSAGE_LIMITS: Record<string, number> = {
   basic: 3,
@@ -8,6 +9,7 @@ export const COLD_MESSAGE_LIMITS: Record<string, number> = {
 };
 
 export function getDailyColdMessageLimit(plan: string): number {
+  if (BETA_MODE) return Infinity;
   return COLD_MESSAGE_LIMITS[plan] ?? 3;
 }
 
@@ -52,7 +54,8 @@ export const canSendMessage = (
   user: User,
   plan: 'basic' | 'plus' | 'elite'
 ): { allowed: boolean; reason?: string } => {
-  const limits = MESSAGING_LIMITS[plan];
+  const effectivePlan = BETA_MODE ? 'elite' : plan;
+  const limits = MESSAGING_LIMITS[effectivePlan];
 
   const today = new Date().toISOString().split('T')[0];
   const resetDate = user.messagingData?.dailyMessageResetDate?.split('T')[0];
@@ -60,7 +63,7 @@ export const canSendMessage = (
     ? (user.messagingData?.dailyMessageCount ?? 0)
     : 0;
 
-  if (plan !== 'elite' && dailyCount >= limits.dailyMessages) {
+  if (effectivePlan !== 'elite' && dailyCount >= limits.dailyMessages) {
     return {
       allowed: false,
       reason: 'daily_limit',
@@ -74,7 +77,7 @@ export const canStartNewChat = (
   user: User,
   plan: 'basic' | 'plus' | 'elite'
 ): { allowed: boolean; reason?: string } => {
-  const limits = MESSAGING_LIMITS[plan];
+  const limits = MESSAGING_LIMITS[BETA_MODE ? 'elite' : plan];
   const activeChats = user.messagingData?.activeChatsCount ?? 0;
 
   if (activeChats >= limits.activeChats) {
